@@ -13,7 +13,7 @@ use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata, FS};
 def_unity_class!(AudioClip, AudioClipObject);
 
 pub trait AudioClipObject: fmt::Debug {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>>;
+    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>>;
     fn get_name(&self) -> String;
 }
 

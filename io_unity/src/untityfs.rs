@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::fs::{File, OpenOptions};
-use std::io::{prelude::*, BufReader, SeekFrom};
+use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
 use std::path::PathBuf;
 
 use std::sync::{Arc, Mutex};
@@ -79,29 +79,29 @@ pub struct UnityFSFile {
 }
 
 impl UnityFS {
-    pub fn get_file_by_path(&self, path: String) -> Option<Vec<u8>> {
+    pub fn get_file_by_path(&self, path: String) -> std::io::Result<Vec<u8>> {
         for node in self.get_files() {
             if path == node.path() {
                 return self.get_file_by_node(node);
             }
         }
-        None
+        Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
-    fn get_file_by_node(&self, node: &Node) -> Option<Vec<u8>> {
+    fn get_file_by_node(&self, node: &Node) -> std::io::Result<Vec<u8>> {
         let mut compressed_data_offset = 0u64;
         let mut uncompressed_data_offset = 0u64;
         let mut file_block = Vec::new();
         for sb in &self.content.blocks_info.storage_blocks {
             if (uncompressed_data_offset + (sb.uncompressed_size as u64)) >= node.offset as u64 {
                 let mut blocks_infocompressedd_stream = vec![0u8; sb.compressed_size as usize];
-                self.file_reader.lock().unwrap().seek(SeekFrom::Start(
-                    compressed_data_offset + self.content.position,
-                ));
-                self.file_reader
-                    .lock()
-                    .unwrap()
-                    .read_exact(&mut blocks_infocompressedd_stream);
+                {
+                    let mut file_reader = self.file_reader.lock().unwrap();
+                    file_reader.seek(SeekFrom::Start(
+                        compressed_data_offset + self.content.position,
+                    ))?;
+                    file_reader.read_exact(&mut blocks_infocompressedd_stream)?;
+                }
 
                 let mut blocks_info_uncompressedd_stream = block_uncompressed(
                     sb.uncompressed_size as u64,
@@ -115,13 +115,13 @@ impl UnityFS {
                 }
                 file_block.extend(blocks_info_uncompressedd_stream);
                 if file_block.len() >= node.size as usize {
-                    return Some(file_block.split_at(node.size as usize).0.to_vec());
+                    return Ok(file_block.split_at(node.size as usize).0.to_vec());
                 }
             }
             compressed_data_offset += sb.compressed_size as u64;
             uncompressed_data_offset += sb.uncompressed_size as u64;
         }
-        None
+        Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
     pub fn get_files(&self) -> &Vec<Node> {
@@ -138,19 +138,19 @@ impl UnityFS {
         None
     }
 
-    pub fn get_cab(&self) -> Option<Vec<u8>> {
+    pub fn get_cab(&self) -> std::io::Result<Vec<u8>> {
         if let Some(path) = self.get_cab_path() {
             return self.get_file_by_path(path);
         }
-        None
+        Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
-    pub fn read(mut file: Box<dyn UnityResource + Send>, search_path: Option<String>) -> UnityFS {
-        UnityFS {
-            content: UnityFSFile::read(&mut file).unwrap(),
+    pub fn read(mut file: Box<dyn UnityResource + Send>, search_path: Option<String>) -> BinResult<UnityFS> {
+        Ok(UnityFS {
+            content: UnityFSFile::read(&mut file)?,
             file_reader: Arc::new(Mutex::new(file)),
             search_path,
-        }
+        })
     }
 }
 
@@ -168,27 +168,24 @@ impl FS for UnityFS {
         } else {
             &s
         };
-        if path.starts_with("archive:/") {
-            let file_name = PathBuf::from(path)
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned();
-            if let Some(file) = self.get_file_by_path(file_name) {
-                let file_reader = Cursor::new(file);
-                return Some(Box::new(file_reader));
-            }
-        } else {
-            let file_name = PathBuf::from(path)
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned();
-            let path = PathBuf::from(search_path).join(file_name);
-            if let Ok(file) = OpenOptions::new().read(true).open(path) {
-                return Some(Box::new(BufReader::new(file)));
+
+        if let Some(file_name) = PathBuf::from(&path)
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+        {
+            if path.starts_with("archive:/") {
+                if let Ok(file) = self.get_file_by_path(file_name) {
+                    let file_reader = Cursor::new(file);
+                    return Some(Box::new(file_reader));
+                }
+            } else {
+                let path = PathBuf::from(search_path).join(file_name);
+                if let Ok(file) = OpenOptions::new().read(true).open(path) {
+                    return Some(Box::new(BufReader::new(file)));
+                }
             }
         }
+
         None
     }
 }
@@ -198,7 +195,7 @@ fn block_uncompressed(
     flag: u32,
     blocks_infocompressedd_stream: Vec<u8>,
 ) -> Vec<u8> {
-    let mut blocks_info_uncompressedd_stream = Vec::with_capacity(uncompressed_size as usize);
+    let blocks_info_uncompressedd_stream;
     match CompressionType::try_from(flag & ArchiveFlags::CompressionTypeMask as u32) {
         Ok(tp) => match tp {
             CompressionType::None => {
@@ -269,19 +266,20 @@ fn blocks_info_parser<R: Read + Seek>(
     }
 
     if version >= 7 {
-        let pos = reader.seek(SeekFrom::Current(0)).unwrap();
+        let pos = reader.seek(SeekFrom::Current(0))?;
         if pos % 16 != 0 {
-            reader
-                .seek(SeekFrom::Current((16 - (pos % 16)) as i64))
-                .unwrap();
+            reader.seek(SeekFrom::Current((16 - (pos % 16)) as i64))?;
         }
     }
 
     let mut blocks_infocompressedd_stream = vec![0u8; compressed_blocks_info_size as usize];
-    reader.read_exact(&mut blocks_infocompressedd_stream);
+    reader.read_exact(&mut blocks_infocompressedd_stream)?;
 
     if (flags & ArchiveFlags::BlockInfoNeedPaddingAtStart as u32) != 0 {
-        todo!();
+        let pos = reader.seek(SeekFrom::Current(0))?;
+        if pos % 16 != 0 {
+            reader.seek(SeekFrom::Current((16 - (pos % 16)) as i64))?;
+        }
     }
 
     let blocks_info_uncompressedd_stream = block_uncompressed(
@@ -291,5 +289,5 @@ fn blocks_info_parser<R: Read + Seek>(
     );
 
     let mut blocks_info_reader = Cursor::new(blocks_info_uncompressedd_stream);
-    Ok(BlocksInfo::read(&mut blocks_info_reader).unwrap())
+    BlocksInfo::read(&mut blocks_info_reader)
 }

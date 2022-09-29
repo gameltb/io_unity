@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::io::{prelude::*, SeekFrom};
 
-use binrw::binrw;
+use binrw::{binrw, BinResult};
 use binrw::{BinRead, ReadOptions};
 
 use num_enum::TryFromPrimitive;
@@ -27,6 +27,7 @@ use crate::classes::skinned_mesh_renderer::SkinnedMeshRenderer;
 use crate::classes::texture_2d::Texture2D;
 use crate::classes::transform::Transform;
 use crate::classes::{Class, ClassIDType};
+use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs};
 use crate::until::{Endian, UnityVersion};
 use crate::UnityResource;
 
@@ -308,6 +309,7 @@ pub struct Object {
     byte_start: u64,
     byte_size: u32,
     pub class: ClassIDType,
+    type_id: usize,
 }
 
 pub struct SerializedFile {
@@ -325,8 +327,8 @@ impl fmt::Debug for SerializedFile {
 }
 
 impl SerializedFile {
-    pub fn read(mut reader: Box<dyn UnityResource + Send>) -> Option<Self> {
-        let head = SerializedFileCommonHeader::read(&mut reader).unwrap();
+    pub fn read(mut reader: Box<dyn UnityResource + Send>) -> BinResult<Self> {
+        let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0));
         let file: Box<dyn Serialized + Send> = match head.version {
             SerializedFileFormatVersion::Unsupported => todo!(),
@@ -345,14 +347,14 @@ impl SerializedFile {
             SerializedFileFormatVersion::SupportsStrippedObject => todo!(),
             SerializedFileFormatVersion::RefactoredClassId => todo!(),
             SerializedFileFormatVersion::RefactorTypeData => {
-                Box::new(version17::SerializedFile::read(&mut reader).unwrap())
+                Box::new(version17::SerializedFile::read(&mut reader)?)
             }
             SerializedFileFormatVersion::RefactorShareableTypeTreeData => todo!(),
             SerializedFileFormatVersion::TypeTreeNodeWithTypeFlags => todo!(),
             SerializedFileFormatVersion::SupportsRefObject => todo!(),
             SerializedFileFormatVersion::StoresTypeDependencies => todo!(),
             SerializedFileFormatVersion::LargeFilesSupport => {
-                Box::new(version22::SerializedFile::read(&mut reader).unwrap())
+                Box::new(version22::SerializedFile::read(&mut reader)?)
             }
         };
         let mut object_map = BTreeMap::new();
@@ -360,7 +362,7 @@ impl SerializedFile {
             let obj = file.get_raw_object_by_index(i as u32);
             object_map.insert(obj.path_id, obj);
         }
-        Some(SerializedFile {
+        Ok(SerializedFile {
             content: file,
             file_reader: RefCell::new(reader),
             object_map,
@@ -389,6 +391,16 @@ impl SerializedFile {
         }
         None
     }
+
+    pub fn get_tt_object_by_path_id(&self, path_id: i64) -> Option<TypeTreeObject> {
+        if let Some(obj) = self.object_map.get(&path_id) {
+            return Some(
+                self.content
+                    .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj),
+            );
+        }
+        None
+    }
 }
 
 pub trait Serialized: fmt::Debug {
@@ -396,6 +408,7 @@ pub trait Serialized: fmt::Debug {
     fn get_data_offset(&self) -> u64;
     fn get_endianess(&self) -> Endian;
     fn get_raw_object_by_index(&self, index: u32) -> Object;
+    fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs;
     fn get_object_count(&self) -> i32;
     fn get_version(&self) -> String;
     fn get_target_platform(&self) -> BuildTarget;
@@ -418,6 +431,28 @@ pub trait Serialized: fmt::Debug {
         self.get_object(reader, &obj)
     }
 
+    fn get_type_tree_object(
+        &self,
+        reader: &mut Box<dyn UnityResource + Send>,
+        obj: &Object,
+    ) -> TypeTreeObject {
+        let args = self.get_type_object_args_by_type_id(obj.type_id);
+        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start));
+
+        let options = ReadOptions::new(match self.get_endianess() {
+            Endian::Little => binrw::Endian::Little,
+            Endian::Big => binrw::Endian::Big,
+        });
+
+        let type_tree_object = TypeTreeObject::read_options(reader, &options, args).unwrap();
+        let apos = reader.seek(SeekFrom::Current(0)).unwrap();
+        assert_eq!(
+            apos - (self.get_data_offset() + obj.byte_start),
+            obj.byte_size as u64
+        );
+        type_tree_object
+    }
+
     fn get_object(
         &self,
         reader: &mut Box<dyn UnityResource + Send>,
@@ -430,57 +465,42 @@ pub trait Serialized: fmt::Debug {
             Endian::Big => binrw::Endian::Big,
         });
 
-        match obj.class {
-            ClassIDType::AssetBundle => Some(Class::AssetBundle(
-                AssetBundle::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::AudioClip => Some(Class::AudioClip(
-                AudioClip::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Texture2D => Some(Class::Texture2D(
-                Texture2D::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Mesh => Some(Class::Mesh(
-                Mesh::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Transform => Some(Class::Transform(
-                Transform::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::GameObject => Some(Class::GameObject(
-                GameObject::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::AnimationClip => Some(Class::AnimationClip(
-                AnimationClip::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::SkinnedMeshRenderer => Some(Class::SkinnedMeshRenderer(
-                SkinnedMeshRenderer::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::MeshRenderer => Some(Class::MeshRenderer(
-                MeshRenderer::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Material => Some(Class::Material(
-                Material::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::MeshFilter => Some(Class::MeshFilter(
-                MeshFilter::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::MonoBehaviour => Some(Class::MonoBehaviour(
-                MonoBehaviour::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::MonoScript => Some(Class::MonoScript(
-                MonoScript::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Animator => Some(Class::Animator(
-                Animator::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            ClassIDType::Avatar => Some(Class::Avatar(
-                Avatar::read_options(reader, &op, self.get_metadata()).unwrap(),
-            )),
-            _ => {
-                println!("{:?}", &obj.class);
-                None
-            }
+        #[macro_export]
+        macro_rules! cov_class {
+            ($($x:ident($y:path)),+) => {
+                match obj.class {
+                    $(ClassIDType::$x => {
+                            if let Ok(o) = $x::read_options(reader, &op, self.get_metadata()) {
+                                Some(Class::$x(o))
+                            } else {
+                                None
+                            }
+                        },)+
+                    _ => {
+                        println!("{:?}", &obj.class);
+                        None
+                    }
+                }
+            };
         }
+
+        cov_class!(
+            AssetBundle(asset_bundle::AssetBundle),
+            AudioClip(audio_clip::AudioClip),
+            Texture2D(texture_2d::Texture2D),
+            Mesh(mesh::Mesh),
+            Transform(transform::Transform),
+            GameObject(game_object::GameObject),
+            AnimationClip(animation_clip::AnimationClip),
+            SkinnedMeshRenderer(skinned_mesh_renderer::SkinnedMeshRenderer),
+            MeshRenderer(mesh_renderer::MeshRenderer),
+            Material(material::Material),
+            MeshFilter(mesh_filter::MeshFilter),
+            MonoBehaviour(mono_behaviour::MonoBehaviour),
+            MonoScript(mono_script::MonoScript),
+            Animator(animator::Animator),
+            Avatar(avatar::Avatar)
+        )
     }
 
     fn get_asset_bundle(&self, reader: &mut Box<dyn UnityResource + Send>) -> Option<Class> {

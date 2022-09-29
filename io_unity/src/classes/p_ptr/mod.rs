@@ -24,7 +24,7 @@ impl BinRead for PPtr {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        if args.version as i32 >= 14 {
+        if args.version.clone() as i32 >= 14 {
             return Ok(PPtr(Box::new(version14::PPtr::read_options(
                 reader, options, args,
             )?)));

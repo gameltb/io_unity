@@ -60,7 +60,7 @@ pub enum Class {
     Avatar(avatar::Avatar),
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive)]
 #[repr(i32)]
 pub enum ClassIDType {
     UnknownType = -1,

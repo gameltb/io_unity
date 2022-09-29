@@ -5,11 +5,11 @@ io_unity is a lib for read unity assets, which supports parsing UnityFS file now
 
 ## example
 
-[lib/io_unity/examples/fsdump.rs](lib/io_unity/examples/fsdump.rs)
+[io_unity/examples/fsdump.rs](io_unity/examples/fsdump.rs)
 
 ## simple python bind
 
-[lib/io_unity_python](lib/io_unity_python/README.md)
+[io_unity_python](io_unity_python/README.md)
 
-[simple python](lib/io_unity_python/blender.py) for blender import mesh (skeleton not work)
+[simple python](io_unity_python/blender.py) for blender import mesh (skeleton not work)
 

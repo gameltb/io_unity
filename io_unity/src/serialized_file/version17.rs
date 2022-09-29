@@ -7,6 +7,7 @@ use binrw::{binrw, NullString};
 use binrw::{io::Cursor, BinRead};
 
 use crate::classes::ClassIDType;
+use crate::type_tree::TypeTreeObjectBinReadArgs;
 use crate::until::{binrw_parser::*, Endian};
 use crate::Serialized;
 
@@ -43,6 +44,7 @@ impl Serialized for SerializedFile {
             byte_start: obj.byte_start as u64,
             byte_size: obj.byte_size,
             class: ClassIDType::try_from(obj.get_type(&self.content.types).class_id).unwrap(),
+            type_id: obj.type_id as usize,
         }
     }
 
@@ -56,6 +58,10 @@ impl Serialized for SerializedFile {
 
     fn get_target_platform(&self) -> BuildTarget {
         self.content.target_platform.clone()
+    }
+
+    fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
+        todo!()
     }
 }
 
@@ -107,7 +113,7 @@ struct TypeTree {
 
 impl fmt::Debug for TypeTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut StringReader = Cursor::new(self.string_buffer.clone());
+        let mut string_reader = Cursor::new(&self.string_buffer);
 
         write!(f, "TypeTree [")?;
         if f.alternate() {
@@ -118,8 +124,8 @@ impl fmt::Debug for TypeTree {
                 f,
                 "{:?} -> {{ type: {}, name: {} }},",
                 node,
-                node.get_type_str(&mut StringReader),
-                node.get_name_str(&mut StringReader)
+                node.get_type_str(&mut string_reader),
+                node.get_name_str(&mut string_reader)
             )?;
             if f.alternate() {
                 write!(f, "\n")?;

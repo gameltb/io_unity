@@ -21,7 +21,8 @@ impl BinRead for Material {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        if args.unity_version >= UnityVersion::new(vec![5, 6], None) {
+        if args.unity_version >= UnityVersion::new(vec![2021, 2], None) {
+        } else if args.unity_version >= UnityVersion::new(vec![5, 6], None) {
             return Ok(Material(Box::new(version_5_6_0::Material::read_options(
                 reader, options, args,
             )?)));

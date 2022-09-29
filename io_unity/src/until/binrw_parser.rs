@@ -9,7 +9,7 @@ use binrw::{BinRead, BinWrite};
 // reading/writing utilities
 
 pub fn position_parser<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<u64> {
-    Ok(reader.seek(SeekFrom::Current(0)).unwrap())
+    Ok(reader.seek(SeekFrom::Current(0))?)
 }
 
 pub fn endian_parser<R: Read + Seek>(

@@ -3,6 +3,7 @@ extern crate io_unity;
 use std::{
     fs::OpenOptions,
     io::{BufReader, Cursor},
+    path::Path,
 };
 
 use io_unity::classes::ClassIDType;
@@ -10,7 +11,29 @@ use io_unity::classes::ClassIDType;
 use io_unity::*;
 
 fn main() {
-    let filepath = "unityfs.ab";
+    let path = "/tmp/files/AssetBundle/";
+    let dirs = std::fs::read_dir(path).unwrap();
+    for entry in dirs {
+        if let Ok(entry) = entry {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file()
+                    && entry
+                        .path()
+                        .to_string_lossy()
+                        .to_lowercase()
+                        .ends_with(".bundle")
+                {
+                    println!("{}", entry.path().display());
+                    handle(entry.path());
+                }
+            } else {
+                println!("Couldn't get file type for {:?}", entry.path());
+            }
+        }
+    }
+}
+
+fn handle<P: AsRef<Path>>(filepath: P) {
     let file = OpenOptions::new().read(true).open(filepath).unwrap();
     let file = BufReader::new(file);
 
@@ -25,20 +48,31 @@ fn main() {
 
     let cabfile_reader = Box::new(Cursor::new(cabfile));
     let s = SerializedFile::read(cabfile_reader).unwrap();
-    println!("{:#?}", s.get_object_count());
+    // println!("{:#?}", s);
 
-    let fs = Box::new(oval) as Box<dyn FS>;
-
+    let mut fs = Box::new(oval) as Box<dyn FS>;
+    let mut viewed = Vec::new();
     for (pathid, obj) in s.get_object_map() {
-        // if obj.class == ClassIDType::Texture2D {
-        //     if let Some(classes::Class::Texture2D(tex)) =
-        //         s.get_object_by_path_id(pathid.to_owned())
-        //     {
-        //         tex.get_image(&mut fs)
-        //             .and_then(|t| Some(t.flipv().save(tex.get_image_name() + ".png")));
-        //     }
-        // }
-        // continue;
+        if obj.class == ClassIDType::Texture2D {
+            if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
+            {
+                println!("{:#?}", &tex);
+                tex.get_image(&mut fs).and_then(|t| {
+                    Some(
+                        t.flipv()
+                            .save("/tmp/tex/".to_string() + &tex.get_image_name() + ".png"),
+                    )
+                });
+            }
+        }
+        if !viewed.contains(&obj.class) {
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            tt_o.display_tree();
+            println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+            // println!("{:#?}", s.get_tt_object_by_path_id(*pathid));
+            viewed.push(obj.class.clone());
+        }
+        continue;
         if obj.class == ClassIDType::SkinnedMeshRenderer {
             println!("{:#?}", pathid);
             // continue;

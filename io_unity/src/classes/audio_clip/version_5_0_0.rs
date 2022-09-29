@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use std::io::{prelude::*, SeekFrom};
+use std::io::{prelude::*, SeekFrom, ErrorKind};
 
 use binrw::binrw;
 
@@ -12,18 +12,18 @@ use crate::{SerializedFileMetadata, FS};
 use super::AudioClipObject;
 
 impl AudioClipObject for AudioClip {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
         if let Some(data) = &self.audio_data {
-            return Some(Cow::Borrowed(data));
+            return Ok(Cow::Borrowed(data));
         } else {
             if let Some(mut file) = fs.get_resource_file_by_path(self.source.to_string(), None) {
-                file.seek(SeekFrom::Start(self.offset as u64));
+                file.seek(SeekFrom::Start(self.offset as u64))?;
                 let mut data = vec![0u8; self.size as usize];
-                file.read_exact(&mut data);
-                return Some(Cow::Owned(data));
+                file.read_exact(&mut data)?;
+                return Ok(Cow::Owned(data));
             }
         }
-        None
+        Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
     fn get_name(&self) -> String {

@@ -55,22 +55,17 @@ impl UnityFS {
     pub fn readfs(path: String) -> PyResult<Self> {
         let file_path = PathBuf::from(&path)
             .parent()
-            .and_then(|p| Some(p.to_string_lossy().into_owned()))
-            .unwrap_or(".".to_owned());
+            .and_then(|p| Some(p.to_string_lossy().into_owned()));
         let file = OpenOptions::new().read(true).open(path)?;
         let file = BufReader::new(file);
-        Ok(UnityFS(io_unity::UnityFS::read(
-            Box::new(file),
-            Some(file_path),
-        )))
+        Ok(UnityFS(
+            io_unity::UnityFS::read(Box::new(file), file_path)
+                .or(Err(pyo3::exceptions::PyException::new_err("")))?,
+        ))
     }
 
     pub fn get_cab(&self) -> PyResult<SerializedFile> {
-        Ok(SerializedFile::read(
-            self.0
-                .get_cab()
-                .ok_or(pyo3::exceptions::PyException::new_err(""))?,
-        )?)
+        Ok(SerializedFile::read(self.0.get_cab()?)?)
     }
 }
 
@@ -79,9 +74,10 @@ impl SerializedFile {
     #[staticmethod]
     pub fn read(cabfile: Vec<u8>) -> PyResult<Self> {
         let cabfile_reader = Box::new(Cursor::new(cabfile));
-        let file = io_unity::SerializedFile::read(cabfile_reader)
-            .ok_or(pyo3::exceptions::PyException::new_err(""))?;
-        Ok(SerializedFile(file))
+        Ok(SerializedFile(
+            io_unity::SerializedFile::read(cabfile_reader)
+                .or(Err(pyo3::exceptions::PyException::new_err("")))?,
+        ))
     }
 
     pub fn get_object_count(&self) -> i32 {
@@ -98,7 +94,7 @@ impl SerializedFile {
             io_unity::classes::Class::AudioClip(ac) => AudioClip(ac).into_py(py),
             io_unity::classes::Class::Texture2D(tex) => Texture2D(tex).into_py(py),
             io_unity::classes::Class::Mesh(mesh) => Mesh(mesh).into_py(py),
-            _ => todo!(),
+            _ => return Err(pyo3::exceptions::PyException::new_err("")),
         };
         Ok(obj)
     }
@@ -113,7 +109,7 @@ impl SerializedFile {
                     .ok_or(pyo3::exceptions::PyException::new_err(""))?
                 {
                     $(io_unity::classes::Class::$x(o) => $x(o).into_py(py),)+
-                };
+                }
             };
         }
 
@@ -184,11 +180,7 @@ impl Mesh {
 impl AudioClip {
     fn get_audio_data(&self, py: Python, fs: &PyCell<UnityFS>) -> PyResult<PyObject> {
         let mut fs = Box::new(fs.try_borrow_mut()?.0.clone()) as Box<dyn io_unity::FS>;
-        let data = self
-            .0
-            .get_audio_data(&mut fs)
-            .ok_or(pyo3::exceptions::PyException::new_err(""))?
-            .to_owned();
+        let data = self.0.get_audio_data(&mut fs)?.to_owned();
         Ok(PyBytes::new(py, &data).into())
     }
 
