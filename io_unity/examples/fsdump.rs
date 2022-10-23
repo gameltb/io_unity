@@ -37,7 +37,7 @@ fn handle<P: AsRef<Path>>(filepath: P) {
     let file = OpenOptions::new().read(true).open(filepath).unwrap();
     let file = BufReader::new(file);
 
-    let oval = UnityFS::read(Box::new(file), None);
+    let oval = UnityFS::read(Box::new(file), None).unwrap();
     for p in oval.get_files() {
         println!("{}", p.path());
     }
