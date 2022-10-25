@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use std::io::{prelude::*, SeekFrom, ErrorKind};
+use std::io::{prelude::*, ErrorKind, SeekFrom};
 
 use binrw::binrw;
 

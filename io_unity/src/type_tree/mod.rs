@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Debug,
     io::{Cursor, Read, Seek, SeekFrom},
     sync::Arc,
@@ -14,7 +15,7 @@ pub trait TypeField: Debug {
     fn get_index(&self) -> i32;
     fn get_meta_flag(&self) -> i32;
     fn is_align(&self) -> bool;
-    fn get_ref_type_hash(&self) -> u64;
+    fn get_ref_type_hash(&self) -> Option<u64>;
     fn get_type(&self) -> &String;
     fn get_name(&self) -> &String;
 }
@@ -48,7 +49,7 @@ pub enum FieldValue {
 pub struct ArrayField {
     array_size: Field,
     item_type_fields: Vec<Arc<Box<dyn TypeField + Send>>>,
-    data: Vec<Field>,
+    data: FieldValue,
 }
 
 #[derive(Debug)]
@@ -75,8 +76,10 @@ impl Field {
             FieldValue::Fields(fls) => fls.into_iter().map(|f| f.display_field(&np)).collect(),
             FieldValue::Array(ar) => {
                 ar.array_size.display_field(&np);
-                if let Some(ai) = ar.data.get(0) {
-                    ai.display_field(&np);
+                if let FieldValue::Fields(ai) = &ar.data {
+                    if let Some(aii) = ai.get(0) {
+                        aii.display_field(&np);
+                    }
                 }
             }
         }
@@ -92,7 +95,7 @@ impl Field {
                         if let Some(array) = fields.get(0) {
                             if let Some(data) = array.get_array() {
                                 return Some(Value::String(
-                                    String::from_utf8(data.concat()).unwrap(),
+                                    String::from_utf8(data.to_vec()).unwrap(),
                                 ));
                             }
                         }
@@ -110,29 +113,18 @@ impl Field {
                         }
                     }
                 }
-                FieldValue::Array(array) => todo!(),
+                FieldValue::Array(_array) => todo!(),
                 _ => (),
             }
         }
         None
     }
 
-    fn get_array(&self) -> Option<Vec<Vec<u8>>> {
+    fn get_array(&self) -> Option<Cow<Vec<u8>>> {
         if let FieldValue::Array(array) = &self.data {
-            let data: Vec<Option<Vec<u8>>> = array
-                .data
-                .iter()
-                .map(|f| {
-                    if let FieldValue::Data(data) = &f.data {
-                        return Some(data.clone());
-                    }
-                    None
-                })
-                .collect();
-            if data.get(0).is_some() && data.get(0).unwrap().is_some() {
-                return Some(data.into_iter().map(|f| f.unwrap()).collect());
+            if let FieldValue::Data(array_data) = &array.data {
+                return Some(Cow::Borrowed(&array_data));
             }
-            return None;
         }
         None
     }
@@ -203,7 +195,6 @@ impl BinRead for TypeTreeObject {
                     _ => unreachable!(),
                 });
                 let size = <u32>::read_options(&mut size_reader, options, ())?;
-                let mut array = Vec::new();
                 *field_index += 1;
                 let item_field_index = *field_index;
                 let item_type_field = type_fields.get(item_field_index).unwrap();
@@ -219,21 +210,46 @@ impl BinRead for TypeTreeObject {
                     *field_index += 1;
                 }
 
-                for _ in 0..size as usize {
-                    *field_index = item_field_index;
-                    array.push(read(reader, options, type_fields, field_index)?);
-                }
+                if item_type_fields.len() == 1 {
+                    let array = <Vec<u8>>::read_options(
+                        reader,
+                        options,
+                        VecArgs {
+                            count: item_type_fields.get(0).unwrap().get_byte_size() as usize
+                                * size as usize,
+                            inner: (),
+                        },
+                    )?;
 
-                Field {
-                    field_type: field.clone(),
-                    data: FieldValue::Array(
-                        ArrayField {
-                            array_size: size_field,
-                            item_type_fields,
-                            data: array,
-                        }
-                        .into(),
-                    ),
+                    Field {
+                        field_type: field.clone(),
+                        data: FieldValue::Array(
+                            ArrayField {
+                                array_size: size_field,
+                                item_type_fields,
+                                data: FieldValue::Data(array),
+                            }
+                            .into(),
+                        ),
+                    }
+                } else {
+                    let mut array = Vec::new();
+                    for _ in 0..size as usize {
+                        *field_index = item_field_index;
+                        array.push(read(reader, options, type_fields, field_index)?);
+                    }
+
+                    Field {
+                        field_type: field.clone(),
+                        data: FieldValue::Array(
+                            ArrayField {
+                                array_size: size_field,
+                                item_type_fields,
+                                data: FieldValue::Fields(array),
+                            }
+                            .into(),
+                        ),
+                    }
                 }
             } else if let Some(next_field) = type_fields.get(*field_index + 1) {
                 if next_field.get_level() == field_level + 1 {

@@ -59,7 +59,7 @@ pub trait Texture2DObject: fmt::Debug {
                         TextureFormat::BC7 => todo!(),
                         TextureFormat::DXT1Crunched => todo!(),
                         TextureFormat::DXT5Crunched => todo!(),
-                        _ => todo!(),
+                        _ => unreachable!(),
                     }
                     let result = RgbaImage::from_raw(width as u32, height as u32, output).unwrap();
                     return Some(DynamicImage::ImageRgba8(result));
@@ -105,7 +105,7 @@ pub trait Texture2DObject: fmt::Debug {
                         TextureFormat::ASTC_RGB_12x12
                         | TextureFormat::ASTC_RGBA_12x12
                         | TextureFormat::ASTC_HDR_12x12 => astc_decode::Footprint::new(12, 12),
-                        _ => todo!(),
+                        _ => unreachable!(),
                     };
                     astc_decode::astc_decode(
                         &**data,

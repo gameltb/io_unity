@@ -231,7 +231,7 @@ impl SkinnedMeshRenderer {
                     .get_bones()
                     .into_iter()
                     .enumerate()
-                    .find(|(index, itbone)| {
+                    .find(|(_index, itbone)| {
                         itbone.get_path_id() == bone.get_father().get_path_id()
                     });
                 bone_father_index_buff.push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));

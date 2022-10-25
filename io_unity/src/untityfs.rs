@@ -107,7 +107,7 @@ impl UnityFS {
                     sb.uncompressed_size as u64,
                     sb.flags as u32,
                     blocks_infocompressedd_stream,
-                );
+                )?;
                 if uncompressed_data_offset < node.offset as u64 {
                     blocks_info_uncompressedd_stream = blocks_info_uncompressedd_stream
                         [(node.offset as u64 - uncompressed_data_offset) as usize..]
@@ -145,7 +145,10 @@ impl UnityFS {
         Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
-    pub fn read(mut file: Box<dyn UnityResource + Send>, search_path: Option<String>) -> BinResult<UnityFS> {
+    pub fn read(
+        mut file: Box<dyn UnityResource + Send>,
+        search_path: Option<String>,
+    ) -> BinResult<UnityFS> {
         Ok(UnityFS {
             content: UnityFSFile::read(&mut file)?,
             file_reader: Arc::new(Mutex::new(file)),
@@ -194,7 +197,7 @@ fn block_uncompressed(
     uncompressed_size: u64,
     flag: u32,
     blocks_infocompressedd_stream: Vec<u8>,
-) -> Vec<u8> {
+) -> std::io::Result<Vec<u8>> {
     let blocks_info_uncompressedd_stream;
     match CompressionType::try_from(flag & ArchiveFlags::CompressionTypeMask as u32) {
         Ok(tp) => match tp {
@@ -206,14 +209,13 @@ fn block_uncompressed(
                 blocks_info_uncompressedd_stream = decompress(
                     &blocks_infocompressedd_stream,
                     Some(uncompressed_size as i32),
-                )
-                .unwrap();
+                )?;
             }
             CompressionType::Lzham => todo!(),
         },
         Err(_) => todo!(),
     }
-    blocks_info_uncompressedd_stream
+    Ok(blocks_info_uncompressedd_stream)
 }
 
 #[binrw]
@@ -286,7 +288,7 @@ fn blocks_info_parser<R: Read + Seek>(
         uncompressed_blocks_info_size as u64,
         flags,
         blocks_infocompressedd_stream,
-    );
+    )?;
 
     let mut blocks_info_reader = Cursor::new(blocks_info_uncompressedd_stream);
     BlocksInfo::read(&mut blocks_info_reader)

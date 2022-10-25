@@ -329,7 +329,7 @@ impl fmt::Debug for SerializedFile {
 impl SerializedFile {
     pub fn read(mut reader: Box<dyn UnityResource + Send>) -> BinResult<Self> {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
-        reader.seek(SeekFrom::Start(0));
+        reader.seek(SeekFrom::Start(0))?;
         let file: Box<dyn Serialized + Send> = match head.version {
             SerializedFileFormatVersion::Unsupported => todo!(),
             SerializedFileFormatVersion::Unknown_2 => todo!(),
@@ -404,21 +404,21 @@ impl SerializedFile {
 }
 
 pub trait Serialized: fmt::Debug {
-    fn get_serialized_file_header(&self) -> &SerializedFileCommonHeader;
+    fn get_serialized_file_version(&self) -> &SerializedFileFormatVersion;
     fn get_data_offset(&self) -> u64;
-    fn get_endianess(&self) -> Endian;
+    fn get_endianess(&self) -> &Endian;
     fn get_raw_object_by_index(&self, index: u32) -> Object;
     fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs;
     fn get_object_count(&self) -> i32;
-    fn get_version(&self) -> String;
-    fn get_target_platform(&self) -> BuildTarget;
+    fn get_unity_version(&self) -> String;
+    fn get_target_platform(&self) -> &BuildTarget;
 
     fn get_metadata(&self) -> SerializedFileMetadata {
         SerializedFileMetadata {
-            version: self.get_serialized_file_header().version.clone(),
-            endianess: self.get_endianess(),
-            unity_version: UnityVersion::from_str(&self.get_version()).unwrap(),
-            target_platform: self.get_target_platform(),
+            version: self.get_serialized_file_version().clone(),
+            endianess: self.get_endianess().clone(),
+            unity_version: UnityVersion::from_str(&self.get_unity_version()).unwrap(),
+            target_platform: self.get_target_platform().clone(),
         }
     }
 

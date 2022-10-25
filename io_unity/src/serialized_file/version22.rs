@@ -1,19 +1,19 @@
-use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 
-use std::io::{prelude::*, SeekFrom};
+use std::io::prelude::*;
 use std::sync::Arc;
 
+use binrw::io::Cursor;
 use binrw::{binrw, NullString};
-use binrw::{io::Cursor, BinRead};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObject, TypeTreeObjectBinReadArgs};
+use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::{binrw_parser::*, Endian};
-use crate::Serialized;
+use crate::version17::read_type_tree_string;
+use crate::{Serialized, SerializedFileFormatVersion};
 
-use super::{BuildTarget, SerializedFileCommonHeader, COMMON_STRING}; // reading/writing utilities
+use super::{BuildTarget, SerializedFileCommonHeader}; // reading/writing utilities
 
 #[binrw]
 #[br(big)]
@@ -38,16 +38,16 @@ pub struct SerializedFile {
 }
 
 impl Serialized for SerializedFile {
-    fn get_serialized_file_header(&self) -> &SerializedFileCommonHeader {
-        &self.header
+    fn get_serialized_file_version(&self) -> &SerializedFileFormatVersion {
+        &self.header.version
     }
 
     fn get_data_offset(&self) -> u64 {
         self.header2.data_offset
     }
 
-    fn get_endianess(&self) -> Endian {
-        self.endianess.clone()
+    fn get_endianess(&self) -> &Endian {
+        &self.endianess
     }
 
     fn get_raw_object_by_index(&self, index: u32) -> super::Object {
@@ -65,12 +65,12 @@ impl Serialized for SerializedFile {
         self.content.object_count
     }
 
-    fn get_version(&self) -> String {
+    fn get_unity_version(&self) -> String {
         self.content.unity_version.to_string()
     }
 
-    fn get_target_platform(&self) -> BuildTarget {
-        self.content.target_platform.clone()
+    fn get_target_platform(&self) -> &BuildTarget {
+        &self.content.target_platform
     }
 
     fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
@@ -191,16 +191,6 @@ impl TypeTreeNodeBlob {
     }
 }
 
-fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
-    let is_offset = (value & 0x80000000) == 0;
-    if is_offset {
-        reader.seek(SeekFrom::Start(value.into()));
-        return NullString::read(reader).unwrap().to_string();
-    }
-    let offset = value & 0x7FFFFFFF;
-    COMMON_STRING.get(&offset).unwrap_or(&"").to_string()
-}
-
 #[binrw]
 #[derive(Debug, PartialEq)]
 struct Object {
@@ -283,8 +273,8 @@ impl TypeField for TypeTreeNode {
         self.node.meta_flag & 0x4000 > 0
     }
 
-    fn get_ref_type_hash(&self) -> u64 {
-        self.node.ref_type_hash
+    fn get_ref_type_hash(&self) -> Option<u64> {
+        Some(self.node.ref_type_hash)
     }
 
     fn get_type(&self) -> &String {

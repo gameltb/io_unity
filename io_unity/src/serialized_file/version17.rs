@@ -2,14 +2,15 @@ use std::convert::TryFrom;
 use std::fmt;
 
 use std::io::{prelude::*, SeekFrom};
+use std::sync::Arc;
 
 use binrw::{binrw, NullString};
 use binrw::{io::Cursor, BinRead};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::TypeTreeObjectBinReadArgs;
+use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::{binrw_parser::*, Endian};
-use crate::Serialized;
+use crate::{Serialized, SerializedFileFormatVersion};
 
 use super::{BuildTarget, SerializedFileCommonHeader, COMMON_STRING}; // reading/writing utilities
 
@@ -25,16 +26,16 @@ pub struct SerializedFile {
 }
 
 impl Serialized for SerializedFile {
-    fn get_serialized_file_header(&self) -> &SerializedFileCommonHeader {
-        &self.header
+    fn get_serialized_file_version(&self) -> &SerializedFileFormatVersion {
+        &self.header.version
     }
 
     fn get_data_offset(&self) -> u64 {
         self.header.data_offset as u64
     }
 
-    fn get_endianess(&self) -> Endian {
-        self.endianess.clone()
+    fn get_endianess(&self) -> &Endian {
+        &self.endianess
     }
 
     fn get_raw_object_by_index(&self, index: u32) -> super::Object {
@@ -52,16 +53,29 @@ impl Serialized for SerializedFile {
         self.content.object_count
     }
 
-    fn get_version(&self) -> String {
+    fn get_unity_version(&self) -> String {
         self.content.unity_version.to_string()
     }
 
-    fn get_target_platform(&self) -> BuildTarget {
-        self.content.target_platform.clone()
+    fn get_target_platform(&self) -> &BuildTarget {
+        &self.content.target_platform
     }
 
     fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
-        todo!()
+        let stypetree = &self.content.types.get(type_id).unwrap();
+        let type_tree = stypetree.type_tree.as_ref().unwrap();
+        let mut type_fields = Vec::new();
+        let mut string_reader = Cursor::new(&type_tree.string_buffer);
+
+        for tp in &type_tree.type_tree_node_blobs {
+            type_fields.push(Arc::new(Box::new(TypeTreeNode {
+                name: tp.get_name_str(&mut string_reader),
+                type_name: tp.get_type_str(&mut string_reader),
+                node: tp.clone(),
+            }) as Box<dyn TypeField + Send>))
+        }
+
+        TypeTreeObjectBinReadArgs::new(stypetree.class_id, type_fields)
     }
 }
 
@@ -136,7 +150,7 @@ impl fmt::Debug for TypeTree {
 }
 
 #[binrw]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct TypeTreeNodeBlob {
     version: u16,
     level: u8,
@@ -158,14 +172,14 @@ impl TypeTreeNodeBlob {
     }
 }
 
-fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
+pub(super) fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
     let is_offset = (value & 0x80000000) == 0;
     if is_offset {
         reader.seek(SeekFrom::Start(value.into()));
         return NullString::read(reader).unwrap().to_string();
     }
     let offset = value & 0x7FFFFFFF;
-    COMMON_STRING.get(&offset).unwrap().to_string()
+    COMMON_STRING.get(&offset).unwrap_or(&"").to_string()
 }
 
 #[binrw]
@@ -199,4 +213,66 @@ struct FileIdentifier {
     guid: [u8; 16],
     r#type: i32,
     path: NullString,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TypeTreeNode {
+    name: String,
+    type_name: String,
+    node: TypeTreeNodeBlob,
+}
+
+impl TypeField for TypeTreeNode {
+    fn get_version(&self) -> u16 {
+        self.node.version
+    }
+
+    fn get_level(&self) -> u8 {
+        self.node.level
+    }
+    //0x01 : IsArray
+    //0x02 : IsRef
+    //0x04 : IsRegistry
+    //0x08 : IsArrayOfRefs
+    fn is_array(&self) -> bool {
+        self.node.type_flags & 1 > 0
+    }
+
+    fn get_byte_size(&self) -> i32 {
+        self.node.byte_size
+    }
+
+    fn get_index(&self) -> i32 {
+        self.node.index
+    }
+
+    //0x0001 : is invisible(?), set for m_FileID and m_PathID; ignored if no parent field exists or the type is neither ColorRGBA, PPtr nor string
+    //0x0100 : ? is bool
+    //0x1000 : ?
+    //0x4000 : align bytes
+    //0x8000 : any child has the align bytes flag
+    //=> if flags & 0xC000 and size != 0xFFFFFFFF, the size field matches the total length of this field plus its children.
+    //0x400000 : ?
+    //0x800000 : ? is non-primitive type
+    //0x02000000 : ? is UInt16 (called char)
+    //0x08000000 : has fixed buffer size? related to Array (i.e. this field or its only child or its father is an array), should be set for vector, Array and the size and data fields.
+    fn get_meta_flag(&self) -> i32 {
+        self.node.meta_flag
+    }
+
+    fn is_align(&self) -> bool {
+        self.node.meta_flag & 0x4000 > 0
+    }
+
+    fn get_ref_type_hash(&self) -> Option<u64> {
+        None
+    }
+
+    fn get_type(&self) -> &String {
+        &self.type_name
+    }
+
+    fn get_name(&self) -> &String {
+        &self.name
+    }
 }
