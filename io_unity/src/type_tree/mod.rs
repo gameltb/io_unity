@@ -211,12 +211,22 @@ impl BinRead for TypeTreeObject {
                 }
 
                 if item_type_fields.len() == 1 {
+                    let item_type = item_type_fields.get(0).unwrap();
+
+                    let mut byte_size = item_type.get_byte_size() as usize;
+
+                    if item_type.is_align() {
+                        let i = byte_size % 4;
+                        if i != 0 {
+                            byte_size = byte_size - i + 4
+                        }
+                    }
+
                     let array = <Vec<u8>>::read_options(
                         reader,
                         options,
                         VecArgs {
-                            count: item_type_fields.get(0).unwrap().get_byte_size() as usize
-                                * size as usize,
+                            count: byte_size * size as usize,
                             inner: (),
                         },
                     )?;
@@ -253,21 +263,21 @@ impl BinRead for TypeTreeObject {
                 }
             } else if let Some(next_field) = type_fields.get(*field_index + 1) {
                 if next_field.get_level() == field_level + 1 {
-                    let mut array = Vec::new();
+                    let mut fields = Vec::new();
                     while let Some(next_field) = type_fields.get(*field_index + 1) {
                         if next_field.get_level() == field_level + 1 {
                             *field_index += 1;
-                            array.push(read(reader, options, type_fields, field_index)?);
+                            fields.push(read(reader, options, type_fields, field_index)?);
                         } else if next_field.get_level() <= field_level {
                             break;
                         } else {
-                            panic!("{:#?} {:#?} ", next_field.get_level(), array);
+                            panic!("{:#?} {:#?} ", next_field.get_level(), fields);
                         }
                     }
 
                     Field {
                         field_type: field.clone(),
-                        data: FieldValue::Fields(array),
+                        data: FieldValue::Fields(fields),
                     }
                 } else {
                     Field::read_options(reader, options, field.clone())?

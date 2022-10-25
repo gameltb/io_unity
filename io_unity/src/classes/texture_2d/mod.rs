@@ -55,10 +55,10 @@ pub trait Texture2DObject: fmt::Debug {
                         TextureFormat::BC5 => {
                             texpresso::Format::Bc5.decompress(&data, width, height, &mut output)
                         }
-                        TextureFormat::BC6H => todo!(),
-                        TextureFormat::BC7 => todo!(),
-                        TextureFormat::DXT1Crunched => todo!(),
-                        TextureFormat::DXT5Crunched => todo!(),
+                        TextureFormat::BC6H |
+                        TextureFormat::BC7 |
+                        TextureFormat::DXT1Crunched |
+                        TextureFormat::DXT5Crunched => println!("unsupport {:?}", self.get_texture_format()),
                         _ => unreachable!(),
                     }
                     let result = RgbaImage::from_raw(width as u32, height as u32, output).unwrap();
