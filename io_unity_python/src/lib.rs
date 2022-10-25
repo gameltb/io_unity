@@ -180,7 +180,7 @@ impl Mesh {
 impl AudioClip {
     fn get_audio_data(&self, py: Python, fs: &PyCell<UnityFS>) -> PyResult<PyObject> {
         let mut fs = Box::new(fs.try_borrow_mut()?.0.clone()) as Box<dyn io_unity::FS>;
-        let data = self.0.get_audio_data(&mut fs)?.to_owned();
+        let data = self.0.get_audio_data(&mut fs)?;
         Ok(PyBytes::new(py, &data).into())
     }
 
