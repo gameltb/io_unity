@@ -2,14 +2,13 @@ use binrw::binrw;
 
 use num_enum::TryFromPrimitive;
 
-use crate::classes::named_object::NamedObject;
 use crate::until::binrw_parser::AlignedString;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 
 use super::MeshObject;
 
-impl NamedObject for Mesh {
+impl Mesh {
     fn get_name(&self) -> &AlignedString {
         &self.name
     }

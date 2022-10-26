@@ -20,12 +20,6 @@ pub trait AudioClipObject: fmt::Debug {
     fn get_name(&self) -> String;
 }
 
-impl AudioClip {
-    pub fn new(inner: TypeTreeObject) -> Self {
-        Self(Box::new(type_tree::AudioClip::new(inner)))
-    }
-}
-
 impl BinRead for AudioClip {
     type Args = SerializedFileMetadata;
 

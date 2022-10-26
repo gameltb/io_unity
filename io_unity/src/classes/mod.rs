@@ -3,9 +3,8 @@ pub mod audio_clip;
 pub mod component;
 pub mod editor_extension;
 pub mod mesh;
-pub mod named_object;
 pub mod p_ptr;
-pub mod texture_2d;
+pub mod texture2d;
 pub mod transform;
 // pub mod object;
 pub mod animation_clip;
@@ -38,6 +37,28 @@ macro_rules! def_unity_class {
                 &self.0
             }
         }
+
+        impl $x {
+            pub fn new(inner: TypeTreeObject) -> Self {
+                Self(Box::new(type_tree::$x::new(inner)))
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! def_type_tree_class {
+    (  $x:ident  ) => {
+        #[derive(Debug)]
+        pub struct $x {
+            inner: TypeTreeObject,
+        }
+
+        impl $x {
+            pub fn new(inner: TypeTreeObject) -> Self {
+                Self { inner }
+            }
+        }
     };
 }
 
@@ -45,7 +66,7 @@ macro_rules! def_unity_class {
 pub enum Class {
     AssetBundle(asset_bundle::AssetBundle),
     AudioClip(audio_clip::AudioClip),
-    Texture2D(texture_2d::Texture2D),
+    Texture2D(texture2d::Texture2D),
     Mesh(mesh::Mesh),
     Transform(transform::Transform),
     GameObject(game_object::GameObject),

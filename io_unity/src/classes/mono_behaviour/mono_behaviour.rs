@@ -1,8 +1,14 @@
 use binrw::binrw;
 
-use crate::{until::binrw_parser::AlignedString, SerializedFileMetadata};
+use crate::{
+    classes::{behaviour::Behaviour, p_ptr::PPtr},
+    until::binrw_parser::AlignedString,
+    SerializedFileMetadata,
+};
 
-use super::{behaviour::Behaviour, p_ptr::PPtr};
+use super::MonoBehaviourObject;
+
+impl MonoBehaviourObject for MonoBehaviour {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]

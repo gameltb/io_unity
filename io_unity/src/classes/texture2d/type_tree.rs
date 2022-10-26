@@ -2,12 +2,11 @@ use std::borrow::Cow;
 
 use std::io::{prelude::*, SeekFrom};
 
-
 use num_enum::TryFromPrimitive;
 
 use crate::type_tree::TypeTreeObject;
 
-use crate::{FS};
+use crate::FS;
 
 use super::{Texture2DObject, TextureFormat};
 

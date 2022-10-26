@@ -1,5 +1,5 @@
+pub mod mesh_renderer;
 pub mod type_tree;
-pub mod version14;
 
 use std::{
     fmt,
@@ -8,14 +8,13 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
-def_unity_class!(AssetBundle, AssetBundleObject);
+def_unity_class!(MeshRenderer, MeshRendererObject);
 
-pub trait AssetBundleObject: fmt::Debug {}
+pub trait MeshRendererObject: fmt::Debug {}
 
-impl BinRead for AssetBundle {
+impl BinRead for MeshRenderer {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -23,13 +22,13 @@ impl BinRead for AssetBundle {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        Ok(AssetBundle(Box::new(version14::AssetBundle::read_options(
-            reader, options, args,
-        )?)))
+        return Ok(MeshRenderer(Box::new(
+            mesh_renderer::MeshRenderer::read_options(reader, options, args)?,
+        )));
     }
 }
 
-impl BinWrite for AssetBundle {
+impl BinWrite for MeshRenderer {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(

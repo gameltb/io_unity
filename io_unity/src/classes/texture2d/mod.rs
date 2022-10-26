@@ -133,12 +133,6 @@ pub trait Texture2DObject: fmt::Debug {
     }
 }
 
-impl Texture2D {
-    pub fn new(inner: TypeTreeObject) -> Self {
-        Self(Box::new(type_tree::Texture2D::new(inner)))
-    }
-}
-
 impl BinRead for Texture2D {
     type Args = SerializedFileMetadata;
 

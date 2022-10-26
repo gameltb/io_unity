@@ -1,3 +1,4 @@
+pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_0_0;
 
@@ -14,11 +15,11 @@ use crate::{
     SerializedFileMetadata,
 };
 
-use super::named_object::NamedObject;
+use crate::type_tree::TypeTreeObject;
 
 def_unity_class!(Mesh, MeshObject);
 
-pub trait MeshObject: fmt::Debug + NamedObject {
+pub trait MeshObject: fmt::Debug {
     fn get_index_buff(&self, sub_mesh_id: usize) -> Vec<u32>;
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> Vec<f32>;
     fn get_normal_buff(&self, sub_mesh_id: usize) -> Vec<f32>;

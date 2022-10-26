@@ -1,8 +1,10 @@
 use binrw::binrw;
 
-use crate::{BuildTarget, SerializedFileMetadata};
+use crate::{classes::p_ptr::PPtr, BuildTarget, SerializedFileMetadata};
 
-use super::p_ptr::PPtr;
+use super::EditorExtensionObject;
+
+impl EditorExtensionObject for EditorExtension {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]

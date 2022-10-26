@@ -10,6 +10,8 @@ use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
 use super::p_ptr::PPtr;
 
 pub mod version_4_3_0;
+use crate::type_tree::TypeTreeObject;
+pub mod type_tree;
 
 def_unity_class!(SkinnedMeshRenderer, SkinnedMeshRendererObject);
 

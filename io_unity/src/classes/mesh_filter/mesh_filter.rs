@@ -1,8 +1,13 @@
 use binrw::binrw;
 
-use crate::SerializedFileMetadata;
+use crate::{
+    classes::{component::Component, p_ptr::PPtr},
+    SerializedFileMetadata,
+};
 
-use super::{component::Component, p_ptr::PPtr};
+use super::MeshFilterObject;
+
+impl MeshFilterObject for MeshFilter {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]

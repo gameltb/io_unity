@@ -24,7 +24,7 @@ use crate::classes::mesh_renderer::MeshRenderer;
 use crate::classes::mono_behaviour::MonoBehaviour;
 use crate::classes::mono_script::MonoScript;
 use crate::classes::skinned_mesh_renderer::SkinnedMeshRenderer;
-use crate::classes::texture_2d::Texture2D;
+use crate::classes::texture2d::Texture2D;
 use crate::classes::transform::Transform;
 use crate::classes::{Class, ClassIDType};
 use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs};

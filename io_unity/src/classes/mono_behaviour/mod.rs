@@ -1,5 +1,5 @@
+pub mod mono_behaviour;
 pub mod type_tree;
-pub mod version14;
 
 use std::{
     fmt,
@@ -8,14 +8,13 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
-def_unity_class!(AssetBundle, AssetBundleObject);
+def_unity_class!(MonoBehaviour, MonoBehaviourObject);
 
-pub trait AssetBundleObject: fmt::Debug {}
+pub trait MonoBehaviourObject: fmt::Debug {}
 
-impl BinRead for AssetBundle {
+impl BinRead for MonoBehaviour {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -23,13 +22,13 @@ impl BinRead for AssetBundle {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        Ok(AssetBundle(Box::new(version14::AssetBundle::read_options(
-            reader, options, args,
-        )?)))
+        return Ok(MonoBehaviour(Box::new(
+            mono_behaviour::MonoBehaviour::read_options(reader, options, args)?,
+        )));
     }
 }
 
-impl BinWrite for AssetBundle {
+impl BinWrite for MonoBehaviour {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(

@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fmt::Debug,
     io::{Cursor, Read, Seek, SeekFrom},
-    sync::{Arc},
+    sync::Arc,
 };
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};

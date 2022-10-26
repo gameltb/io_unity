@@ -1,8 +1,10 @@
 use binrw::binrw;
 
-use crate::SerializedFileMetadata;
+use crate::{classes::renderer::Renderer, SerializedFileMetadata};
 
-use super::renderer::Renderer;
+use super::MeshRendererObject;
+
+impl MeshRendererObject for MeshRenderer {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]

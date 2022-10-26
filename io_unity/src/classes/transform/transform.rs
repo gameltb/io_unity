@@ -2,11 +2,12 @@ use binrw::binrw;
 use glam::Mat4;
 
 use crate::{
+    classes::{component::Component, p_ptr::PPtr},
     until::binrw_parser::{Quat, Vec3},
     SerializedFileMetadata,
 };
 
-use super::{component::Component, p_ptr::PPtr};
+use super::TransformObject;
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]
@@ -25,16 +26,16 @@ pub struct Transform {
     father: PPtr,
 }
 
-impl Transform {
-    pub fn get_component(&self) -> &Component {
+impl TransformObject for Transform {
+    fn get_component(&self) -> &Component {
         &self.component
     }
 
-    pub fn get_father(&self) -> &PPtr {
+    fn get_father(&self) -> &PPtr {
         &self.father
     }
 
-    pub fn get_local_mat(&self) -> Mat4 {
+    fn get_local_mat(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(
             *self.local_scale,
             *self.local_rotation,

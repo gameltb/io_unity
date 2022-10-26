@@ -1,3 +1,6 @@
+pub mod mesh_filter;
+pub mod type_tree;
+
 use std::{
     fmt,
     io::{Read, Seek, Write},
@@ -5,20 +8,13 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
-pub mod type_tree;
-pub mod version13;
-pub mod version14;
+def_unity_class!(MeshFilter, MeshFilterObject);
 
-def_unity_class!(PPtr, PPtrObject);
+pub trait MeshFilterObject: fmt::Debug {}
 
-pub trait PPtrObject: fmt::Debug {
-    fn get_path_id(&self) -> i64;
-}
-
-impl BinRead for PPtr {
+impl BinRead for MeshFilter {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -26,18 +22,13 @@ impl BinRead for PPtr {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        if args.version.clone() as i32 >= 14 {
-            return Ok(PPtr(Box::new(version14::PPtr::read_options(
-                reader, options, args,
-            )?)));
-        }
-        Ok(PPtr(Box::new(version13::PPtr::read_options(
+        return Ok(MeshFilter(Box::new(mesh_filter::MeshFilter::read_options(
             reader, options, args,
-        )?)))
+        )?)));
     }
 }
 
-impl BinWrite for PPtr {
+impl BinWrite for MeshFilter {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(
@@ -46,7 +37,6 @@ impl BinWrite for PPtr {
         _options: &WriteOptions,
         _args: Self::Args,
     ) -> BinResult<()> {
-        todo!();
         Ok(())
     }
 }

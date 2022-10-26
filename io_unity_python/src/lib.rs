@@ -26,7 +26,7 @@ pub mod python_unity_class {
     def_python_unity_class!(
         AssetBundle(asset_bundle::AssetBundle),
         AudioClip(audio_clip::AudioClip),
-        Texture2D(texture_2d::Texture2D),
+        Texture2D(texture2d::Texture2D),
         Mesh(mesh::Mesh),
         Transform(transform::Transform),
         GameObject(game_object::GameObject),

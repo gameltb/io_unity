@@ -1,3 +1,6 @@
+pub mod component;
+pub mod type_tree;
+
 use std::{
     fmt,
     io::{Read, Seek, Write},
@@ -5,20 +8,17 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
-pub mod type_tree;
-pub mod version13;
-pub mod version14;
+use super::p_ptr::PPtr;
 
-def_unity_class!(PPtr, PPtrObject);
+def_unity_class!(Component, ComponentObject);
 
-pub trait PPtrObject: fmt::Debug {
-    fn get_path_id(&self) -> i64;
+pub trait ComponentObject: fmt::Debug {
+    fn get_game_object(&self) -> &PPtr;
 }
 
-impl BinRead for PPtr {
+impl BinRead for Component {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -26,18 +26,13 @@ impl BinRead for PPtr {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        if args.version.clone() as i32 >= 14 {
-            return Ok(PPtr(Box::new(version14::PPtr::read_options(
-                reader, options, args,
-            )?)));
-        }
-        Ok(PPtr(Box::new(version13::PPtr::read_options(
+        return Ok(Component(Box::new(component::Component::read_options(
             reader, options, args,
-        )?)))
+        )?)));
     }
 }
 
-impl BinWrite for PPtr {
+impl BinWrite for Component {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(
@@ -46,7 +41,6 @@ impl BinWrite for PPtr {
         _options: &WriteOptions,
         _args: Self::Args,
     ) -> BinResult<()> {
-        todo!();
         Ok(())
     }
 }

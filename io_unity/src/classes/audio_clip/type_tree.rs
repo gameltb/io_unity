@@ -6,9 +6,9 @@ use binrw::binrw;
 
 use num_enum::TryFromPrimitive;
 
-use crate::type_tree::{TypeTreeObject};
+use crate::type_tree::TypeTreeObject;
 
-use crate::{FS};
+use crate::FS;
 
 use super::AudioClipObject;
 

@@ -1,8 +1,10 @@
 use binrw::binrw;
 
-use crate::{until::binrw_parser::U8Bool, SerializedFileMetadata};
+use crate::{classes::component::Component, until::binrw_parser::U8Bool, SerializedFileMetadata};
 
-use super::component::Component;
+use super::BehaviourObject;
+
+impl BehaviourObject for Behaviour {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]

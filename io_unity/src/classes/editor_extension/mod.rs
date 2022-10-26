@@ -1,6 +1,5 @@
+pub mod editor_extension;
 pub mod type_tree;
-pub mod version14;
-
 use std::{
     fmt,
     io::{Read, Seek, Write},
@@ -8,14 +7,13 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
-def_unity_class!(AssetBundle, AssetBundleObject);
+def_unity_class!(EditorExtension, EditorExtensionObject);
 
-pub trait AssetBundleObject: fmt::Debug {}
+pub trait EditorExtensionObject: fmt::Debug {}
 
-impl BinRead for AssetBundle {
+impl BinRead for EditorExtension {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -23,13 +21,13 @@ impl BinRead for AssetBundle {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        Ok(AssetBundle(Box::new(version14::AssetBundle::read_options(
-            reader, options, args,
-        )?)))
+        return Ok(EditorExtension(Box::new(
+            editor_extension::EditorExtension::read_options(reader, options, args)?,
+        )));
     }
 }
 
-impl BinWrite for AssetBundle {
+impl BinWrite for EditorExtension {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(

@@ -1,3 +1,4 @@
+pub mod type_tree;
 pub mod version_5_6_0;
 
 use std::{
@@ -7,8 +8,8 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
+use crate::type_tree::TypeTreeObject;
 use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
-
 def_unity_class!(Material, MaterialObject);
 
 pub trait MaterialObject: fmt::Debug {}
