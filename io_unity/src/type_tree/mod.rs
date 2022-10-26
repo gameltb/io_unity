@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fmt::Debug,
     io::{Cursor, Read, Seek, SeekFrom},
-    sync::Arc,
+    sync::{Arc},
 };
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
@@ -21,7 +21,7 @@ pub trait TypeField: Debug {
 }
 
 #[derive(Debug)]
-pub enum Value {
+pub enum Value<'a> {
     Bool(bool),
     Int8(i8),
     UInt8(u8),
@@ -35,7 +35,7 @@ pub enum Value {
     Double(f64),
     String(String),
     Array(Vec<FieldValue>),
-    ByteArray(Vec<u8>),
+    ByteArray(Cow<'a, Vec<u8>>),
 }
 
 #[derive(Debug)]
@@ -48,13 +48,13 @@ pub enum FieldValue {
 #[derive(Debug)]
 pub struct ArrayField {
     array_size: Field,
-    item_type_fields: Vec<Arc<Box<dyn TypeField + Send>>>,
+    item_type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
     data: FieldValue,
 }
 
 #[derive(Debug)]
 pub struct Field {
-    field_type: Arc<Box<dyn TypeField + Send>>,
+    field_type: Arc<Box<dyn TypeField + Send + Sync>>,
     data: FieldValue,
 }
 
@@ -66,20 +66,35 @@ impl Field {
     fn display_field(&self, p: &String) {
         let np = p.clone() + "/" + self.field_type.get_name();
         println!(
-            "{}/{} : {}",
+            "{}/{} : {}({})",
             p,
             self.field_type.get_name(),
-            self.field_type.get_type()
+            self.field_type.get_type(),
+            self.field_type.get_byte_size()
         );
         match &self.data {
             FieldValue::Data(_) => (),
             FieldValue::Fields(fls) => fls.into_iter().map(|f| f.display_field(&np)).collect(),
             FieldValue::Array(ar) => {
                 ar.array_size.display_field(&np);
-                if let FieldValue::Fields(ai) = &ar.data {
-                    if let Some(aii) = ai.get(0) {
-                        aii.display_field(&np);
+                match &ar.data {
+                    FieldValue::Fields(ai) => {
+                        if let Some(aii) = ai.get(0) {
+                            aii.display_field(&np);
+                        }
                     }
+                    FieldValue::Data(_) => {
+                        for item in &ar.item_type_fields {
+                            println!(
+                                "{}/{} : {}({})",
+                                np,
+                                item.get_name(),
+                                item.get_type(),
+                                item.get_byte_size()
+                            );
+                        }
+                    }
+                    _ => (),
                 }
             }
         }
@@ -87,16 +102,80 @@ impl Field {
 
     fn get_value(&self, path: &[String], endian: &binrw::Endian) -> Option<Value> {
         if path.len() == 0 {
-            if let FieldValue::Data(data) = &self.data {
-                return Some(Value::ByteArray(data.clone()));
-            } else {
-                if "string" == self.field_type.get_type() {
-                    if let FieldValue::Fields(fields) = &self.data {
-                        if let Some(array) = fields.get(0) {
-                            if let Some(data) = array.get_array() {
-                                return Some(Value::String(
-                                    String::from_utf8(data.to_vec()).unwrap(),
-                                ));
+            match &self.data {
+                FieldValue::Data(data) => {
+                    let op = ReadOptions::new(endian.clone());
+                    match self.field_type.get_type().as_str() {
+                        "bool" => {
+                            if let Some(i) = data.get(0) {
+                                return Some(Value::Bool(*i != 0));
+                            }
+                        }
+                        "SInt8" => {
+                            if let Ok(i) = <i8>::read(&mut Cursor::new(data)) {
+                                return Some(Value::Int8(i));
+                            }
+                        }
+                        "SInt16" => {
+                            if let Ok(i) = <i16>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::Int16(i));
+                            }
+                        }
+                        "SInt32" | "int" => {
+                            if let Ok(i) = <i32>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::Int32(i));
+                            }
+                        }
+                        "SInt64" => {
+                            if let Ok(i) = <i64>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::Int64(i));
+                            }
+                        }
+                        "UInt8" => {
+                            if let Ok(i) = <u8>::read(&mut Cursor::new(data)) {
+                                return Some(Value::UInt8(i));
+                            }
+                        }
+                        "UInt16" => {
+                            if let Ok(i) = <u16>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::UInt16(i));
+                            }
+                        }
+                        "UInt32" | "unsigned int" => {
+                            if let Ok(i) = <u32>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::UInt32(i));
+                            }
+                        }
+                        "UInt64" => {
+                            if let Ok(i) = <u64>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::UInt64(i));
+                            }
+                        }
+                        "float" => {
+                            if let Ok(i) = <f32>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::Float(i));
+                            }
+                        }
+                        &_ => (),
+                    }
+                    return Some(Value::ByteArray(Cow::Borrowed(data)));
+                }
+                FieldValue::Array(array_field) => {
+                    if let FieldValue::Data(array) = &array_field.data {
+                        if array.len() > 0 {
+                            return Some(Value::ByteArray(Cow::Borrowed(array)));
+                        }
+                    }
+                }
+                _ => {
+                    if "string" == self.field_type.get_type() {
+                        if let FieldValue::Fields(fields) = &self.data {
+                            if let Some(array) = fields.get(0) {
+                                if let Some(data) = array.get_array() {
+                                    return Some(Value::String(
+                                        String::from_utf8(data.to_vec()).unwrap(),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -113,7 +192,7 @@ impl Field {
                         }
                     }
                 }
-                FieldValue::Array(_array) => todo!(),
+                FieldValue::Array(_array) => (),
                 _ => (),
             }
         }
@@ -154,16 +233,51 @@ impl TypeTreeObject {
         }
         self.data.get_value(&path[1..], &self.endian)
     }
+
+    pub fn get_string_by_path(&self, path: &str) -> Option<String> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::String(s) = v {
+                return Some(s);
+            }
+        }
+        None
+    }
+
+    pub fn get_int_by_path(&self, path: &str) -> Option<i64> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Int8(i) => Some(i as i64),
+                Value::Int16(i) => Some(i as i64),
+                Value::Int32(i) => Some(i as i64),
+                Value::Int64(i) => Some(i as i64),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_uint_by_path(&self, path: &str) -> Option<u64> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::UInt8(i) => Some(i as u64),
+                Value::UInt16(i) => Some(i as u64),
+                Value::UInt32(i) => Some(i as u64),
+                Value::UInt64(i) => Some(i as u64),
+                _ => None,
+            };
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct TypeTreeObjectBinReadArgs {
     class_id: i32,
-    type_fields: Vec<Arc<Box<dyn TypeField + Send>>>,
+    type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
 }
 
 impl TypeTreeObjectBinReadArgs {
-    pub fn new(class_id: i32, type_fields: Vec<Arc<Box<dyn TypeField + Send>>>) -> Self {
+    pub fn new(class_id: i32, type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>) -> Self {
         Self {
             class_id,
             type_fields,
@@ -182,7 +296,7 @@ impl BinRead for TypeTreeObject {
         fn read<R: Read + Seek>(
             reader: &mut R,
             options: &ReadOptions,
-            type_fields: &Vec<Arc<Box<dyn TypeField + Send>>>,
+            type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
         ) -> BinResult<Field> {
             let field = type_fields.get(*field_index).unwrap().to_owned();
@@ -308,7 +422,7 @@ impl BinRead for TypeTreeObject {
 }
 
 impl BinRead for Field {
-    type Args = Arc<Box<dyn TypeField + Send>>;
+    type Args = Arc<Box<dyn TypeField + Send + Sync>>;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,

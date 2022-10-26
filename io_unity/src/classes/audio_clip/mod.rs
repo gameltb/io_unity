@@ -1,3 +1,4 @@
+pub mod type_tree;
 pub mod version_5_0_0;
 
 use std::{
@@ -8,13 +9,21 @@ use std::{
 
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata, FS};
+use crate::{
+    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
+};
 
 def_unity_class!(AudioClip, AudioClipObject);
 
 pub trait AudioClipObject: fmt::Debug {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>>;
     fn get_name(&self) -> String;
+}
+
+impl AudioClip {
+    pub fn new(inner: TypeTreeObject) -> Self {
+        Self(Box::new(type_tree::AudioClip::new(inner)))
+    }
 }
 
 impl BinRead for AudioClip {

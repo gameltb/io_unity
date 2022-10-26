@@ -95,7 +95,7 @@ impl UnityFS {
         for sb in &self.content.blocks_info.storage_blocks {
             if (uncompressed_data_offset + (sb.uncompressed_size as u64)) >= node.offset as u64 {
                 let mut blocks_infocompressedd_stream = vec![0u8; sb.compressed_size as usize];
-                if let Ok(mut file_reader) =  self.file_reader.lock() {
+                if let Ok(mut file_reader) = self.file_reader.lock() {
                     file_reader.seek(SeekFrom::Start(
                         compressed_data_offset + self.content.position,
                     ))?;

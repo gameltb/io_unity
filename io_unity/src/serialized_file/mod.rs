@@ -301,6 +301,7 @@ pub struct SerializedFileMetadata {
     pub endianess: Endian,
     pub unity_version: UnityVersion,
     pub target_platform: BuildTarget,
+    pub enable_type_tree: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -412,6 +413,7 @@ pub trait Serialized: fmt::Debug {
     fn get_object_count(&self) -> i32;
     fn get_unity_version(&self) -> String;
     fn get_target_platform(&self) -> &BuildTarget;
+    fn get_enable_type_tree(&self) -> bool;
 
     fn get_metadata(&self) -> SerializedFileMetadata {
         SerializedFileMetadata {
@@ -419,6 +421,7 @@ pub trait Serialized: fmt::Debug {
             endianess: self.get_endianess().clone(),
             unity_version: UnityVersion::from_str(&self.get_unity_version()).unwrap(),
             target_platform: self.get_target_platform().clone(),
+            enable_type_tree: self.get_enable_type_tree(),
         }
     }
 
@@ -464,6 +467,20 @@ pub trait Serialized: fmt::Debug {
             Endian::Little => binrw::Endian::Little,
             Endian::Big => binrw::Endian::Big,
         });
+
+        if self.get_enable_type_tree() {
+            match obj.class {
+                ClassIDType::AudioClip => {
+                    let type_tree_object = self.get_type_tree_object(reader, obj);
+                    return Some(Class::AudioClip(AudioClip::new(type_tree_object)));
+                }
+                ClassIDType::Texture2D => {
+                    let type_tree_object = self.get_type_tree_object(reader, obj);
+                    return Some(Class::Texture2D(Texture2D::new(type_tree_object)));
+                }
+                _ => (),
+            }
+        }
 
         #[macro_export]
         macro_rules! cov_class {

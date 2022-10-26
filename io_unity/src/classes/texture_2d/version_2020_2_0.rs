@@ -17,8 +17,8 @@ impl Texture2DObject for Texture2D {
         self.height as u64
     }
 
-    fn get_texture_format(&self) -> &TextureFormat {
-        &self.texture_format
+    fn get_texture_format(&self) -> TextureFormat {
+        self.texture_format.clone()
     }
 
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>> {

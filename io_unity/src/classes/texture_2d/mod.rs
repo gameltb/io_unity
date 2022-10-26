@@ -1,3 +1,4 @@
+pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_2_0;
 
@@ -11,14 +12,16 @@ use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use image::{DynamicImage, RgbaImage};
 use num_enum::TryFromPrimitive;
 
-use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata, FS};
+use crate::{
+    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
+};
 
 def_unity_class!(Texture2D, Texture2DObject);
 
 pub trait Texture2DObject: fmt::Debug {
     fn get_width(&self) -> u64;
     fn get_height(&self) -> u64;
-    fn get_texture_format(&self) -> &TextureFormat;
+    fn get_texture_format(&self) -> TextureFormat;
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>>;
     fn get_image_name(&self) -> String;
 
@@ -55,10 +58,12 @@ pub trait Texture2DObject: fmt::Debug {
                         TextureFormat::BC5 => {
                             texpresso::Format::Bc5.decompress(&data, width, height, &mut output)
                         }
-                        TextureFormat::BC6H |
-                        TextureFormat::BC7 |
-                        TextureFormat::DXT1Crunched |
-                        TextureFormat::DXT5Crunched => println!("unsupport {:?}", self.get_texture_format()),
+                        TextureFormat::BC6H
+                        | TextureFormat::BC7
+                        | TextureFormat::DXT1Crunched
+                        | TextureFormat::DXT5Crunched => {
+                            println!("unsupport {:?}", self.get_texture_format())
+                        }
                         _ => unreachable!(),
                     }
                     let result = RgbaImage::from_raw(width as u32, height as u32, output).unwrap();
@@ -125,6 +130,12 @@ pub trait Texture2DObject: fmt::Debug {
             }
         }
         None
+    }
+}
+
+impl Texture2D {
+    pub fn new(inner: TypeTreeObject) -> Self {
+        Self(Box::new(type_tree::Texture2D::new(inner)))
     }
 }
 

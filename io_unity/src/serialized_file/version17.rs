@@ -61,6 +61,10 @@ impl Serialized for SerializedFile {
         &self.content.target_platform
     }
 
+    fn get_enable_type_tree(&self) -> bool {
+        *self.content.enable_type_tree
+    }
+
     fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
         let stypetree = &self.content.types.get(type_id).unwrap();
         let type_tree = stypetree.type_tree.as_ref().unwrap();
@@ -72,7 +76,7 @@ impl Serialized for SerializedFile {
                 name: tp.get_name_str(&mut string_reader),
                 type_name: tp.get_type_str(&mut string_reader),
                 node: tp.clone(),
-            }) as Box<dyn TypeField + Send>))
+            }) as Box<dyn TypeField + Send + Sync>))
         }
 
         TypeTreeObjectBinReadArgs::new(stypetree.class_id, type_fields)
