@@ -1,11 +1,9 @@
-use binrw::binrw;
-
+use super::SkinnedMeshRendererObject;
 use crate::classes::p_ptr::PPtr;
 use crate::classes::renderer::Renderer;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::SkinnedMeshRendererObject;
+use binrw::binrw;
 
 impl SkinnedMeshRendererObject for SkinnedMeshRenderer {
     fn get_bones(&self) -> &Vec<PPtr> {

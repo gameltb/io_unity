@@ -1,14 +1,13 @@
 pub mod mesh_renderer;
 pub mod type_tree;
 
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 
 def_unity_class!(MeshRenderer, MeshRendererObject);
 

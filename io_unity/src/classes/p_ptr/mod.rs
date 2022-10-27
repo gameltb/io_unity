@@ -1,16 +1,15 @@
+pub mod type_tree;
+pub mod version13;
+pub mod version14;
+
+use crate::type_tree::TypeTreeObject;
+use crate::{def_unity_class, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
-
-pub mod type_tree;
-pub mod version13;
-pub mod version14;
 
 def_unity_class!(PPtr, PPtrObject);
 

@@ -1,12 +1,11 @@
-use crate::type_tree::TypeTreeObject;
-
-use crate::def_type_tree_class;
-
 use super::MeshObject;
+use crate::def_type_tree_class;
+use crate::type_tree::TypeTreeObject;
+use supercow::Supercow;
 
 def_type_tree_class!(Mesh);
 
-impl MeshObject for Mesh {
+impl MeshObject for Mesh<'_> {
     fn get_index_buff(&self, _sub_mesh_id: usize) -> Vec<u32> {
         todo!()
     }
@@ -36,4 +35,4 @@ impl MeshObject for Mesh {
     }
 }
 
-impl Mesh {}
+impl Mesh<'_> {}

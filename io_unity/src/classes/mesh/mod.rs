@@ -2,20 +2,18 @@ pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_0_0;
 
-use std::{
-    fmt,
-    io::{Read, Seek, SeekFrom, Write},
-};
-
-use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
+use crate::type_tree::TypeTreeObject;
 use crate::{
     def_unity_class,
     until::{binrw_parser::Mat4, UnityVersion},
     SerializedFileMetadata,
 };
+use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use std::{
+    fmt,
+    io::{Read, Seek, SeekFrom, Write},
+};
 
-use crate::type_tree::TypeTreeObject;
 
 def_unity_class!(Mesh, MeshObject);
 

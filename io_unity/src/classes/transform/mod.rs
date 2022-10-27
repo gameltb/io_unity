@@ -1,23 +1,21 @@
 pub mod transform;
 pub mod type_tree;
 
+use super::{p_ptr::PPtr};
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use glam::Mat4;
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
-
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-use glam::Mat4;
-
-use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
-
-use super::{component::Component, p_ptr::PPtr};
+use supercow::Supercow;
 
 def_unity_class!(Transform, TransformObject);
 
 pub trait TransformObject: fmt::Debug {
-    fn get_component(&self) -> &Component;
-    fn get_father(&self) -> &PPtr;
+    fn get_game_object(&self) -> Supercow<PPtr>;
+    fn get_father(&self) -> Supercow<PPtr>;
     fn get_local_mat(&self) -> Mat4;
 }
 

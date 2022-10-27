@@ -1,11 +1,9 @@
-use binrw::binrw;
-
+use super::AnimatorObject;
 use crate::classes::behaviour::Behaviour;
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::AnimatorObject;
+use binrw::binrw;
 
 impl AnimatorObject for Animator {}
 

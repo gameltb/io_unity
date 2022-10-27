@@ -1,9 +1,7 @@
-use binrw::binrw;
-
+use super::MonoScriptObject;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::MonoScriptObject;
+use binrw::binrw;
 
 impl MonoScriptObject for MonoScript {}
 

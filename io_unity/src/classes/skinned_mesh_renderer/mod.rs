@@ -1,17 +1,15 @@
+pub mod type_tree;
+pub mod version_4_3_0;
+
+use super::p_ptr::PPtr;
+use crate::type_tree::TypeTreeObject;
+use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
-
-use super::p_ptr::PPtr;
-
-pub mod version_4_3_0;
-use crate::type_tree::TypeTreeObject;
-pub mod type_tree;
 
 def_unity_class!(SkinnedMeshRenderer, SkinnedMeshRendererObject);
 

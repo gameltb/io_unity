@@ -1,9 +1,7 @@
-use binrw::binrw;
-
+use super::AvatarObject;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::AvatarObject;
+use binrw::binrw;
 
 impl AvatarObject for Avatar {}
 

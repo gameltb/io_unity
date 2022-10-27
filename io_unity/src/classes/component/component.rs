@@ -1,15 +1,14 @@
-use binrw::binrw;
-
+use super::ComponentObject;
 use crate::{
     classes::{editor_extension::EditorExtension, p_ptr::PPtr},
     SerializedFileMetadata,
 };
-
-use super::ComponentObject;
+use binrw::binrw;
+use supercow::Supercow;
 
 impl ComponentObject for Component {
-    fn get_game_object(&self) -> &PPtr {
-        &self.game_object
+    fn get_game_object(&self) -> Supercow<PPtr> {
+        Supercow::borrowed(&self.game_object)
     }
 }
 

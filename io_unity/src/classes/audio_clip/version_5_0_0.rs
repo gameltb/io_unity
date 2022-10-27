@@ -1,15 +1,10 @@
-use std::borrow::Cow;
-
-use std::io::{prelude::*, ErrorKind, SeekFrom};
-
-use binrw::binrw;
-
-use num_enum::TryFromPrimitive;
-
+use super::AudioClipObject;
 use crate::until::binrw_parser::*;
 use crate::{SerializedFileMetadata, FS};
-
-use super::AudioClipObject;
+use binrw::binrw;
+use num_enum::TryFromPrimitive;
+use std::borrow::Cow;
+use std::io::{prelude::*, ErrorKind, SeekFrom};
 
 impl AudioClipObject for AudioClip {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {

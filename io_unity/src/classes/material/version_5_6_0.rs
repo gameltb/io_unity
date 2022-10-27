@@ -1,10 +1,8 @@
-use binrw::binrw;
-
+use super::MaterialObject;
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::MaterialObject;
+use binrw::binrw;
 
 impl MaterialObject for Material {}
 

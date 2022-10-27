@@ -219,7 +219,7 @@ impl SkinnedMeshRenderer {
                     if let Some(io_unity::classes::Class::GameObject(go)) = sf
                         .try_borrow()?
                         .0
-                        .get_object_by_path_id(bone.get_component().get_game_object().get_path_id())
+                        .get_object_by_path_id(bone.get_game_object().get_path_id())
                     {
                         go.get_name().to_string()
                     } else {

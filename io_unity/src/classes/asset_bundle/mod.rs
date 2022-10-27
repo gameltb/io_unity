@@ -1,15 +1,14 @@
 pub mod type_tree;
 pub mod version14;
 
+use crate::type_tree::TypeTreeObject;
+use crate::{def_unity_class, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::type_tree::TypeTreeObject;
-use crate::{def_unity_class, SerializedFileMetadata};
 
 def_unity_class!(AssetBundle, AssetBundleObject);
 

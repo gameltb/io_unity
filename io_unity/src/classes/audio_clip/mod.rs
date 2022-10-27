@@ -1,17 +1,16 @@
 pub mod type_tree;
 pub mod version_5_0_0;
 
+use crate::{
+    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
+};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     borrow::Cow,
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::{
-    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
-};
 
 def_unity_class!(AudioClip, AudioClipObject);
 

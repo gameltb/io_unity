@@ -1,8 +1,6 @@
-use binrw::binrw;
-
-use crate::{classes::component::Component, until::binrw_parser::U8Bool, SerializedFileMetadata};
-
 use super::BehaviourObject;
+use crate::{classes::component::Component, until::binrw_parser::U8Bool, SerializedFileMetadata};
+use binrw::binrw;
 
 impl BehaviourObject for Behaviour {}
 

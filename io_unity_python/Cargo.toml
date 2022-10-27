@@ -12,5 +12,5 @@ name = "io_unity_python"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.17.1", features = ["extension-module"] }
+pyo3 = { version = "0.17", features = ["extension-module"] }
 io_unity = { path = "../io_unity" }  

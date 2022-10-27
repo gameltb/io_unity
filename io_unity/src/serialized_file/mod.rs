@@ -469,17 +469,36 @@ pub trait Serialized: fmt::Debug {
         });
 
         if self.get_enable_type_tree() {
-            match obj.class {
-                ClassIDType::AudioClip => {
-                    let type_tree_object = self.get_type_tree_object(reader, obj);
-                    return Some(Class::AudioClip(AudioClip::new(type_tree_object)));
-                }
-                ClassIDType::Texture2D => {
-                    let type_tree_object = self.get_type_tree_object(reader, obj);
-                    return Some(Class::Texture2D(Texture2D::new(type_tree_object)));
-                }
-                _ => (),
+            #[macro_export]
+            macro_rules! cov_type_tree_class {
+                ($($x:ident($y:path)),+) => {
+                    match obj.class {
+                        $(ClassIDType::$x => {
+                            let type_tree_object = self.get_type_tree_object(reader, obj);
+                            return Some(Class::$x($x::new(type_tree_object)));
+                        },)+
+                        _ => (),
+                    }
+                };
             }
+
+            cov_type_tree_class!(
+                AssetBundle(asset_bundle::AssetBundle),
+                AudioClip(audio_clip::AudioClip),
+                Texture2D(texture_2d::Texture2D),
+                Mesh(mesh::Mesh),
+                Transform(transform::Transform),
+                GameObject(game_object::GameObject),
+                AnimationClip(animation_clip::AnimationClip),
+                SkinnedMeshRenderer(skinned_mesh_renderer::SkinnedMeshRenderer),
+                MeshRenderer(mesh_renderer::MeshRenderer),
+                Material(material::Material),
+                MeshFilter(mesh_filter::MeshFilter),
+                MonoBehaviour(mono_behaviour::MonoBehaviour),
+                MonoScript(mono_script::MonoScript),
+                Animator(animator::Animator),
+                Avatar(avatar::Avatar)
+            )
         }
 
         #[macro_export]

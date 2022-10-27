@@ -1,16 +1,14 @@
-use binrw::binrw;
-
+use super::GameObjectObject;
 use crate::{
     classes::{editor_extension::EditorExtension, p_ptr::PPtr},
     until::binrw_parser::AlignedString,
     SerializedFileMetadata,
 };
-
-use super::GameObjectObject;
+use binrw::binrw;
 
 impl GameObjectObject for GameObject {
-    fn get_name(&self) -> &AlignedString {
-        &self.name
+    fn get_name(&self) -> String {
+        self.name.to_string()
     }
 }
 

@@ -1,18 +1,15 @@
-use std::borrow::Cow;
-
-use std::io::{prelude::*, ErrorKind, SeekFrom};
-
-use binrw::binrw;
-
-use num_enum::TryFromPrimitive;
-
-use crate::type_tree::TypeTreeObject;
-
-use crate::FS;
-
 use super::AudioClipObject;
+use crate::type_tree::TypeTreeObject;
+use crate::{def_type_tree_class, FS};
+use binrw::binrw;
+use num_enum::TryFromPrimitive;
+use std::borrow::Cow;
+use std::io::{prelude::*, ErrorKind, SeekFrom};
+use supercow::Supercow;
 
-impl AudioClipObject for AudioClip {
+def_type_tree_class!(AudioClip);
+
+impl AudioClipObject for AudioClip<'_> {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
         if let Some(mut file) =
             fs.get_resource_file_by_path(self.get_resource_source().unwrap(), None)
@@ -30,16 +27,7 @@ impl AudioClipObject for AudioClip {
     }
 }
 
-#[derive(Debug)]
-pub struct AudioClip {
-    inner: TypeTreeObject,
-}
-
-impl AudioClip {
-    pub fn new(inner: TypeTreeObject) -> Self {
-        Self { inner }
-    }
-
+impl AudioClip<'_> {
     fn get_name(&self) -> Option<String> {
         self.inner.get_string_by_path("/Base/m_Name")
     }

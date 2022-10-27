@@ -50,13 +50,19 @@ macro_rules! def_unity_class {
 macro_rules! def_type_tree_class {
     (  $x:ident  ) => {
         #[derive(Debug)]
-        pub struct $x {
-            inner: TypeTreeObject,
+        pub struct $x<'a> {
+            inner: Supercow<'a, TypeTreeObject>,
         }
 
-        impl $x {
-            pub fn new(inner: TypeTreeObject) -> Self {
-                Self { inner }
+        impl<'a> $x<'a> {
+            pub fn new<T: Into<Supercow<'a, TypeTreeObject>>>(inner: T) -> Self {
+                Self {
+                    inner: inner.into(),
+                }
+            }
+
+            pub fn inner(self) -> Supercow<'a, TypeTreeObject> {
+                self.inner
             }
         }
     };

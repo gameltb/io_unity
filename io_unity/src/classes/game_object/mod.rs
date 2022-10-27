@@ -1,23 +1,23 @@
 pub mod type_tree;
 pub mod version_5_5_0;
 
+use crate::type_tree::TypeTreeObject;
+use crate::{
+    def_unity_class,
+    until::{UnityVersion},
+    SerializedFileMetadata,
+};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 
-use crate::type_tree::TypeTreeObject;
-use crate::{
-    def_unity_class,
-    until::{binrw_parser::AlignedString, UnityVersion},
-    SerializedFileMetadata,
-};
 def_unity_class!(GameObject, GameObjectObject);
 
 pub trait GameObjectObject: fmt::Debug {
-    fn get_name(&self) -> &AlignedString;
+    fn get_name(&self) -> String;
 }
 
 impl BinRead for GameObject {

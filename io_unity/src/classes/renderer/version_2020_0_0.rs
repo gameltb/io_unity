@@ -1,11 +1,9 @@
-use binrw::binrw;
-
+use super::RendererObject;
 use crate::classes::component::Component;
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::RendererObject;
+use binrw::binrw;
 
 impl RendererObject for Renderer {
     fn get_materials(&self) -> &Vec<PPtr> {

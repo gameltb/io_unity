@@ -1,8 +1,6 @@
-use binrw::binrw;
-
-use crate::SerializedFileMetadata;
-
 use super::PPtrObject;
+use crate::SerializedFileMetadata;
+use binrw::binrw;
 
 impl PPtrObject for PPtr {
     fn get_path_id(&self) -> i64 {

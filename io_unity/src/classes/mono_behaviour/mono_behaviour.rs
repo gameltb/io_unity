@@ -1,12 +1,10 @@
-use binrw::binrw;
-
+use super::MonoBehaviourObject;
 use crate::{
     classes::{behaviour::Behaviour, p_ptr::PPtr},
     until::binrw_parser::AlignedString,
     SerializedFileMetadata,
 };
-
-use super::MonoBehaviourObject;
+use binrw::binrw;
 
 impl MonoBehaviourObject for MonoBehaviour {}
 

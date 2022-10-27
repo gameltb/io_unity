@@ -1,21 +1,19 @@
 pub mod component;
 pub mod type_tree;
 
+use super::p_ptr::PPtr;
+use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
+use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
-
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-
-use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
-
-use super::p_ptr::PPtr;
+use supercow::Supercow;
 
 def_unity_class!(Component, ComponentObject);
 
 pub trait ComponentObject: fmt::Debug {
-    fn get_game_object(&self) -> &PPtr;
+    fn get_game_object(&self) -> Supercow<PPtr>;
 }
 
 impl BinRead for Component {

@@ -1,8 +1,6 @@
-use binrw::binrw;
-
-use crate::{classes::renderer::Renderer, SerializedFileMetadata};
-
 use super::MeshRendererObject;
+use crate::{classes::renderer::Renderer, SerializedFileMetadata};
+use binrw::binrw;
 
 impl MeshRendererObject for MeshRenderer {}
 

@@ -1,14 +1,11 @@
-use std::io::{prelude::*, SeekFrom};
-
-use binrw::{binrw, ReadOptions, VecArgs};
-use binrw::{io::Cursor, BinRead};
-use num_enum::TryFromPrimitive;
-
+use super::{BoneWeights, MeshObject, StreamBuff};
 use crate::until::binrw_parser::AlignedString;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::{BoneWeights, MeshObject, StreamBuff};
+use binrw::{binrw, ReadOptions, VecArgs};
+use binrw::{io::Cursor, BinRead};
+use num_enum::TryFromPrimitive;
+use std::io::{prelude::*, SeekFrom};
 
 impl Mesh {
     fn get_name(&self) -> &AlignedString {

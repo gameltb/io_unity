@@ -18,5 +18,6 @@ image = "0.24"
 texpresso = "2"
 astc-decode = "0.3"
 
-glam = "0.21"
+glam = "0.22"
 half = "2.1"
+supercow = "0.1"

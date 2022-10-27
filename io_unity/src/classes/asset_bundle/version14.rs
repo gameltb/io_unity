@@ -1,10 +1,8 @@
-use binrw::binrw;
-
+use super::AssetBundleObject;
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::AlignedString;
 use crate::SerializedFileMetadata;
-
-use super::AssetBundleObject;
+use binrw::binrw;
 
 impl AssetBundleObject for AssetBundle {}
 

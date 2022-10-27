@@ -1,12 +1,9 @@
-use binrw::binrw;
-
-use num_enum::TryFromPrimitive;
-
+use super::MeshObject;
 use crate::until::binrw_parser::AlignedString;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::MeshObject;
+use binrw::binrw;
+use num_enum::TryFromPrimitive;
 
 impl Mesh {
     fn get_name(&self) -> &AlignedString {

@@ -1,16 +1,14 @@
-use std::borrow::Cow;
-
-use std::io::{prelude::*, SeekFrom};
-
-use num_enum::TryFromPrimitive;
-
-use crate::type_tree::TypeTreeObject;
-
-use crate::FS;
-
 use super::{Texture2DObject, TextureFormat};
+use crate::type_tree::TypeTreeObject;
+use crate::{def_type_tree_class, FS};
+use num_enum::TryFromPrimitive;
+use std::borrow::Cow;
+use std::io::{prelude::*, SeekFrom};
+use supercow::Supercow;
 
-impl Texture2DObject for Texture2D {
+def_type_tree_class!(Texture2D);
+
+impl Texture2DObject for Texture2D<'_> {
     fn get_width(&self) -> u64 {
         self.get_width().unwrap() as u64
     }
@@ -43,16 +41,7 @@ impl Texture2DObject for Texture2D {
     }
 }
 
-#[derive(Debug)]
-pub struct Texture2D {
-    inner: TypeTreeObject,
-}
-
-impl Texture2D {
-    pub fn new(inner: TypeTreeObject) -> Self {
-        Self { inner }
-    }
-
+impl Texture2D<'_> {
     fn get_name(&self) -> Option<String> {
         self.inner.get_string_by_path("/Base/m_Name")
     }

@@ -2,19 +2,18 @@ pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_2_0;
 
+use crate::{
+    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
+};
+use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use image::{DynamicImage, GrayAlphaImage, RgbImage, RgbaImage};
+use num_enum::TryFromPrimitive;
 use std::{
     borrow::Cow,
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
-use image::{DynamicImage, RgbaImage};
-use num_enum::TryFromPrimitive;
-
-use crate::{
-    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata, FS,
-};
 
 def_unity_class!(Texture2D, Texture2DObject);
 
@@ -126,7 +125,35 @@ pub trait Texture2DObject: fmt::Debug {
                         RgbaImage::from_raw(width as u32, height as u32, output.concat()).unwrap();
                     return Some(DynamicImage::ImageRgba8(result));
                 }
-                _ => println!("{:?}", self.get_texture_format()),
+                TextureFormat::Alpha8 => {
+                    let buff: Vec<[u8; 2]> = data.as_ref().into_iter().map(|f| [0, *f]).collect();
+                    let result = GrayAlphaImage::from_raw(
+                        self.get_width() as u32,
+                        self.get_height() as u32,
+                        buff.concat(),
+                    )
+                    .unwrap();
+                    return Some(DynamicImage::ImageLumaA8(result));
+                }
+                TextureFormat::RGB24 => {
+                    let result = RgbImage::from_raw(
+                        self.get_width() as u32,
+                        self.get_height() as u32,
+                        data.to_vec(),
+                    )
+                    .unwrap();
+                    return Some(DynamicImage::ImageRgb8(result));
+                }
+                TextureFormat::RGBA32 => {
+                    let result = RgbaImage::from_raw(
+                        self.get_width() as u32,
+                        self.get_height() as u32,
+                        data.to_vec(),
+                    )
+                    .unwrap();
+                    return Some(DynamicImage::ImageRgba8(result));
+                }
+                _ => println!("unsupport texture_format: {:?}", self.get_texture_format()),
             }
         }
         None

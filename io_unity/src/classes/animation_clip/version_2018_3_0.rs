@@ -1,10 +1,8 @@
-use binrw::binrw;
-
+use super::AnimationClipObject;
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
-
-use super::AnimationClipObject;
+use binrw::binrw;
 
 impl AnimationClipObject for AnimationClip {
     fn get_name(&self) -> String {

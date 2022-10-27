@@ -1,23 +1,23 @@
-use crate::type_tree::TypeTreeObject;
-
-use crate::def_type_tree_class;
-
 use super::SkinnedMeshRendererObject;
+use crate::classes::p_ptr::PPtr;
+use crate::def_type_tree_class;
+use crate::type_tree::TypeTreeObject;
+use supercow::Supercow;
 
 def_type_tree_class!(SkinnedMeshRenderer);
 
-impl SkinnedMeshRendererObject for SkinnedMeshRenderer {
-    fn get_bones(&self) -> &Vec<crate::classes::p_ptr::PPtr> {
+impl SkinnedMeshRendererObject for SkinnedMeshRenderer<'_> {
+    fn get_bones(&self) -> &Vec<PPtr> {
         todo!()
     }
 
-    fn get_mesh(&self) -> &crate::classes::p_ptr::PPtr {
+    fn get_mesh(&self) -> &PPtr {
         todo!()
     }
 
-    fn get_materials(&self) -> &Vec<crate::classes::p_ptr::PPtr> {
+    fn get_materials(&self) -> &Vec<PPtr> {
         todo!()
     }
 }
 
-impl SkinnedMeshRenderer {}
+impl SkinnedMeshRenderer<'_> {}

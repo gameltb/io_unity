@@ -1,8 +1,6 @@
-use binrw::binrw;
-
-use crate::{classes::p_ptr::PPtr, BuildTarget, SerializedFileMetadata};
-
 use super::EditorExtensionObject;
+use crate::{classes::p_ptr::PPtr, BuildTarget, SerializedFileMetadata};
+use binrw::binrw;
 
 impl EditorExtensionObject for EditorExtension {}
 

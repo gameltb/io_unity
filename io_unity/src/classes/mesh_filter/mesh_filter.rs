@@ -1,11 +1,9 @@
-use binrw::binrw;
-
+use super::MeshFilterObject;
 use crate::{
     classes::{component::Component, p_ptr::PPtr},
     SerializedFileMetadata,
 };
-
-use super::MeshFilterObject;
+use binrw::binrw;
 
 impl MeshFilterObject for MeshFilter {}
 

@@ -7,6 +7,8 @@ use std::{
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
 
+
+
 pub trait TypeField: Debug {
     fn get_version(&self) -> u16;
     fn get_level(&self) -> u8;
@@ -34,25 +36,26 @@ pub enum Value<'a> {
     Float(f32),
     Double(f64),
     String(String),
-    Array(Vec<FieldValue>),
+    Array(Vec<TypeTreeObject>),
+    Object(TypeTreeObject),
     ByteArray(Cow<'a, Vec<u8>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FieldValue {
     Data(Vec<u8>),
     Fields(Vec<Field>),
     Array(Box<ArrayField>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayField {
     array_size: Field,
     item_type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
     data: FieldValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Field {
     field_type: Arc<Box<dyn TypeField + Send + Sync>>,
     data: FieldValue,
@@ -116,7 +119,7 @@ impl Field {
                                 return Some(Value::Int8(i));
                             }
                         }
-                        "SInt16" => {
+                        "SInt16" | "short" => {
                             if let Ok(i) = <i16>::read_options(&mut Cursor::new(data), &op, ()) {
                                 return Some(Value::Int16(i));
                             }
@@ -126,17 +129,17 @@ impl Field {
                                 return Some(Value::Int32(i));
                             }
                         }
-                        "SInt64" => {
+                        "SInt64" | "long long" => {
                             if let Ok(i) = <i64>::read_options(&mut Cursor::new(data), &op, ()) {
                                 return Some(Value::Int64(i));
                             }
                         }
-                        "UInt8" => {
+                        "UInt8" | "char" => {
                             if let Ok(i) = <u8>::read(&mut Cursor::new(data)) {
                                 return Some(Value::UInt8(i));
                             }
                         }
-                        "UInt16" => {
+                        "UInt16" | "unsigned short" => {
                             if let Ok(i) = <u16>::read_options(&mut Cursor::new(data), &op, ()) {
                                 return Some(Value::UInt16(i));
                             }
@@ -146,7 +149,7 @@ impl Field {
                                 return Some(Value::UInt32(i));
                             }
                         }
-                        "UInt64" => {
+                        "UInt64" | "unsigned long long" | "FileSize" => {
                             if let Ok(i) = <u64>::read_options(&mut Cursor::new(data), &op, ()) {
                                 return Some(Value::UInt64(i));
                             }
@@ -156,29 +159,51 @@ impl Field {
                                 return Some(Value::Float(i));
                             }
                         }
+                        "double" => {
+                            if let Ok(i) = <f64>::read_options(&mut Cursor::new(data), &op, ()) {
+                                return Some(Value::Double(i));
+                            }
+                        }
                         &_ => (),
                     }
                     return Some(Value::ByteArray(Cow::Borrowed(data)));
                 }
-                FieldValue::Array(array_field) => {
-                    if let FieldValue::Data(array) = &array_field.data {
+                FieldValue::Array(array_field) => match &array_field.data {
+                    FieldValue::Data(array) => {
                         if array.len() > 0 {
                             return Some(Value::ByteArray(Cow::Borrowed(array)));
                         }
                     }
-                }
-                _ => {
+                    FieldValue::Fields(array_object) => {
+                        if array_object.len() > 0 {
+                            let array = array_object
+                                .into_iter()
+                                .map(|f| TypeTreeObject {
+                                    endian: endian.clone(),
+                                    class_id: 0,
+                                    data: f.clone(),
+                                })
+                                .collect();
+                            return Some(Value::Array(array));
+                        }
+                    }
+                    _ => (),
+                },
+                FieldValue::Fields(fields) => {
                     if "string" == self.field_type.get_type() {
-                        if let FieldValue::Fields(fields) = &self.data {
-                            if let Some(array) = fields.get(0) {
-                                if let Some(data) = array.get_array() {
-                                    return Some(Value::String(
-                                        String::from_utf8(data.to_vec()).unwrap(),
-                                    ));
-                                }
+                        if let Some(array) = fields.get(0) {
+                            if let Some(data) = array.get_sized_array_buff() {
+                                return Some(Value::String(
+                                    String::from_utf8(data.to_vec()).unwrap(),
+                                ));
                             }
                         }
                     }
+                    return Some(Value::Object(TypeTreeObject {
+                        endian: endian.clone(),
+                        class_id: 0,
+                        data: self.clone(),
+                    }));
                 }
             }
         } else {
@@ -199,7 +224,7 @@ impl Field {
         None
     }
 
-    fn get_array(&self) -> Option<Cow<Vec<u8>>> {
+    fn get_sized_array_buff(&self) -> Option<Cow<Vec<u8>>> {
         if let FieldValue::Array(array) = &self.data {
             if let FieldValue::Data(array_data) = &array.data {
                 return Some(Cow::Borrowed(&array_data));
@@ -209,7 +234,7 @@ impl Field {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeTreeObject {
     endian: binrw::Endian,
     class_id: i32,
@@ -263,6 +288,16 @@ impl TypeTreeObject {
                 Value::UInt16(i) => Some(i as u64),
                 Value::UInt32(i) => Some(i as u64),
                 Value::UInt64(i) => Some(i as u64),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_object_by_path(&self, path: &str) -> Option<TypeTreeObject> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Object(inner) => Some(inner),
                 _ => None,
             };
         }

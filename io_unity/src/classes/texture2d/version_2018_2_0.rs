@@ -1,13 +1,9 @@
-use std::borrow::Cow;
-
-use std::io::{prelude::*, SeekFrom};
-
-use binrw::binrw;
-
+use super::{Texture2DObject, TextureFormat};
 use crate::until::binrw_parser::{AlignedString, U8Bool};
 use crate::{SerializedFileMetadata, FS};
-
-use super::{Texture2DObject, TextureFormat};
+use binrw::binrw;
+use std::borrow::Cow;
+use std::io::{prelude::*, SeekFrom};
 
 impl Texture2DObject for Texture2D {
     fn get_width(&self) -> u64 {
