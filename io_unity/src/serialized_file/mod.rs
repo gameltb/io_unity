@@ -314,8 +314,8 @@ pub struct Object {
 }
 
 pub struct SerializedFile {
-    content: Box<dyn Serialized + Send>,
-    file_reader: RefCell<Box<dyn UnityResource + Send>>,
+    content: Box<dyn Serialized + Send + Sync>,
+    file_reader: RefCell<Box<dyn UnityResource + Send + Sync>>,
     object_map: BTreeMap<i64, Object>,
 }
 
@@ -328,10 +328,10 @@ impl fmt::Debug for SerializedFile {
 }
 
 impl SerializedFile {
-    pub fn read(mut reader: Box<dyn UnityResource + Send>) -> BinResult<Self> {
+    pub fn read(mut reader: Box<dyn UnityResource + Send + Sync>) -> BinResult<Self> {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0))?;
-        let file: Box<dyn Serialized + Send> = match head.version {
+        let file: Box<dyn Serialized + Send+ Sync> = match head.version {
             SerializedFileFormatVersion::Unsupported => todo!(),
             SerializedFileFormatVersion::Unknown_2 => todo!(),
             SerializedFileFormatVersion::Unknown_3 => todo!(),
@@ -427,7 +427,7 @@ pub trait Serialized: fmt::Debug {
 
     fn get_object_by_index(
         &self,
-        reader: &mut Box<dyn UnityResource + Send>,
+        reader: &mut Box<dyn UnityResource + Send + Sync>,
         index: u32,
     ) -> Option<Class> {
         let obj = self.get_raw_object_by_index(index);
@@ -436,7 +436,7 @@ pub trait Serialized: fmt::Debug {
 
     fn get_type_tree_object(
         &self,
-        reader: &mut Box<dyn UnityResource + Send>,
+        reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
     ) -> TypeTreeObject {
         let args = self.get_type_object_args_by_type_id(obj.type_id);
@@ -458,7 +458,7 @@ pub trait Serialized: fmt::Debug {
 
     fn get_object(
         &self,
-        reader: &mut Box<dyn UnityResource + Send>,
+        reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
     ) -> Option<Class> {
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start));
@@ -539,7 +539,7 @@ pub trait Serialized: fmt::Debug {
         )
     }
 
-    fn get_asset_bundle(&self, reader: &mut Box<dyn UnityResource + Send>) -> Option<Class> {
+    fn get_asset_bundle(&self, reader: &mut Box<dyn UnityResource + Send + Sync>) -> Option<Class> {
         for i in 0..self.get_object_count() {
             let obj = self.get_raw_object_by_index(i as u32);
             if obj.class == ClassIDType::AssetBundle {
