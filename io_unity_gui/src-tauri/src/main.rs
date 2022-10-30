@@ -81,11 +81,13 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
             let mut objects = vec![];
             for (pathid, obj) in cab.get_object_map() {
                 let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();
-                let name = tt_o.get_string_by_path("/Base/m_Name").unwrap_or("".to_owned());
+                let name = tt_o
+                    .get_string_by_path("/Base/m_Name")
+                    .unwrap_or("".to_owned());
                 objects.push(Object {
                     path_id: pathid.to_string(),
                     tp: format!("{:?}", &obj.class),
-                    name
+                    name,
                 });
             }
             return Ok(objects);
@@ -93,22 +95,25 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
     }
     if let Ok(op) = state.fs.lock() {
         if let Some(fs) = op.get(fs_path) {
-            let cabfile = fs.get_cab().unwrap();
-
-            let cabfile_reader = Box::new(Cursor::new(cabfile));
-            let cab = io_unity::SerializedFile::read(cabfile_reader).unwrap();
-            let mut objects = vec![];
-            for (pathid, obj) in cab.get_object_map() {                
-                let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();
-                let name = tt_o.get_string_by_path("/Base/m_Name").unwrap_or("".to_owned());
-                objects.push(Object {
-                    path_id: pathid.to_string(),
-                    tp: format!("{:?}", &obj.class),
-                    name
-                });
+            if let Some(cabfile_path) = fs.get_cab_path().get(0) {
+                let cabfile= fs.get_file_by_path(cabfile_path).unwrap(); 
+                let cabfile_reader = Box::new(Cursor::new(cabfile));
+                let cab = io_unity::SerializedFile::read(cabfile_reader).unwrap();
+                let mut objects = vec![];
+                for (pathid, obj) in cab.get_object_map() {
+                    let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();
+                    let name = tt_o
+                        .get_string_by_path("/Base/m_Name")
+                        .unwrap_or("".to_owned());
+                    objects.push(Object {
+                        path_id: pathid.to_string(),
+                        tp: format!("{:?}", &obj.class),
+                        name,
+                    });
+                }
+                state.cabs.lock().unwrap().insert(fs_path.to_owned(), cab);
+                return Ok(objects);
             }
-            state.cabs.lock().unwrap().insert(fs_path.to_owned(), cab);
-            return Ok(objects);
         }
     }
     Err(())

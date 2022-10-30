@@ -8,7 +8,6 @@ use std::{
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
 
 
-
 pub trait TypeField: Debug {
     fn get_version(&self) -> u16;
     fn get_level(&self) -> u8;

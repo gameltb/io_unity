@@ -45,6 +45,13 @@ const menu_open_event_listen = await listen('menu-open-event', (event) => {
   emit('selectedCab',  event.payload);
 });
 
+listen('tauri://file-drop', event => {
+  console.log(event)
+  Promise.all([invoke("open_fs", { fsPath: event.payload[0] })])
+  refresh.value = Date.now()
+  emit('selectedCab',  event.payload[0]);
+})
+
 const emit = defineEmits(['selectedCab']);
 
 const changehandle = (tree: Tree ,node: Node) => {

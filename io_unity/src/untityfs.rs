@@ -2,13 +2,11 @@ use std::convert::TryFrom;
 use std::fs::{File, OpenOptions};
 use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
 use std::path::PathBuf;
-
 use std::sync::{Arc, Mutex};
 
 use binrw::{binrw, BinResult, NullString, ReadOptions};
 use binrw::{io::Cursor, BinRead};
 use lz4::block::decompress;
-
 use num_enum::TryFromPrimitive;
 
 use crate::until::binrw_parser::position_parser; // reading/writing utilities
@@ -79,9 +77,9 @@ pub struct UnityFSFile {
 }
 
 impl UnityFS {
-    pub fn get_file_by_path(&self, path: String) -> std::io::Result<Vec<u8>> {
+    pub fn get_file_by_path(&self, path: &String) -> std::io::Result<Vec<u8>> {
         for node in self.get_files() {
-            if path == node.path() {
+            if path == &node.path() {
                 return self.get_file_by_node(node);
             }
         }
@@ -129,21 +127,15 @@ impl UnityFS {
         return &self.content.blocks_info.directory_info;
     }
 
-    pub fn get_cab_path(&self) -> Option<String> {
+    pub fn get_cab_path(&self) -> Vec<String> {
+        let mut paths = vec![];
         for file in self.get_files() {
             let path = file.path();
             if path.starts_with("CAB-") && (path.len() == 36) {
-                return Some(path);
+                paths.push(path);
             }
         }
-        None
-    }
-
-    pub fn get_cab(&self) -> std::io::Result<Vec<u8>> {
-        if let Some(path) = self.get_cab_path() {
-            return self.get_file_by_path(path);
-        }
-        Err(std::io::Error::from(ErrorKind::NotFound))
+        paths
     }
 
     pub fn read(
@@ -178,7 +170,7 @@ impl FS for UnityFS {
             .map(|f| f.to_string_lossy().into_owned())
         {
             if path.starts_with("archive:/") {
-                if let Ok(file) = self.get_file_by_path(file_name) {
+                if let Ok(file) = self.get_file_by_path(&file_name) {
                     let file_reader = Cursor::new(file);
                     return Some(Box::new(file_reader));
                 }

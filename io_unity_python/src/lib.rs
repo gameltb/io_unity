@@ -65,7 +65,14 @@ impl UnityFS {
     }
 
     pub fn get_cab(&self) -> PyResult<SerializedFile> {
-        Ok(SerializedFile::read(self.0.get_cab()?)?)
+        Ok(SerializedFile::read(
+            self.0.get_file_by_path(
+                self.0
+                    .get_cab_path()
+                    .get(0)
+                    .ok_or(pyo3::exceptions::PyException::new_err(""))?,
+            )?,
+        )?)
     }
 }
 

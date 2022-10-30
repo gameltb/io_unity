@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fmt;
-
 use std::io::prelude::*;
 use std::sync::Arc;
 

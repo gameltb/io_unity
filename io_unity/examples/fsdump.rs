@@ -11,7 +11,7 @@ use io_unity::classes::ClassIDType;
 use io_unity::*;
 
 fn main() {
-    let path = "/tmp/files/AssetBundle/";
+    let path = "/tmp/files/aa/Android/";
     let dirs = std::fs::read_dir(path).unwrap();
     for entry in dirs {
         if let Ok(entry) = entry {
@@ -42,7 +42,7 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         println!("{}", p.path());
     }
 
-    let cabfile = oval.get_cab().unwrap();
+    let cabfile =  oval.get_file_by_path(oval.get_cab_path().get(0).unwrap()).unwrap();
     // let mut outfile = File::create("test").unwrap();
     // outfile.write_all(&cabfile);
 
@@ -50,25 +50,92 @@ fn handle<P: AsRef<Path>>(filepath: P) {
     let s = SerializedFile::read(cabfile_reader).unwrap();
     // println!("{:#?}", s);
 
-    let mut fs = Box::new(oval) as Box<dyn FS>;
+    let _fs = Box::new(oval) as Box<dyn FS>;
     let mut viewed = Vec::new();
     for (pathid, obj) in s.get_object_map() {
-        if obj.class == ClassIDType::Texture2D {
-            if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
-            {
-                println!("{:#?}", &tex);
-                tex.get_image(&mut fs).and_then(|t| {
-                    Some(
-                        t.flipv()
-                            .save("/tmp/tex/".to_string() + &tex.get_image_name() + ".png"),
-                    )
-                });
-            }
-        }
-        if !viewed.contains(&obj.class) {
+        // match obj.class {
+        //     ClassIDType::Texture2D
+        //     | ClassIDType::AudioClip
+        //     | ClassIDType::TextAsset
+        //     | ClassIDType::CanvasRenderer
+        //     | ClassIDType::RectTransform
+        //     | ClassIDType::GameObject
+        //     | ClassIDType::Animation
+        //     | ClassIDType::Sprite
+        //     | ClassIDType::ParticleSystemRenderer
+        //     | ClassIDType::ParticleSystem
+        //     | ClassIDType::AnimationClip
+        //     | ClassIDType::Material
+        //     | ClassIDType::Shader
+        //     | ClassIDType::Animator
+        //     | ClassIDType::PlayableDirector
+        //     | ClassIDType::Canvas
+        //     | ClassIDType::SpriteAtlas
+        //     | ClassIDType::CanvasGroup
+        //     | ClassIDType::Transform
+        //     | ClassIDType::MeshFilter
+        //     | ClassIDType::MeshRenderer
+        //     | ClassIDType::Font
+        //     | ClassIDType::TrailRenderer
+        //     | ClassIDType::Camera
+        //     | ClassIDType::AudioListener
+        //     | ClassIDType::AnimatorController
+        //     | ClassIDType::AudioSource
+        //     | ClassIDType::AudioMixerGroupController
+        //     | ClassIDType::AudioMixerController
+        //     | ClassIDType::AudioMixerSnapshotController
+        //     | ClassIDType::MonoBehaviour
+        //     | ClassIDType::AssetBundle => {
+        //         continue;
+        //     }
+        //     _ => {
+        //         // let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+        //         // tt_o.display_tree();
+        //         // println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
+        //         // panic!("")
+        //     }
+        // }
+        // if obj.class == ClassIDType::Texture2D {
+        //     if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
+        //     {
+        //         // println!("{:#?}", &tex);
+        //         tex.get_image(&mut fs).and_then(|t| {
+        //             Some(
+        //                 t.flipv()
+        //                     .save("/tmp/tex/".to_string() + &tex.get_image_name() + ".png"),
+        //             )
+        //         });
+        //     }
+        // }
+        // if obj.class == ClassIDType::AudioClip {
+        //     if let Some(classes::Class::AudioClip(audio)) = s.get_object_by_path_id(pathid.to_owned())
+        //     {
+        //         println!("{:#?}", &audio.get_name());
+        //     }
+        // }
+        if obj.class == ClassIDType::TextAsset {
             let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
             tt_o.display_tree();
-            println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+            println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
+        }
+        // if obj.class == ClassIDType::MonoBehaviour {
+        //     let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+        //     tt_o.display_tree();
+        //     println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
+        // }
+        if obj.class == ClassIDType::MonoScript {
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            // tt_o.display_tree();
+            println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
+            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
+            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
+        }
+        if !viewed.contains(&obj.class) {
+            // let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            // println!("class {:?}", &obj.class);
+            // // tt_o.display_tree();
+            // println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
             // println!("{:#?}", s.get_tt_object_by_path_id(*pathid));
             viewed.push(obj.class.clone());
         }
@@ -89,9 +156,9 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                     {
                         println!("{:#?}", bone);
                         bone_name_buff.push(
-                            if let Some(classes::Class::GameObject(go)) = s.get_object_by_path_id(
-                                bone.get_component().get_game_object().get_path_id(),
-                            ) {
+                            if let Some(classes::Class::GameObject(go)) =
+                                s.get_object_by_path_id(bone.get_game_object().get_path_id())
+                            {
                                 go.get_name().to_string()
                             } else {
                                 "bone".to_string()
