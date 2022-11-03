@@ -18,7 +18,7 @@ use crate::classes::{Class, ClassIDType};
 use crate::until::binrw_parser::*;
 use crate::Serialized;
 
-use super::{SerializedFileCommonHeader, COMMON_STRING}; // reading/writing utilities
+use super::{SerializedFileCommonHeader, COMMON_STRING}; 
 
 #[binrw]
 #[derive(Debug, PartialEq)]

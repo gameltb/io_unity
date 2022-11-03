@@ -9,7 +9,6 @@ use std::{
     io::{Read, Seek, Write},
 };
 
-
 def_unity_class!(AssetBundle, AssetBundleObject);
 
 pub trait AssetBundleObject: fmt::Debug {}

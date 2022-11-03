@@ -10,7 +10,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(Renderer, RendererObject);
 
 pub trait RendererObject: fmt::Debug {

@@ -8,7 +8,6 @@ use std::{
     io::{Read, Seek, Write},
 };
 
-
 def_unity_class!(MeshFilter, MeshFilterObject);
 
 pub trait MeshFilterObject: fmt::Debug {}

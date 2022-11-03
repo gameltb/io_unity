@@ -10,7 +10,6 @@ use std::{
     io::{Read, Seek, Write},
 };
 
-
 def_unity_class!(PPtr, PPtrObject);
 
 pub trait PPtrObject: fmt::Debug {

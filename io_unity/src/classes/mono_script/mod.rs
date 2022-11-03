@@ -9,7 +9,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(MonoScript, MonoScriptObject);
 
 pub trait MonoScriptObject: fmt::Debug {}

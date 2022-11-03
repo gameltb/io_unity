@@ -1,4 +1,13 @@
+pub mod version10;
+pub mod version12;
+pub mod version13;
+pub mod version14;
+pub mod version15;
+pub mod version16;
 pub mod version17;
+pub mod version19;
+pub mod version20;
+pub mod version21;
 pub mod version22;
 
 use std::cell::RefCell;
@@ -331,7 +340,7 @@ impl SerializedFile {
     pub fn read(mut reader: Box<dyn UnityResource + Send + Sync>) -> BinResult<Self> {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0))?;
-        let file: Box<dyn Serialized + Send+ Sync> = match head.version {
+        let file: Box<dyn Serialized + Send + Sync> = match head.version {
             SerializedFileFormatVersion::Unsupported => todo!(),
             SerializedFileFormatVersion::Unknown_2 => todo!(),
             SerializedFileFormatVersion::Unknown_3 => todo!(),
@@ -340,20 +349,40 @@ impl SerializedFile {
             SerializedFileFormatVersion::Unknown_7 => todo!(),
             SerializedFileFormatVersion::Unknown_8 => todo!(),
             SerializedFileFormatVersion::Unknown_9 => todo!(),
-            SerializedFileFormatVersion::Unknown_10 => todo!(),
+            SerializedFileFormatVersion::Unknown_10 => {
+                Box::new(version10::SerializedFile::read(&mut reader)?)
+            }
             SerializedFileFormatVersion::HasScriptTypeIndex => todo!(),
-            SerializedFileFormatVersion::Unknown_12 => todo!(),
-            SerializedFileFormatVersion::HasTypeTreeHashes => todo!(),
-            SerializedFileFormatVersion::Unknown_14 => todo!(),
-            SerializedFileFormatVersion::SupportsStrippedObject => todo!(),
-            SerializedFileFormatVersion::RefactoredClassId => todo!(),
+            SerializedFileFormatVersion::Unknown_12 => {
+                Box::new(version12::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::HasTypeTreeHashes => {
+                Box::new(version13::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_14 => {
+                Box::new(version14::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::SupportsStrippedObject => {
+                Box::new(version15::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::RefactoredClassId => {
+                Box::new(version16::SerializedFile::read(&mut reader)?)
+            }
             SerializedFileFormatVersion::RefactorTypeData => {
                 Box::new(version17::SerializedFile::read(&mut reader)?)
             }
-            SerializedFileFormatVersion::RefactorShareableTypeTreeData => todo!(),
-            SerializedFileFormatVersion::TypeTreeNodeWithTypeFlags => todo!(),
-            SerializedFileFormatVersion::SupportsRefObject => todo!(),
-            SerializedFileFormatVersion::StoresTypeDependencies => todo!(),
+            SerializedFileFormatVersion::RefactorShareableTypeTreeData => {
+                Box::new(version17::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::TypeTreeNodeWithTypeFlags => {
+                Box::new(version19::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::SupportsRefObject => {
+                Box::new(version20::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::StoresTypeDependencies => {
+                Box::new(version21::SerializedFile::read(&mut reader)?)
+            }
             SerializedFileFormatVersion::LargeFilesSupport => {
                 Box::new(version22::SerializedFile::read(&mut reader)?)
             }

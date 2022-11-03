@@ -8,7 +8,6 @@ use std::{
     io::{Read, Seek, Write},
 };
 
-
 def_unity_class!(MonoBehaviour, MonoBehaviourObject);
 
 pub trait MonoBehaviourObject: fmt::Debug {}

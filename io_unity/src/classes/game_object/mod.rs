@@ -2,17 +2,12 @@ pub mod type_tree;
 pub mod version_5_5_0;
 
 use crate::type_tree::TypeTreeObject;
-use crate::{
-    def_unity_class,
-    until::{UnityVersion},
-    SerializedFileMetadata,
-};
+use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
-
 
 def_unity_class!(GameObject, GameObjectObject);
 

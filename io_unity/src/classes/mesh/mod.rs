@@ -14,7 +14,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(Mesh, MeshObject);
 
 pub trait MeshObject: fmt::Debug {

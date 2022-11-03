@@ -9,7 +9,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(Material, MaterialObject);
 
 pub trait MaterialObject: fmt::Debug {}

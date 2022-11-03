@@ -8,7 +8,6 @@ use std::{
     io::{Read, Seek, Write},
 };
 
-
 def_unity_class!(EditorExtension, EditorExtensionObject);
 
 pub trait EditorExtensionObject: fmt::Debug {}

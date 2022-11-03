@@ -7,24 +7,10 @@ use binrw::{binrw, NullString};
 use crate::classes::ClassIDType;
 use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::{binrw_parser::*, Endian};
-use crate::version17::{FileIdentifier, ScriptType};
-use crate::version19::TypeTreeNode;
-use crate::version21::{
-    SerializedRefType, SerializedRefTypeBinReadArgs, SerializedType, SerializedTypeBinReadArgs,
-};
+use crate::version17::{FileIdentifier, ScriptType, TypeTree, TypeTreeNode};
 use crate::{Serialized, SerializedFileFormatVersion};
 
 use super::{BuildTarget, SerializedFileCommonHeader};
-
-#[binrw]
-#[br(big)]
-#[derive(Debug, Eq, PartialEq)]
-struct SerializedFileHeader {
-    metadata_size: u32,
-    file_size: u64,
-    data_offset: u64,
-    unknown: u64,
-}
 
 #[binrw]
 #[brw(big)]
@@ -33,7 +19,6 @@ pub struct SerializedFile {
     header: SerializedFileCommonHeader,
     endianess: Endian,
     reserved: [u8; 3],
-    header2: SerializedFileHeader,
     #[br(is_little = endianess == Endian::Little)]
     content: SerializedFileContent,
 }
@@ -44,7 +29,7 @@ impl Serialized for SerializedFile {
     }
 
     fn get_data_offset(&self) -> u64 {
-        self.header2.data_offset
+        self.header.data_offset as u64
     }
 
     fn get_endianess(&self) -> &Endian {
@@ -55,16 +40,9 @@ impl Serialized for SerializedFile {
         let obj = self.content.objects.get(index as usize).unwrap();
         super::Object {
             path_id: obj.path_id,
-            byte_start: obj.byte_start,
+            byte_start: obj.byte_start as u64,
             byte_size: obj.byte_size,
-            class: ClassIDType::try_from(
-                self.content
-                    .types
-                    .get(obj.type_id as usize)
-                    .unwrap()
-                    .class_id,
-            )
-            .unwrap(),
+            class: ClassIDType::try_from(obj.class_id as i32).unwrap(),
             type_id: obj.type_id as usize,
         }
     }
@@ -86,7 +64,12 @@ impl Serialized for SerializedFile {
     }
 
     fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
-        let stypetree = &self.content.types.get(type_id).unwrap();
+        let stypetree = self
+            .content
+            .types
+            .iter()
+            .find(|tp| tp.class_id == type_id as i32)
+            .unwrap();
         let type_tree = stypetree.type_tree.as_ref().unwrap();
         let mut type_fields = Vec::new();
         let mut string_reader = Cursor::new(&type_tree.string_buffer);
@@ -105,26 +88,35 @@ impl Serialized for SerializedFile {
 
 #[binrw]
 #[derive(Debug, PartialEq)]
-pub struct SerializedFileContent {
-    pub unity_version: NullString,
-    pub target_platform: BuildTarget,
-    pub enable_type_tree: U8Bool,
+struct SerializedFileContent {
+    unity_version: NullString,
+    target_platform: BuildTarget,
+    enable_type_tree: U8Bool,
     type_count: u32,
-    #[br(args { count: type_count as usize, inner:  SerializedTypeBinReadArgs::builder().enable_type_tree(*enable_type_tree).finalize() })]
-    pub types: Vec<SerializedType>,
-    pub object_count: i32,
+    #[br(args { count: type_count as usize, inner: SerializedTypeBinReadArgs { enable_type_tree:*enable_type_tree } })]
+    types: Vec<SerializedType>,
+    object_count: i32,
     #[br(count = object_count)]
-    pub objects: Vec<Object>,
+    objects: Vec<Object>,
     script_count: i32,
     #[br(count = script_count)]
     script_types: Vec<ScriptType>,
     externals_count: i32,
     #[br(count = externals_count)]
     externals: Vec<FileIdentifier>,
-    ref_type_count: i32,
-    #[br(args { count: ref_type_count as usize, inner: SerializedRefTypeBinReadArgs::builder().enable_type_tree(*enable_type_tree).finalize() })]
-    ref_types: Vec<SerializedRefType>,
     user_information: NullString,
+}
+
+#[binrw]
+#[br(import { enable_type_tree: bool})]
+#[derive(Debug, PartialEq)]
+pub struct SerializedType {
+    pub class_id: i32,
+    #[br(if(class_id <  0))]
+    pub script_id: Option<[u8; 16]>,
+    pub old_type_hash: [u8; 16],
+    #[br(if(enable_type_tree))]
+    pub type_tree: Option<TypeTree>,
 }
 
 #[binrw]
@@ -132,7 +124,10 @@ pub struct SerializedFileContent {
 pub struct Object {
     #[br(align_before(4))]
     pub path_id: i64,
-    pub byte_start: u64,
+    pub byte_start: u32,
     pub byte_size: u32,
     pub type_id: i32,
+    pub class_id: u16,
+    pub script_type_index: i16,
+    pub stripped: u8,
 }

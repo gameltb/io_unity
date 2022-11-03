@@ -96,7 +96,7 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
     if let Ok(op) = state.fs.lock() {
         if let Some(fs) = op.get(fs_path) {
             if let Some(cabfile_path) = fs.get_cab_path().get(0) {
-                let cabfile= fs.get_file_by_path(cabfile_path).unwrap(); 
+                let cabfile = fs.get_file_by_path(cabfile_path).unwrap();
                 let cabfile_reader = Box::new(Cursor::new(cabfile));
                 let cab = io_unity::SerializedFile::read(cabfile_reader).unwrap();
                 let mut objects = vec![];

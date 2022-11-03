@@ -9,7 +9,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(Avatar, AvatarObject);
 
 pub trait AvatarObject: fmt::Debug {}

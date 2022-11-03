@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fmt;
-
 use std::io::{prelude::*, SeekFrom};
 use std::sync::Arc;
 
@@ -12,7 +11,7 @@ use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::{binrw_parser::*, Endian};
 use crate::{Serialized, SerializedFileFormatVersion};
 
-use super::{BuildTarget, SerializedFileCommonHeader, COMMON_STRING}; // reading/writing utilities
+use super::{BuildTarget, SerializedFileCommonHeader, COMMON_STRING};
 
 #[binrw]
 #[brw(big)]
@@ -44,7 +43,14 @@ impl Serialized for SerializedFile {
             path_id: obj.path_id,
             byte_start: obj.byte_start as u64,
             byte_size: obj.byte_size,
-            class: ClassIDType::try_from(obj.get_type(&self.content.types).class_id).unwrap(),
+            class: ClassIDType::try_from(
+                self.content
+                    .types
+                    .get(obj.type_id as usize)
+                    .unwrap()
+                    .class_id,
+            )
+            .unwrap(),
             type_id: obj.type_id as usize,
         }
     }
@@ -119,14 +125,14 @@ pub struct SerializedType {
 }
 
 #[binrw]
-#[derive(PartialEq)]
-struct TypeTree {
+#[derive(Clone, PartialEq)]
+pub struct TypeTree {
     number_of_nodes: i32,
     string_buffer_size: i32,
     #[br(count = number_of_nodes)]
-    type_tree_node_blobs: Vec<TypeTreeNodeBlob>,
+    pub type_tree_node_blobs: Vec<TypeTreeNodeBlob>,
     #[br(count = string_buffer_size)]
-    string_buffer: Vec<u8>,
+    pub string_buffer: Vec<u8>,
 }
 
 impl fmt::Debug for TypeTree {
@@ -155,7 +161,7 @@ impl fmt::Debug for TypeTree {
 
 #[binrw]
 #[derive(Debug, Clone, PartialEq)]
-struct TypeTreeNodeBlob {
+pub struct TypeTreeNodeBlob {
     version: u16,
     level: u8,
     type_flags: u8,
@@ -167,16 +173,16 @@ struct TypeTreeNodeBlob {
 }
 
 impl TypeTreeNodeBlob {
-    fn get_type_str<R: Read + Seek>(&self, reader: &mut R) -> String {
+    pub fn get_type_str<R: Read + Seek>(&self, reader: &mut R) -> String {
         read_type_tree_string(self.type_str_offset, reader)
     }
 
-    fn get_name_str<R: Read + Seek>(&self, reader: &mut R) -> String {
+    pub fn get_name_str<R: Read + Seek>(&self, reader: &mut R) -> String {
         read_type_tree_string(self.name_str_offset, reader)
     }
 }
 
-pub(super) fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
+pub fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
     let is_offset = (value & 0x80000000) == 0;
     if is_offset {
         reader.seek(SeekFrom::Start(value.into()));
@@ -188,23 +194,17 @@ pub(super) fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) 
 
 #[binrw]
 #[derive(Debug, PartialEq)]
-struct Object {
+pub struct Object {
     #[br(align_before(4))]
-    path_id: i64,
-    byte_start: u32,
-    byte_size: u32,
-    type_id: i32,
-}
-
-impl Object {
-    fn get_type<'a>(&self, types: &'a Vec<SerializedType>) -> &'a SerializedType {
-        types.get(self.type_id as usize).unwrap()
-    }
+    pub path_id: i64,
+    pub byte_start: u32,
+    pub byte_size: u32,
+    pub type_id: i32,
 }
 
 #[binrw]
 #[derive(Debug, PartialEq)]
-struct ScriptType {
+pub struct ScriptType {
     local_serialized_file_index: i32,
     #[br(align_before(4))]
     local_identifier_in_file: i64,
@@ -212,7 +212,7 @@ struct ScriptType {
 
 #[binrw]
 #[derive(Debug, PartialEq)]
-struct FileIdentifier {
+pub struct FileIdentifier {
     temp_empty: NullString,
     guid: [u8; 16],
     r#type: i32,
@@ -221,9 +221,9 @@ struct FileIdentifier {
 
 #[derive(Debug, PartialEq)]
 pub struct TypeTreeNode {
-    name: String,
-    type_name: String,
-    node: TypeTreeNodeBlob,
+    pub name: String,
+    pub type_name: String,
+    pub node: TypeTreeNodeBlob,
 }
 
 impl TypeField for TypeTreeNode {

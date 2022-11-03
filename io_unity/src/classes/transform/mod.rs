@@ -1,7 +1,7 @@
 pub mod transform;
 pub mod type_tree;
 
-use super::{p_ptr::PPtr};
+use super::p_ptr::PPtr;
 use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use glam::Mat4;

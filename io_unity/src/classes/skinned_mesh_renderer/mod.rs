@@ -10,7 +10,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(SkinnedMeshRenderer, SkinnedMeshRendererObject);
 
 pub trait SkinnedMeshRendererObject: fmt::Debug {

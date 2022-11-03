@@ -42,7 +42,9 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         println!("{}", p.path());
     }
 
-    let cabfile =  oval.get_file_by_path(oval.get_cab_path().get(0).unwrap()).unwrap();
+    let cabfile = oval
+        .get_file_by_path(oval.get_cab_path().get(0).unwrap())
+        .unwrap();
     // let mut outfile = File::create("test").unwrap();
     // outfile.write_all(&cabfile);
 

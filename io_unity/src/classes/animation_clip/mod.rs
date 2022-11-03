@@ -9,7 +9,6 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-
 def_unity_class!(AnimationClip, AnimationClipObject);
 
 pub trait AnimationClipObject: fmt::Debug {
