@@ -130,7 +130,7 @@ pub struct ScriptType {
     local_identifier_in_file: i32,
 }
 
-fn path_id_parser<R: Read + Seek>(
+pub fn path_id_parser<R: Read + Seek>(
     reader: &mut R,
     ro: &ReadOptions,
     flags: (bool,),

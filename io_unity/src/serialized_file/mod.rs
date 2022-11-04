@@ -1,4 +1,6 @@
+pub mod version1;
 pub mod version10;
+pub mod version11;
 pub mod version12;
 pub mod version13;
 pub mod version14;
@@ -6,9 +8,17 @@ pub mod version15;
 pub mod version16;
 pub mod version17;
 pub mod version19;
+pub mod version2;
 pub mod version20;
 pub mod version21;
 pub mod version22;
+pub mod version3;
+pub mod version4;
+pub mod version5;
+pub mod version6;
+pub mod version7;
+pub mod version8;
+pub mod version9;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -341,18 +351,36 @@ impl SerializedFile {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0))?;
         let file: Box<dyn Serialized + Send + Sync> = match head.version {
-            SerializedFileFormatVersion::Unsupported => todo!(),
-            SerializedFileFormatVersion::Unknown_2 => todo!(),
-            SerializedFileFormatVersion::Unknown_3 => todo!(),
-            SerializedFileFormatVersion::Unknown_5 => todo!(),
-            SerializedFileFormatVersion::Unknown_6 => todo!(),
-            SerializedFileFormatVersion::Unknown_7 => todo!(),
-            SerializedFileFormatVersion::Unknown_8 => todo!(),
-            SerializedFileFormatVersion::Unknown_9 => todo!(),
+            SerializedFileFormatVersion::Unsupported => {
+                Box::new(version1::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_2 => {
+                Box::new(version2::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_3 => {
+                Box::new(version3::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_5 => {
+                Box::new(version5::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_6 =>{
+                Box::new(version6::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_7 => {
+                Box::new(version7::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_8 => {
+                Box::new(version8::SerializedFile::read(&mut reader)?)
+            }
+            SerializedFileFormatVersion::Unknown_9 =>{
+                Box::new(version9::SerializedFile::read(&mut reader)?)
+            }
             SerializedFileFormatVersion::Unknown_10 => {
                 Box::new(version10::SerializedFile::read(&mut reader)?)
             }
-            SerializedFileFormatVersion::HasScriptTypeIndex => todo!(),
+            SerializedFileFormatVersion::HasScriptTypeIndex => {
+                Box::new(version11::SerializedFile::read(&mut reader)?)
+            }
             SerializedFileFormatVersion::Unknown_12 => {
                 Box::new(version12::SerializedFile::read(&mut reader)?)
             }

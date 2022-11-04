@@ -6,9 +6,9 @@ use binrw::{binrw, NullString};
 use crate::classes::ClassIDType;
 use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::Endian;
-use crate::version10::{Object, ObjectBinReadArgs};
-use crate::version11::{SerializedType, TypeTree, TypeTreeNode};
-use crate::version17::FileIdentifier;
+use crate::version11::TypeTreeNode;
+use crate::version4::FileIdentifier;
+use crate::version6::Object;
 use crate::{Serialized, SerializedFileFormatVersion};
 
 use super::{BuildTarget, SerializedFileCommonHeader};
@@ -40,7 +40,7 @@ impl Serialized for SerializedFile {
     fn get_raw_object_by_index(&self, index: u32) -> super::Object {
         let obj = self.content.objects.get(index as usize).unwrap();
         super::Object {
-            path_id: obj.path_id,
+            path_id: obj.path_id as i64,
             byte_start: obj.byte_start as u64,
             byte_size: obj.byte_size,
             class: ClassIDType::try_from(obj.class_id as i32).unwrap(),
@@ -53,11 +53,11 @@ impl Serialized for SerializedFile {
     }
 
     fn get_unity_version(&self) -> String {
-        self.content.unity_version.to_string()
+        "".to_string()
     }
 
     fn get_target_platform(&self) -> &BuildTarget {
-        &self.content.target_platform
+        &BuildTarget::UnknownPlatform
     }
 
     fn get_enable_type_tree(&self) -> bool {
@@ -101,17 +101,39 @@ impl Serialized for SerializedFile {
 #[binrw]
 #[derive(Debug, PartialEq)]
 struct SerializedFileContent {
-    unity_version: NullString,
-    target_platform: BuildTarget,
     type_count: u32,
     #[br(count = type_count)]
     types: Vec<SerializedType>,
-    big_id_enabled: i32,
     object_count: i32,
-    #[br(args { count: object_count as usize, inner: ObjectBinReadArgs::builder().big_id_enabled(big_id_enabled != 0).finalize() })]
+    #[br(count = object_count)]
     objects: Vec<Object>,
     externals_count: i32,
     #[br(count = externals_count)]
     externals: Vec<FileIdentifier>,
-    user_information: NullString,
+}
+
+#[binrw]
+#[derive(Debug, PartialEq)]
+pub struct SerializedType {
+    pub class_id: i32,
+    pub type_tree: TypeTree,
+}
+
+#[binrw]
+#[br(import { level: i32 = 0})]
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeTree {
+    #[br(calc = level)]
+    pub level: i32,
+    pub type_name: NullString,
+    pub name: NullString,
+    pub byte_size: i32,
+    pub variable_count: i32,
+    pub index: i32,
+    pub type_flags: i32,
+    pub version: i32,
+    pub meta_flag: i32,
+    pub children_count: i32,
+    #[br(args { count: children_count as usize, inner: TypeTreeBinReadArgs::builder().level(level + 1).finalize() })]
+    pub children: Vec<TypeTree>,
 }

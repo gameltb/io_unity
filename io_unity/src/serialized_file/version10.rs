@@ -7,7 +7,7 @@ use binrw::{binrw, NullString};
 use crate::classes::ClassIDType;
 use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
 use crate::until::Endian;
-use crate::version13::{Object, ObjectBinReadArgs};
+use crate::version13::path_id_parser;
 use crate::version17::{FileIdentifier, TypeTree, TypeTreeNode};
 use crate::{Serialized, SerializedFileFormatVersion};
 
@@ -110,4 +110,17 @@ struct SerializedFileContent {
 pub struct SerializedType {
     pub class_id: i32,
     pub type_tree: TypeTree,
+}
+
+#[binrw]
+#[br(import { big_id_enabled: bool})]
+#[derive(Debug, PartialEq)]
+pub struct Object {
+    #[br(parse_with = path_id_parser, args (big_id_enabled))]
+    pub path_id: i64,
+    pub byte_start: u32,
+    pub byte_size: u32,
+    pub type_id: i32,
+    pub class_id: u16,
+    pub is_destroyed: u16,
 }
