@@ -363,7 +363,7 @@ impl SerializedFile {
             SerializedFileFormatVersion::Unknown_5 => {
                 Box::new(version5::SerializedFile::read(&mut reader)?)
             }
-            SerializedFileFormatVersion::Unknown_6 =>{
+            SerializedFileFormatVersion::Unknown_6 => {
                 Box::new(version6::SerializedFile::read(&mut reader)?)
             }
             SerializedFileFormatVersion::Unknown_7 => {
@@ -372,7 +372,7 @@ impl SerializedFile {
             SerializedFileFormatVersion::Unknown_8 => {
                 Box::new(version8::SerializedFile::read(&mut reader)?)
             }
-            SerializedFileFormatVersion::Unknown_9 =>{
+            SerializedFileFormatVersion::Unknown_9 => {
                 Box::new(version9::SerializedFile::read(&mut reader)?)
             }
             SerializedFileFormatVersion::Unknown_10 => {

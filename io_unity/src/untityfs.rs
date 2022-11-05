@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::fs::{File, OpenOptions};
 use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
 use std::path::PathBuf;
@@ -7,6 +6,8 @@ use std::sync::{Arc, Mutex};
 use binrw::{binrw, BinResult, NullString, ReadOptions};
 use binrw::{io::Cursor, BinRead};
 use lz4::block::decompress;
+use modular_bitfield::specifiers::{B22, B9};
+use modular_bitfield::{bitfield, BitfieldSpecifier};
 use num_enum::TryFromPrimitive;
 
 use crate::until::binrw_parser::position_parser; // reading/writing utilities
@@ -24,24 +25,38 @@ pub trait FS {
     ) -> Option<Box<dyn UnityResource>>;
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
-#[repr(u32)]
-enum ArchiveFlags {
-    CompressionTypeMask = 0x3f,
-    BlocksAndDirectoryInfoCombined = 0x40,
-    BlocksInfoAtTheEnd = 0x80,
-    OldWebPluginCompatibility = 0x100,
-    BlockInfoNeedPaddingAtStart = 0x200,
+#[bitfield]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[binrw]
+#[br(map = |mut x:[u8;4]| {x.reverse();Self::from_bytes(x)})]
+#[bw(map = |&x| {let mut b = Self::into_bytes(x);b.reverse();b})]
+pub struct ArchiveFlags {
+    #[bits = 6]
+    compression_type: CompressionType,
+    blocks_and_directory_info_combined: bool,
+    blocks_info_at_the_end: bool,
+    old_web_plugin_compatibility: bool,
+    block_info_need_padding_at_start: bool,
+    #[skip]
+    __: B22,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-enum StorageBlockFlags {
-    CompressionTypeMask = 0x3f,
-    Streamed = 0x40,
+#[bitfield]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[binrw]
+#[br(map = |mut x:[u8;2]| {x.reverse();Self::from_bytes(x)})]
+#[bw(map = |&x| {let mut b = Self::into_bytes(x);b.reverse();b})]
+pub struct StorageBlockFlags {
+    #[bits = 6]
+    compression_type: CompressionType,
+    streamed: bool,
+    #[skip]
+    __: B9,
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive, BitfieldSpecifier)]
 #[repr(u32)]
+#[bits = 6]
 enum CompressionType {
     None = 0,
     Lzma,
@@ -68,7 +83,7 @@ pub struct UnityFSFile {
     size: i64,
     compressed_blocks_info_size: u32,
     uncompressed_blocks_info_size: u32,
-    flags: u32,
+    flags: ArchiveFlags,
     #[br(parse_with = blocks_info_parser, args (version, compressed_blocks_info_size,uncompressed_blocks_info_size,flags))]
     blocks_info: BlocksInfo,
     #[br(parse_with = position_parser)]
@@ -104,7 +119,7 @@ impl UnityFS {
 
                 let mut blocks_info_uncompressedd_stream = block_uncompressed(
                     sb.uncompressed_size as u64,
-                    sb.flags as u32,
+                    sb.flags.compression_type(),
                     blocks_infocompressedd_stream,
                 )?;
                 if uncompressed_data_offset < node.offset as u64 {
@@ -188,25 +203,20 @@ impl FS for UnityFS {
 
 fn block_uncompressed(
     uncompressed_size: u64,
-    flag: u32,
+    flag: CompressionType,
     blocks_infocompressedd_stream: Vec<u8>,
 ) -> std::io::Result<Vec<u8>> {
     let blocks_info_uncompressedd_stream;
-    match CompressionType::try_from(flag & ArchiveFlags::CompressionTypeMask as u32) {
-        Ok(tp) => match tp {
-            CompressionType::None => {
-                blocks_info_uncompressedd_stream = blocks_infocompressedd_stream
-            }
-            CompressionType::Lzma => todo!(),
-            CompressionType::Lz4 | CompressionType::Lz4HC => {
-                blocks_info_uncompressedd_stream = decompress(
-                    &blocks_infocompressedd_stream,
-                    Some(uncompressed_size as i32),
-                )?;
-            }
-            CompressionType::Lzham => todo!(),
-        },
-        Err(_) => todo!(),
+    match flag {
+        CompressionType::None => blocks_info_uncompressedd_stream = blocks_infocompressedd_stream,
+        CompressionType::Lzma => todo!(),
+        CompressionType::Lz4 | CompressionType::Lz4HC => {
+            blocks_info_uncompressedd_stream = decompress(
+                &blocks_infocompressedd_stream,
+                Some(uncompressed_size as i32),
+            )?;
+        }
+        CompressionType::Lzham => todo!(),
     }
     Ok(blocks_info_uncompressedd_stream)
 }
@@ -230,7 +240,7 @@ struct BlocksInfo {
 struct StorageBlock {
     uncompressed_size: u32,
     compressed_size: i32,
-    flags: u16,
+    flags: StorageBlockFlags,
 }
 
 #[binrw]
@@ -252,11 +262,11 @@ impl Node {
 fn blocks_info_parser<R: Read + Seek>(
     reader: &mut R,
     _ro: &ReadOptions,
-    flags: (u32, u32, u32, u32),
+    flags: (u32, u32, u32, ArchiveFlags),
 ) -> BinResult<BlocksInfo> {
     let (version, compressed_blocks_info_size, uncompressed_blocks_info_size, flags) = flags;
 
-    if (flags & ArchiveFlags::BlocksInfoAtTheEnd as u32) != 0 {
+    if flags.blocks_info_at_the_end() {
         todo!();
     }
 
@@ -270,7 +280,7 @@ fn blocks_info_parser<R: Read + Seek>(
     let mut blocks_infocompressedd_stream = vec![0u8; compressed_blocks_info_size as usize];
     reader.read_exact(&mut blocks_infocompressedd_stream)?;
 
-    if (flags & ArchiveFlags::BlockInfoNeedPaddingAtStart as u32) != 0 {
+    if flags.block_info_need_padding_at_start() {
         let pos = reader.seek(SeekFrom::Current(0))?;
         if pos % 16 != 0 {
             reader.seek(SeekFrom::Current((16 - (pos % 16)) as i64))?;
@@ -279,7 +289,7 @@ fn blocks_info_parser<R: Read + Seek>(
 
     let blocks_info_uncompressedd_stream = block_uncompressed(
         uncompressed_blocks_info_size as u64,
-        flags,
+        flags.compression_type(),
         blocks_infocompressedd_stream,
     )?;
 
