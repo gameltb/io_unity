@@ -109,10 +109,10 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         //         });
         //     }
         // }
-        // if obj.class == ClassIDType::AudioClip {
-        //     if let Some(classes::Class::AudioClip(audio)) = s.get_object_by_path_id(pathid.to_owned())
+        // if obj.class == ClassIDType::Transform {
+        //     if let Some(classes::Class::Transform(tran)) = s.get_object_by_path_id(pathid.to_owned())
         //     {
-        //         println!("{:#?}", &audio.get_name());
+        //         println!("{:#?}", &tran.get_local_mat());
         //     }
         // }
         if obj.class == ClassIDType::TextAsset {
@@ -134,10 +134,10 @@ fn handle<P: AsRef<Path>>(filepath: P) {
             println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
         }
         if !viewed.contains(&obj.class) {
-            // let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
-            // println!("class {:?}", &obj.class);
-            // // tt_o.display_tree();
-            // println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            println!("class {:?}", &obj.class);
+            tt_o.display_tree();
+            println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
             // println!("{:#?}", s.get_tt_object_by_path_id(*pathid));
             viewed.push(obj.class.clone());
         }
@@ -148,15 +148,15 @@ fn handle<P: AsRef<Path>>(filepath: P) {
             if let Some(classes::Class::SkinnedMeshRenderer(smr)) =
                 s.get_object_by_path_id(pathid.to_owned())
             {
-                println!("{:#?}", smr);
+                // println!("{:#?}", smr);
                 let mut bone_name_buff = Vec::new();
                 let mut bone_father_index_buff = Vec::new();
 
-                for bone in smr.get_bones() {
+                for bone in &*smr.get_bones() {
                     if let Some(classes::Class::Transform(bone)) =
                         s.get_object_by_path_id(bone.get_path_id())
                     {
-                        println!("{:#?}", bone);
+                        // println!("{:#?}", bone);
                         bone_name_buff.push(
                             if let Some(classes::Class::GameObject(go)) =
                                 s.get_object_by_path_id(bone.get_game_object().get_path_id())
@@ -166,13 +166,10 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                                 "bone".to_string()
                             },
                         );
-                        let father =
-                            smr.get_bones()
-                                .into_iter()
-                                .enumerate()
-                                .find(|(_index, itbone)| {
-                                    itbone.get_path_id() == bone.get_father().get_path_id()
-                                });
+                        let bones = smr.get_bones();
+                        let father = bones.iter().enumerate().find(|(_index, itbone)| {
+                            itbone.get_path_id() == bone.get_father().get_path_id()
+                        });
                         bone_father_index_buff
                             .push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));
                     }
@@ -180,14 +177,14 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 println!("{:#?}", bone_name_buff.len());
                 println!("{:#?}", bone_father_index_buff.len());
 
-                for material in smr.get_materials() {
+                for material in &*smr.get_materials() {
                     let material = s.get_object_by_path_id(material.get_path_id());
                     println!("{:#?}", material);
                 }
-                if let Some(classes::Class::Mesh(mesh)) =
+                if let Some(classes::Class::Mesh(_mesh)) =
                     s.get_object_by_path_id(smr.get_mesh().get_path_id())
                 {
-                    println!("{:#?}", mesh.get_bind_pose());
+                    // println!("{:#?}", mesh.get_bind_pose());
                 }
                 break;
             }

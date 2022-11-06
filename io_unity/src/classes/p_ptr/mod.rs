@@ -44,7 +44,6 @@ impl BinWrite for PPtr {
         _options: &WriteOptions,
         _args: Self::Args,
     ) -> BinResult<()> {
-        todo!();
-        Ok(())
+        todo!()
     }
 }

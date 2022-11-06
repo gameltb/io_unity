@@ -245,6 +245,10 @@ impl TypeTreeObject {
         self.data.display_field(&"".to_string());
     }
 
+    pub fn get_endian(&self) -> binrw::Endian {
+        self.endian.clone()
+    }
+
     pub fn get_value_by_path(&self, path: &str) -> Option<Value> {
         let path: Vec<String> = path
             .split("/")
@@ -262,6 +266,54 @@ impl TypeTreeObject {
             if let Value::String(s) = v {
                 return Some(s);
             }
+        }
+        None
+    }
+
+    pub fn get_byte_array_by_path(&self, path: &str) -> Option<Cow<Vec<u8>>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::ByteArray(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_array_object_by_path(&self, path: &str) -> Option<Vec<TypeTreeObject>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::Array(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_bool_by_path(&self, path: &str) -> Option<bool> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Bool(i) => Some(i),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_float_by_path(&self, path: &str) -> Option<f32> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Float(i) => Some(i),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_double_by_path(&self, path: &str) -> Option<f64> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Double(i) => Some(i),
+                _ => None,
+            };
         }
         None
     }
@@ -296,6 +348,63 @@ impl TypeTreeObject {
         if let Some(v) = self.get_value_by_path(path) {
             return match v {
                 Value::Object(inner) => Some(inner),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_quat_by_path(&self, path: &str) -> Option<glam::Quat> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Object(inner) => Some([0f32; 4])
+                    .and_then(|_a| {
+                        inner
+                            .get_float_by_path("/Base/x")
+                            .and_then(|x| Some([x, 0.0, 0.0, 0.0]))
+                    })
+                    .and_then(|a| {
+                        inner
+                            .get_float_by_path("/Base/y")
+                            .and_then(|y| Some([a[0], y, 0.0, 0.0]))
+                    })
+                    .and_then(|a| {
+                        inner
+                            .get_float_by_path("/Base/z")
+                            .and_then(|z| Some([a[0], a[1], z, 0.0]))
+                    })
+                    .and_then(|a| {
+                        inner
+                            .get_float_by_path("/Base/w")
+                            .and_then(|w| Some([a[0], a[1], a[2], w]))
+                    })
+                    .and_then(|a| Some(glam::Quat::from_array(a))),
+                _ => None,
+            };
+        }
+        None
+    }
+
+    pub fn get_vec3f_by_path(&self, path: &str) -> Option<glam::Vec3> {
+        if let Some(v) = self.get_value_by_path(path) {
+            return match v {
+                Value::Object(inner) => Some([0f32; 3])
+                    .and_then(|_a| {
+                        inner
+                            .get_float_by_path("/Base/x")
+                            .and_then(|x| Some([x, 0.0, 0.0]))
+                    })
+                    .and_then(|a| {
+                        inner
+                            .get_float_by_path("/Base/y")
+                            .and_then(|y| Some([a[0], y, 0.0]))
+                    })
+                    .and_then(|a| {
+                        inner
+                            .get_float_by_path("/Base/z")
+                            .and_then(|z| Some([a[0], a[1], z]))
+                    })
+                    .and_then(|a| Some(glam::Vec3::from_array(a))),
                 _ => None,
             };
         }

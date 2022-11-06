@@ -53,10 +53,11 @@ impl MeshObject for Mesh {
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
         let sub_mesh = self.sub_meshes.get(sub_mesh_id).unwrap();
 
-        match self
-            .vertex_data
-            .get_channel(&Channel::kShaderChannelVertex, sub_mesh, self.endian)
-        {
+        match self.vertex_data.get_channel(
+            &ChannelType::kShaderChannelVertex,
+            sub_mesh,
+            self.endian,
+        ) {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
@@ -66,10 +67,11 @@ impl MeshObject for Mesh {
     fn get_normal_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
         let sub_mesh = self.sub_meshes.get(sub_mesh_id).unwrap();
 
-        match self
-            .vertex_data
-            .get_channel(&Channel::kShaderChannelNormal, sub_mesh, self.endian)
-        {
+        match self.vertex_data.get_channel(
+            &ChannelType::kShaderChannelNormal,
+            sub_mesh,
+            self.endian,
+        ) {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
@@ -79,10 +81,11 @@ impl MeshObject for Mesh {
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
         let sub_mesh = self.sub_meshes.get(sub_mesh_id).unwrap();
 
-        match self
-            .vertex_data
-            .get_channel(&Channel::kShaderChannelTexCoord0, sub_mesh, self.endian)
-        {
+        match self.vertex_data.get_channel(
+            &ChannelType::kShaderChannelTexCoord0,
+            sub_mesh,
+            self.endian,
+        ) {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
@@ -93,7 +96,7 @@ impl MeshObject for Mesh {
         let sub_mesh = self.sub_meshes.get(sub_mesh_id).unwrap();
 
         let weight_buff = match self.vertex_data.get_channel(
-            &Channel::kShaderChannelBlendWeight,
+            &ChannelType::kShaderChannelBlendWeight,
             sub_mesh,
             self.endian,
         ) {
@@ -101,7 +104,7 @@ impl MeshObject for Mesh {
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         };
         let bone_index_buff = match self.vertex_data.get_channel(
-            &Channel::kShaderChannelBlendIndices,
+            &ChannelType::kShaderChannelBlendIndices,
             sub_mesh,
             self.endian,
         ) {
@@ -274,7 +277,7 @@ impl VertexData {
 
     fn get_channel(
         &self,
-        channel: &Channel,
+        channel: &ChannelType,
         sub_mesh: &SubMesh,
         endian: binrw::Endian,
     ) -> StreamBuff {
@@ -359,7 +362,7 @@ impl VertexData {
     }
 }
 
-fn get_format_size(format: VertexFormat) -> u8 {
+pub fn get_format_size(format: VertexFormat) -> u8 {
     match format {
         VertexFormat::UNorm8 | VertexFormat::SNorm8 | VertexFormat::UInt8 | VertexFormat::SInt8 => {
             1
@@ -475,7 +478,7 @@ pub enum VertexFormat {
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive, Clone)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
-pub enum Channel {
+pub enum ChannelType {
     kShaderChannelVertex,
     kShaderChannelNormal,
     kShaderChannelTangent,

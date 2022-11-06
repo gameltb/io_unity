@@ -4,18 +4,19 @@ use crate::classes::renderer::Renderer;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 use binrw::binrw;
+use supercow::Supercow;
 
 impl SkinnedMeshRendererObject for SkinnedMeshRenderer {
-    fn get_bones(&self) -> &Vec<PPtr> {
-        &self.bones
+    fn get_bones(&self) -> Supercow<Vec<PPtr>> {
+        Supercow::borrowed(&self.bones)
     }
 
-    fn get_mesh(&self) -> &PPtr {
-        &self.mesh
+    fn get_mesh(&self) -> Supercow<PPtr> {
+        Supercow::borrowed(&self.mesh)
     }
 
-    fn get_materials(&self) -> &Vec<PPtr> {
-        &self.renderer.get_materials()
+    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
+        self.renderer.get_materials()
     }
 }
 

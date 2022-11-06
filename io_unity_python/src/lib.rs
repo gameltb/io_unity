@@ -218,7 +218,9 @@ impl SkinnedMeshRenderer {
         let mut bone_father_index_buff = Vec::new();
         let mut bone_local_mat_buff = Vec::new();
 
-        for bone in self.0.get_bones() {
+        let bones = self.0.get_bones();
+
+        for bone in &*bones {
             if let Some(io_unity::classes::Class::Transform(bone)) =
                 sf.try_borrow()?.0.get_object_by_path_id(bone.get_path_id())
             {
@@ -233,14 +235,9 @@ impl SkinnedMeshRenderer {
                         "bone".to_string()
                     },
                 );
-                let father = self
-                    .0
-                    .get_bones()
-                    .into_iter()
-                    .enumerate()
-                    .find(|(_index, itbone)| {
-                        itbone.get_path_id() == bone.get_father().get_path_id()
-                    });
+                let father = bones.iter().enumerate().find(|(_index, itbone)| {
+                    itbone.get_path_id() == bone.get_father().get_path_id()
+                });
                 bone_father_index_buff.push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));
                 bone_local_mat_buff.push(bone.get_local_mat().to_cols_array_2d());
             }

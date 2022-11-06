@@ -9,13 +9,14 @@ use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
+use supercow::Supercow;
 
 def_unity_class!(SkinnedMeshRenderer, SkinnedMeshRendererObject);
 
 pub trait SkinnedMeshRendererObject: fmt::Debug {
-    fn get_bones(&self) -> &Vec<PPtr>;
-    fn get_mesh(&self) -> &PPtr;
-    fn get_materials(&self) -> &Vec<PPtr>;
+    fn get_bones(&self) -> Supercow<Vec<PPtr>>;
+    fn get_mesh(&self) -> Supercow<PPtr>;
+    fn get_materials(&self) -> Supercow<Vec<PPtr>>;
 }
 
 impl BinRead for SkinnedMeshRenderer {
@@ -46,7 +47,6 @@ impl BinWrite for SkinnedMeshRenderer {
         _options: &WriteOptions,
         _args: Self::Args,
     ) -> BinResult<()> {
-        todo!();
-        Ok(())
+        todo!()
     }
 }

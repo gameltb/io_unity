@@ -4,10 +4,11 @@ use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 use binrw::binrw;
+use supercow::Supercow;
 
 impl RendererObject for Renderer {
-    fn get_materials(&self) -> &Vec<PPtr> {
-        &self.materials
+    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
+        Supercow::borrowed(&self.materials)
     }
 }
 
