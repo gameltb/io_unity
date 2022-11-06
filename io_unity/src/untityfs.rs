@@ -28,8 +28,8 @@ pub trait FS {
 #[bitfield]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[binrw]
-#[br(map = |mut x:[u8;4]| {x.reverse();Self::from_bytes(x)})]
-#[bw(map = |&x| {let mut b = Self::into_bytes(x);b.reverse();b})]
+#[br(map = |x:u32| Self::from_bytes(x.to_le_bytes()))]
+#[bw(map = |&x| <u32>::from_le_bytes(Self::into_bytes(x)))]
 pub struct ArchiveFlags {
     #[bits = 6]
     compression_type: CompressionType,
@@ -44,8 +44,8 @@ pub struct ArchiveFlags {
 #[bitfield]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[binrw]
-#[br(map = |mut x:[u8;2]| {x.reverse();Self::from_bytes(x)})]
-#[bw(map = |&x| {let mut b = Self::into_bytes(x);b.reverse();b})]
+#[br(map = |x:u16| Self::from_bytes(x.to_le_bytes()))]
+#[bw(map = |&x| <u16>::from_le_bytes(Self::into_bytes(x)))]
 pub struct StorageBlockFlags {
     #[bits = 6]
     compression_type: CompressionType,
