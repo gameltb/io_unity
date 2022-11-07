@@ -36,15 +36,15 @@ impl Serialized for SerializedFile {
         &self.endianess
     }
 
-    fn get_raw_object_by_index(&self, index: u32) -> super::Object {
-        let obj = self.content.objects.get(index as usize).unwrap();
-        super::Object {
+    fn get_raw_object_by_index(&self, index: u32) -> Option<super::Object> {
+        let obj = self.content.objects.get(index as usize)?;
+        Some(super::Object {
             path_id: obj.path_id as i64,
             byte_start: obj.byte_start as u64,
             byte_size: obj.byte_size,
-            class: ClassIDType::try_from(obj.class_id as i32).unwrap(),
+            class: ClassIDType::try_from(obj.class_id as i32).unwrap_or(ClassIDType::Object),
             type_id: obj.type_id as usize,
-        }
+        })
     }
 
     fn get_object_count(&self) -> i32 {
@@ -63,13 +63,12 @@ impl Serialized for SerializedFile {
         true
     }
 
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs {
+    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs> {
         let stypetree = self
             .content
             .types
             .iter()
-            .find(|tp| tp.class_id == type_id as i32)
-            .unwrap();
+            .find(|tp| tp.class_id == type_id as i32)?;
         let type_tree = &stypetree.type_tree;
         let mut type_fields = Vec::new();
 
@@ -93,7 +92,10 @@ impl Serialized for SerializedFile {
             }
         }
         build_type_fields(&mut type_fields, type_tree);
-        TypeTreeObjectBinReadArgs::new(stypetree.class_id, type_fields)
+        Some(TypeTreeObjectBinReadArgs::new(
+            stypetree.class_id,
+            type_fields,
+        ))
     }
 }
 

@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     fmt::Debug,
-    io::{Cursor, Read, Seek, SeekFrom},
+    io::{Cursor, ErrorKind, Read, Seek, SeekFrom},
     sync::Arc,
 };
 
@@ -191,9 +191,9 @@ impl Field {
                     if "string" == self.field_type.get_type() {
                         if let Some(array) = fields.get(0) {
                             if let Some(data) = array.get_sized_array_buff() {
-                                return Some(Value::String(
-                                    String::from_utf8(data.to_vec()).unwrap(),
-                                ));
+                                if let Ok(s) = String::from_utf8(data.to_vec()) {
+                                    return Some(Value::String(s));
+                                }
                             }
                         }
                     }
@@ -441,7 +441,9 @@ impl BinRead for TypeTreeObject {
             type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
         ) -> BinResult<Field> {
-            let field = type_fields.get(*field_index).unwrap().to_owned();
+            let field = type_fields
+                .get(*field_index)
+                .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
             let field_level = field.get_level();
             let field_value = if field.is_array() {
                 *field_index += 1;
@@ -453,7 +455,9 @@ impl BinRead for TypeTreeObject {
                 let size = <u32>::read_options(&mut size_reader, options, ())?;
                 *field_index += 1;
                 let item_field_index = *field_index;
-                let item_type_field = type_fields.get(item_field_index).unwrap();
+                let item_type_field = type_fields
+                    .get(item_field_index)
+                    .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
                 let item_level = item_type_field.get_level();
                 let mut item_type_fields = Vec::new();
                 item_type_fields.push(item_type_field.clone());
@@ -467,7 +471,9 @@ impl BinRead for TypeTreeObject {
                 }
 
                 if item_type_fields.len() == 1 {
-                    let item_type = item_type_fields.get(0).unwrap();
+                    let item_type = item_type_fields
+                        .get(0)
+                        .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
 
                     let mut byte_size = item_type.get_byte_size() as usize;
 

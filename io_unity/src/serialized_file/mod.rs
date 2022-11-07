@@ -23,7 +23,7 @@ pub mod version9;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::io::{prelude::*, SeekFrom};
+use std::io::{prelude::*, ErrorKind, SeekFrom};
 
 use binrw::{binrw, BinResult};
 use binrw::{BinRead, ReadOptions};
@@ -417,8 +417,8 @@ impl SerializedFile {
         };
         let mut object_map = BTreeMap::new();
         for i in 0..file.get_object_count() {
-            let obj = file.get_raw_object_by_index(i as u32);
-            object_map.insert(obj.path_id, obj);
+            file.get_raw_object_by_index(i as u32)
+                .and_then(|obj| object_map.insert(obj.path_id, obj));
         }
         Ok(SerializedFile {
             content: file,
@@ -436,28 +436,25 @@ impl SerializedFile {
     }
 
     pub fn get_object_by_index(&self, index: u32) -> Option<Class> {
-        let obj = self.content.get_raw_object_by_index(index);
-        self.content
-            .get_object(&mut *self.file_reader.borrow_mut(), &obj)
+        self.content.get_raw_object_by_index(index).and_then(|obj| {
+            self.content
+                .get_object(&mut *self.file_reader.borrow_mut(), &obj)
+        })
     }
 
     pub fn get_object_by_path_id(&self, path_id: i64) -> Option<Class> {
-        if let Some(obj) = self.object_map.get(&path_id) {
-            return self
-                .content
-                .get_object(&mut *self.file_reader.borrow_mut(), obj);
-        }
-        None
+        self.object_map.get(&path_id).and_then(|obj| {
+            self.content
+                .get_object(&mut *self.file_reader.borrow_mut(), obj)
+        })
     }
 
     pub fn get_tt_object_by_path_id(&self, path_id: i64) -> Option<TypeTreeObject> {
-        if let Some(obj) = self.object_map.get(&path_id) {
-            return Some(
-                self.content
-                    .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj),
-            );
-        }
-        None
+        self.object_map.get(&path_id).and_then(|obj| {
+            self.content
+                .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj)
+                .ok()
+        })
     }
 }
 
@@ -465,8 +462,8 @@ pub trait Serialized: fmt::Debug {
     fn get_serialized_file_version(&self) -> &SerializedFileFormatVersion;
     fn get_data_offset(&self) -> u64;
     fn get_endianess(&self) -> &Endian;
-    fn get_raw_object_by_index(&self, index: u32) -> Object;
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> TypeTreeObjectBinReadArgs;
+    fn get_raw_object_by_index(&self, index: u32) -> Option<Object>;
+    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs>;
     fn get_object_count(&self) -> i32;
     fn get_unity_version(&self) -> String;
     fn get_target_platform(&self) -> &BuildTarget;
@@ -487,30 +484,32 @@ pub trait Serialized: fmt::Debug {
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         index: u32,
     ) -> Option<Class> {
-        let obj = self.get_raw_object_by_index(index);
-        self.get_object(reader, &obj)
+        self.get_raw_object_by_index(index)
+            .and_then(|obj| self.get_object(reader, &obj))
     }
 
     fn get_type_tree_object(
         &self,
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
-    ) -> TypeTreeObject {
-        let args = self.get_type_object_args_by_type_id(obj.type_id);
-        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start));
+    ) -> BinResult<TypeTreeObject> {
+        let args = self
+            .get_type_object_args_by_type_id(obj.type_id)
+            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 
         let options = ReadOptions::new(match self.get_endianess() {
             Endian::Little => binrw::Endian::Little,
             Endian::Big => binrw::Endian::Big,
         });
 
-        let type_tree_object = TypeTreeObject::read_options(reader, &options, args).unwrap();
-        let apos = reader.seek(SeekFrom::Current(0)).unwrap();
+        let type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
+        let apos = reader.seek(SeekFrom::Current(0))?;
         assert_eq!(
             apos - (self.get_data_offset() + obj.byte_start),
             obj.byte_size as u64
         );
-        type_tree_object
+        Ok(type_tree_object)
     }
 
     fn get_object(
@@ -518,7 +517,9 @@ pub trait Serialized: fmt::Debug {
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
     ) -> Option<Class> {
-        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start));
+        reader
+            .seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))
+            .ok()?;
 
         let op = ReadOptions::new(match self.get_endianess() {
             Endian::Little => binrw::Endian::Little,
@@ -531,8 +532,9 @@ pub trait Serialized: fmt::Debug {
                 ($($x:ident($y:path)),+) => {
                     match obj.class {
                         $(ClassIDType::$x => {
-                            let type_tree_object = self.get_type_tree_object(reader, obj);
-                            return Some(Class::$x($x::new(type_tree_object)));
+                            if let Ok(type_tree_object) = self.get_type_tree_object(reader, obj){
+                                return Some(Class::$x($x::new(type_tree_object)));
+                            }
                         },)+
                         _ => (),
                     }
@@ -598,9 +600,10 @@ pub trait Serialized: fmt::Debug {
 
     fn get_asset_bundle(&self, reader: &mut Box<dyn UnityResource + Send + Sync>) -> Option<Class> {
         for i in 0..self.get_object_count() {
-            let obj = self.get_raw_object_by_index(i as u32);
-            if obj.class == ClassIDType::AssetBundle {
-                return self.get_object(reader, &obj);
+            if let Some(obj) = self.get_raw_object_by_index(i as u32) {
+                if obj.class == ClassIDType::AssetBundle {
+                    return self.get_object(reader, &obj);
+                }
             }
         }
         None

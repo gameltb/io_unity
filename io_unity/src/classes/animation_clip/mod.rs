@@ -29,7 +29,7 @@ impl BinRead for AnimationClip {
             )));
         }
         Err(binrw::Error::NoVariantMatch {
-            pos: reader.seek(SeekFrom::Current(0)).unwrap(),
+            pos: reader.seek(SeekFrom::Current(0))?,
         })
     }
 }

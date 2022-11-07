@@ -44,7 +44,7 @@ impl BinRead for Mesh {
             )?)));
         }
         Err(binrw::Error::NoVariantMatch {
-            pos: reader.seek(SeekFrom::Current(0)).unwrap(),
+            pos: reader.seek(SeekFrom::Current(0))?,
         })
     }
 }

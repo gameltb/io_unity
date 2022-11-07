@@ -31,7 +31,7 @@ impl BinRead for Renderer {
             )));
         }
         Err(binrw::Error::NoVariantMatch {
-            pos: reader.seek(SeekFrom::Current(0)).unwrap(),
+            pos: reader.seek(SeekFrom::Current(0))?,
         })
     }
 }
