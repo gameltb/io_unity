@@ -266,10 +266,6 @@ fn blocks_info_parser<R: Read + Seek>(
 ) -> BinResult<BlocksInfo> {
     let (version, compressed_blocks_info_size, uncompressed_blocks_info_size, flags) = flags;
 
-    if flags.blocks_info_at_the_end() {
-        todo!();
-    }
-
     if version >= 7 {
         let pos = reader.seek(SeekFrom::Current(0))?;
         if pos % 16 != 0 {
@@ -278,7 +274,15 @@ fn blocks_info_parser<R: Read + Seek>(
     }
 
     let mut blocks_infocompressedd_stream = vec![0u8; compressed_blocks_info_size as usize];
-    reader.read_exact(&mut blocks_infocompressedd_stream)?;
+
+    if flags.blocks_info_at_the_end() {
+        let pos = reader.seek(SeekFrom::Current(0))?;
+        reader.seek(SeekFrom::End(-(compressed_blocks_info_size as i64)))?;
+        reader.read_exact(&mut blocks_infocompressedd_stream)?;
+        reader.seek(SeekFrom::Start(pos))?;
+    } else {
+        reader.read_exact(&mut blocks_infocompressedd_stream)?;
+    }
 
     if flags.block_info_need_padding_at_start() {
         let pos = reader.seek(SeekFrom::Current(0))?;

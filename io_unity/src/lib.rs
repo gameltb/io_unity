@@ -5,7 +5,7 @@ pub mod classes;
 pub mod serialized_file;
 pub mod type_tree;
 mod until;
-pub mod untityfs;
+pub mod unityfs;
 
 pub use serialized_file::*;
-pub use untityfs::*;
+pub use unityfs::*;
