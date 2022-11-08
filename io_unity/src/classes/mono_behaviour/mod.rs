@@ -7,6 +7,7 @@ use std::{
     fmt,
     io::{Read, Seek, Write},
 };
+use supercow::Supercow;
 
 def_unity_class!(MonoBehaviour, MonoBehaviourObject);
 

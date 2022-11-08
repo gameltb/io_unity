@@ -1,4 +1,6 @@
 use super::AudioClipObject;
+use crate::classes::named_object;
+use crate::classes::named_object::NamedObjectObject;
 use crate::type_tree::TypeTreeObject;
 use crate::{def_type_tree_class, FS};
 use binrw::binrw;
@@ -8,6 +10,14 @@ use std::io::{prelude::*, ErrorKind, SeekFrom};
 use supercow::Supercow;
 
 def_type_tree_class!(AudioClip);
+
+impl named_object::DownCast for AudioClip<'_> {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
+            &*self.inner,
+        )))
+    }
+}
 
 impl AudioClipObject for AudioClip<'_> {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
@@ -20,10 +30,6 @@ impl AudioClipObject for AudioClip<'_> {
             return Ok(Cow::Owned(data));
         }
         Err(std::io::Error::from(ErrorKind::NotFound))
-    }
-
-    fn get_name(&self) -> String {
-        self.get_name().unwrap()
     }
 }
 

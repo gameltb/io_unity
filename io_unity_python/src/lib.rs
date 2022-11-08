@@ -192,7 +192,7 @@ impl AudioClip {
     }
 
     fn get_name(&self) -> String {
-        self.0.get_name()
+        self.0.downcast().get_name().unwrap()
     }
 }
 

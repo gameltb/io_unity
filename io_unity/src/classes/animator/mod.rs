@@ -8,6 +8,7 @@ use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
+use supercow::Supercow;
 
 def_unity_class!(Animator, AnimatorObject);
 

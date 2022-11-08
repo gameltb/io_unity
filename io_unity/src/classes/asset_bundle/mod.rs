@@ -1,6 +1,8 @@
 pub mod type_tree;
 pub mod version14;
 
+use supercow::Supercow;
+
 use crate::type_tree::TypeTreeObject;
 use crate::{def_unity_class, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};

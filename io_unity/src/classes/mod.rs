@@ -17,6 +17,7 @@ pub mod mesh_filter;
 pub mod mesh_renderer;
 pub mod mono_behaviour;
 pub mod mono_script;
+pub mod named_object;
 pub mod renderer;
 pub mod skinned_mesh_renderer;
 
@@ -42,6 +43,10 @@ macro_rules! def_unity_class {
             pub fn new(inner: TypeTreeObject) -> Self {
                 Self(Box::new(type_tree::$x::new(inner)))
             }
+        }
+
+        pub trait DownCast {
+            fn downcast<'a>(&'a self) -> Supercow<Box<dyn $y + Send + 'a>>;
         }
     };
 }

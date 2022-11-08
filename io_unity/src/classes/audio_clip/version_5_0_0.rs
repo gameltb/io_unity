@@ -1,10 +1,18 @@
 use super::AudioClipObject;
+use crate::classes::named_object::{NamedObject, NamedObjectObject, self};
 use crate::until::binrw_parser::*;
 use crate::{SerializedFileMetadata, FS};
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, ErrorKind, SeekFrom};
+use supercow::Supercow;
+
+impl named_object::DownCast for AudioClip {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::borrowed(&*self.name)
+    }
+}
 
 impl AudioClipObject for AudioClip {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
@@ -20,17 +28,14 @@ impl AudioClipObject for AudioClip {
         }
         Err(std::io::Error::from(ErrorKind::NotFound))
     }
-
-    fn get_name(&self) -> String {
-        self.name.to_string()
-    }
 }
 
 #[binrw]
-#[brw(import_raw(_args: SerializedFileMetadata))]
+#[brw(import_raw(args: SerializedFileMetadata))]
 #[derive(Debug)]
 pub struct AudioClip {
-    name: AlignedString,
+    #[brw(args_raw = args)]
+    name: NamedObject,
     load_type: i32,
     channels: i32,
     frequency: i32,

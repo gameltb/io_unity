@@ -1,4 +1,4 @@
-pub mod editor_extension;
+pub mod named_object;
 pub mod type_tree;
 
 use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
@@ -9,11 +9,13 @@ use std::{
 };
 use supercow::Supercow;
 
-def_unity_class!(EditorExtension, EditorExtensionObject);
+def_unity_class!(NamedObject, NamedObjectObject);
 
-pub trait EditorExtensionObject: fmt::Debug {}
+pub trait NamedObjectObject: fmt::Debug {
+    fn get_name(&self) -> Option<String>;
+}
 
-impl BinRead for EditorExtension {
+impl BinRead for NamedObject {
     type Args = SerializedFileMetadata;
 
     fn read_options<R: Read + Seek>(
@@ -21,13 +23,13 @@ impl BinRead for EditorExtension {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        return Ok(EditorExtension(Box::new(
-            editor_extension::EditorExtension::read_options(reader, options, args)?,
-        )));
+        Ok(NamedObject(Box::new(
+            named_object::NamedObject::read_options(reader, options, args)?,
+        )))
     }
 }
 
-impl BinWrite for EditorExtension {
+impl BinWrite for NamedObject {
     type Args = SerializedFileMetadata;
 
     fn write_options<W: Write + Seek>(
