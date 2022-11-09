@@ -10,3 +10,8 @@ updates:
     schedule:
       interval: "weekly"
 
+  # Maintain dependencies for npm
+  - package-ecosystem: "npm"
+    directory: "/io_unity_gui"
+    schedule:
+      interval: "weekly"
