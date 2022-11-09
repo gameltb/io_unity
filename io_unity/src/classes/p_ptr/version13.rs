@@ -3,8 +3,8 @@ use crate::SerializedFileMetadata;
 use binrw::binrw;
 
 impl PPtrObject for PPtr {
-    fn get_path_id(&self) -> i64 {
-        self.path_id as i64
+    fn get_path_id(&self) -> Option<i64> {
+        Some(self.path_id as i64)
     }
 }
 #[binrw]

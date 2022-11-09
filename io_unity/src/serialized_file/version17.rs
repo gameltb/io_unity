@@ -188,10 +188,13 @@ impl TypeTreeNodeBlob {
 pub fn read_type_tree_string<R: Read + Seek>(value: u32, reader: &mut R) -> String {
     let is_offset = (value & 0x80000000) == 0;
     if is_offset {
-        reader.seek(SeekFrom::Start(value.into()));
-        return NullString::read(reader)
-            .unwrap_or(NullString::default())
-            .to_string();
+        if reader.seek(SeekFrom::Start(value.into())).is_ok() {
+            return NullString::read(reader)
+                .unwrap_or(NullString::default())
+                .to_string();
+        } else {
+            return String::default();
+        }
     }
     let offset = value & 0x7FFFFFFF;
     COMMON_STRING.get(&offset).unwrap_or(&"").to_string()

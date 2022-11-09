@@ -14,15 +14,15 @@ impl named_object::DownCast for Texture2D {
 }
 
 impl Texture2DObject for Texture2D {
-    fn get_width(&self) -> u64 {
-        self.width as u64
+    fn get_width(&self) -> Option<u64> {
+        Some(self.width as u64)
     }
-    fn get_height(&self) -> u64 {
-        self.height as u64
+    fn get_height(&self) -> Option<u64> {
+        Some(self.height as u64)
     }
 
-    fn get_texture_format(&self) -> TextureFormat {
-        self.texture_format.clone()
+    fn get_texture_format(&self) -> Option<TextureFormat> {
+        Some(self.texture_format.clone())
     }
 
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>> {
@@ -32,9 +32,10 @@ impl Texture2DObject for Texture2D {
             if let Some(mut file) =
                 fs.get_resource_file_by_path(self.stream_data.path.to_string(), None)
             {
-                file.seek(SeekFrom::Start(self.stream_data.offset as u64));
+                file.seek(SeekFrom::Start(self.stream_data.offset as u64))
+                    .ok()?;
                 let mut data = vec![0u8; self.stream_data.size as usize];
-                file.read_exact(&mut data);
+                file.read_exact(&mut data).ok()?;
                 return Some(Cow::Owned(data));
             }
         }

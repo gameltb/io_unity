@@ -35,15 +35,15 @@ pub struct Transform {
 }
 
 impl TransformObject for Transform {
-    fn get_father(&self) -> Supercow<PPtr> {
-        Supercow::borrowed(&self.father)
+    fn get_father(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::borrowed(&self.father))
     }
 
-    fn get_local_mat(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(
+    fn get_local_mat(&self) -> Option<Mat4> {
+        Some(Mat4::from_scale_rotation_translation(
             *self.local_scale,
             *self.local_rotation,
             *self.local_position,
-        )
+        ))
     }
 }

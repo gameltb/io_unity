@@ -7,15 +7,15 @@ use binrw::binrw;
 use supercow::Supercow;
 
 impl SkinnedMeshRendererObject for SkinnedMeshRenderer {
-    fn get_bones(&self) -> Supercow<Vec<PPtr>> {
-        Supercow::borrowed(&self.bones)
+    fn get_bones(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::borrowed(&self.bones))
     }
 
-    fn get_mesh(&self) -> Supercow<PPtr> {
-        Supercow::borrowed(&self.mesh)
+    fn get_mesh(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::borrowed(&self.mesh))
     }
 
-    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>> {
         self.renderer.get_materials()
     }
 }

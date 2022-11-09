@@ -6,8 +6,8 @@ use supercow::Supercow;
 def_type_tree_class!(GameObject);
 
 impl GameObjectObject for GameObject<'_> {
-    fn get_name(&self) -> String {
-        self.get_name().unwrap()
+    fn get_name(&self) -> Option<String> {
+        self.get_name()
     }
 }
 

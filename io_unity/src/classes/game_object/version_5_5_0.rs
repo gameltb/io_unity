@@ -7,8 +7,8 @@ use crate::{
 use binrw::binrw;
 
 impl GameObjectObject for GameObject {
-    fn get_name(&self) -> String {
-        self.name.to_string()
+    fn get_name(&self) -> Option<String> {
+        Some(self.name.to_string())
     }
 }
 

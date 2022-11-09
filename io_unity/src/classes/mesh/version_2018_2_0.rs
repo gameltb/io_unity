@@ -14,31 +14,34 @@ impl named_object::DownCast for Mesh {
 }
 
 impl MeshObject for Mesh {
-    fn get_index_buff(&self, _sub_mesh_id: usize) -> Vec<u32> {
+    fn get_index_buff(&self, _sub_mesh_id: usize) -> Result<Vec<u32>, String> {
         todo!()
     }
 
-    fn get_vertex_buff(&self, _sub_mesh_id: usize) -> Vec<f32> {
+    fn get_vertex_buff(&self, _sub_mesh_id: usize) -> Result<Vec<f32>, String> {
         todo!()
     }
 
-    fn get_normal_buff(&self, _sub_mesh_id: usize) -> Vec<f32> {
+    fn get_normal_buff(&self, _sub_mesh_id: usize) -> Result<Vec<f32>, String> {
         todo!()
     }
 
-    fn get_uv0_buff(&self, _sub_mesh_id: usize) -> Vec<f32> {
+    fn get_uv0_buff(&self, _sub_mesh_id: usize) -> Result<Vec<f32>, String> {
         todo!()
     }
 
-    fn get_sub_mesh_count(&self) -> usize {
+    fn get_sub_mesh_count(&self) -> Option<usize> {
         todo!()
     }
 
-    fn get_bone_weights_buff(&self, _sub_mesh_id: usize) -> Vec<super::BoneWeights> {
+    fn get_bone_weights_buff(
+        &self,
+        _sub_mesh_id: usize,
+    ) -> Result<Vec<super::BoneWeights>, String> {
         todo!()
     }
 
-    fn get_bind_pose(&self) -> &Vec<Mat4> {
+    fn get_bind_pose(&self) -> Result<Supercow<Vec<Mat4>>, String> {
         todo!()
     }
 }

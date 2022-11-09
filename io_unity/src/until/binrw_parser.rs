@@ -182,7 +182,7 @@ impl BinWrite for Vec4 {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Mat4(glam::Mat4);
+pub struct Mat4(pub glam::Mat4);
 
 impl Deref for Mat4 {
     type Target = glam::Mat4;

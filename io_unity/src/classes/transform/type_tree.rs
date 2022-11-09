@@ -15,16 +15,16 @@ impl component::DownCast for Transform<'_> {
 }
 
 impl TransformObject for Transform<'_> {
-    fn get_father(&self) -> Supercow<PPtr> {
-        Supercow::owned(self.get_father().unwrap())
+    fn get_father(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::owned(self.get_father()?))
     }
 
-    fn get_local_mat(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(
-            self.get_local_scale().unwrap(),
-            self.get_local_rotation().unwrap(),
-            self.get_local_position().unwrap(),
-        )
+    fn get_local_mat(&self) -> Option<Mat4> {
+        Some(Mat4::from_scale_rotation_translation(
+            self.get_local_scale()?,
+            self.get_local_rotation()?,
+            self.get_local_position()?,
+        ))
     }
 }
 

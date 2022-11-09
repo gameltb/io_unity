@@ -7,8 +7,8 @@ use supercow::Supercow;
 def_type_tree_class!(Renderer);
 
 impl RendererObject for Renderer<'_> {
-    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
-        Supercow::owned(self.get_materials().unwrap())
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::owned(self.get_materials()?))
     }
 }
 

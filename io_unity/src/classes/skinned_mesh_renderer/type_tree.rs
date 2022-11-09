@@ -8,20 +8,18 @@ use supercow::Supercow;
 def_type_tree_class!(SkinnedMeshRenderer);
 
 impl SkinnedMeshRendererObject for SkinnedMeshRenderer<'_> {
-    fn get_bones(&self) -> Supercow<Vec<PPtr>> {
-        Supercow::owned(self.get_bones().unwrap())
+    fn get_bones(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::owned(self.get_bones()?))
     }
 
-    fn get_mesh(&self) -> Supercow<PPtr> {
-        Supercow::owned(self.get_mesh().unwrap())
+    fn get_mesh(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::owned(self.get_mesh()?))
     }
 
-    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
-        Supercow::owned(
-            renderer::type_tree::Renderer::new(&*self.inner)
-                .get_materials()
-                .unwrap(),
-        )
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::owned(
+            renderer::type_tree::Renderer::new(&*self.inner).get_materials()?,
+        ))
     }
 }
 

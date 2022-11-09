@@ -21,11 +21,19 @@ impl named_object::DownCast for AudioClip<'_> {
 
 impl AudioClipObject for AudioClip<'_> {
     fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
-        if let Some(mut file) =
-            fs.get_resource_file_by_path(self.get_resource_source().unwrap(), None)
-        {
-            file.seek(SeekFrom::Start(self.get_resource_offset().unwrap()))?;
-            let mut data = vec![0u8; self.get_resource_size().unwrap() as usize];
+        let resource_source = self
+            .get_resource_source()
+            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let resource_offset = self
+            .get_resource_offset()
+            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let resource_size = self
+            .get_resource_size()
+            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+
+        if let Some(mut file) = fs.get_resource_file_by_path(resource_source, None) {
+            file.seek(SeekFrom::Start(resource_offset))?;
+            let mut data = vec![0u8; resource_size as usize];
             file.read_exact(&mut data)?;
             return Ok(Cow::Owned(data));
         }

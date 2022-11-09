@@ -20,144 +20,135 @@ use super::named_object;
 def_unity_class!(Texture2D, Texture2DObject);
 
 pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
-    fn get_width(&self) -> u64;
-    fn get_height(&self) -> u64;
-    fn get_texture_format(&self) -> TextureFormat;
+    fn get_width(&self) -> Option<u64>;
+    fn get_height(&self) -> Option<u64>;
+    fn get_texture_format(&self) -> Option<TextureFormat>;
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>>;
 
-    fn get_image(&self, fs: &mut Box<dyn FS>) -> Option<DynamicImage> {
-        if let Some(data) = self.get_image_data(fs) {
-            match self.get_texture_format() {
-                TextureFormat::DXT1
-                | TextureFormat::DXT3
-                | TextureFormat::DXT5
-                | TextureFormat::BC4
-                | TextureFormat::BC5
-                | TextureFormat::BC6H
-                | TextureFormat::BC7
-                | TextureFormat::DXT1Crunched
-                | TextureFormat::DXT5Crunched => {
-                    let width = self.get_width() as usize;
-                    let height = self.get_height() as usize;
-                    let size = width * height * 4;
-                    let mut output = vec![0; size];
-                    match self.get_texture_format() {
-                        TextureFormat::DXT1 => {
-                            texpresso::Format::Bc1.decompress(&data, width, height, &mut output)
-                        }
-                        TextureFormat::DXT3 => {
-                            texpresso::Format::Bc2.decompress(&data, width, height, &mut output)
-                        }
-                        TextureFormat::DXT5 => {
-                            texpresso::Format::Bc3.decompress(&data, width, height, &mut output)
-                        }
+    fn get_image(&self, fs: &mut Box<dyn FS>) -> Result<DynamicImage, String> {
+        let data = self.get_image_data(fs).ok_or("data")?;
+        let texture_format = self.get_texture_format().ok_or("texture_format")?;
+        let width = self.get_width().ok_or("width")? as usize;
+        let height = self.get_height().ok_or("height")? as usize;
 
-                        TextureFormat::BC4 => {
-                            texpresso::Format::Bc4.decompress(&data, width, height, &mut output)
-                        }
-                        TextureFormat::BC5 => {
-                            texpresso::Format::Bc5.decompress(&data, width, height, &mut output)
-                        }
-                        TextureFormat::BC6H
-                        | TextureFormat::BC7
-                        | TextureFormat::DXT1Crunched
-                        | TextureFormat::DXT5Crunched => {
-                            println!("unsupport {:?}", self.get_texture_format())
-                        }
-                        _ => unreachable!(),
+        match &texture_format {
+            TextureFormat::DXT1
+            | TextureFormat::DXT3
+            | TextureFormat::DXT5
+            | TextureFormat::BC4
+            | TextureFormat::BC5
+            | TextureFormat::BC6H
+            | TextureFormat::BC7
+            | TextureFormat::DXT1Crunched
+            | TextureFormat::DXT5Crunched => {
+                let size = width * height * 4;
+                let mut output = vec![0; size];
+                match &texture_format {
+                    TextureFormat::DXT1 => {
+                        texpresso::Format::Bc1.decompress(&data, width, height, &mut output)
                     }
-                    let result = RgbaImage::from_raw(width as u32, height as u32, output).unwrap();
-                    return Some(DynamicImage::ImageRgba8(result));
+                    TextureFormat::DXT3 => {
+                        texpresso::Format::Bc2.decompress(&data, width, height, &mut output)
+                    }
+                    TextureFormat::DXT5 => {
+                        texpresso::Format::Bc3.decompress(&data, width, height, &mut output)
+                    }
+
+                    TextureFormat::BC4 => {
+                        texpresso::Format::Bc4.decompress(&data, width, height, &mut output)
+                    }
+                    TextureFormat::BC5 => {
+                        texpresso::Format::Bc5.decompress(&data, width, height, &mut output)
+                    }
+                    TextureFormat::BC6H
+                    | TextureFormat::BC7
+                    | TextureFormat::DXT1Crunched
+                    | TextureFormat::DXT5Crunched => {
+                        return Err(format!("unsupport {:?}", self.get_texture_format()))
+                    }
+                    _ => unreachable!(),
                 }
-                TextureFormat::ASTC_RGB_4x4
-                | TextureFormat::ASTC_RGB_5x5
-                | TextureFormat::ASTC_RGB_6x6
-                | TextureFormat::ASTC_RGB_8x8
-                | TextureFormat::ASTC_RGB_10x10
-                | TextureFormat::ASTC_RGB_12x12
-                | TextureFormat::ASTC_RGBA_4x4
-                | TextureFormat::ASTC_RGBA_5x5
-                | TextureFormat::ASTC_RGBA_6x6
-                | TextureFormat::ASTC_RGBA_8x8
-                | TextureFormat::ASTC_RGBA_10x10
-                | TextureFormat::ASTC_RGBA_12x12
-                | TextureFormat::ASTC_HDR_4x4
-                | TextureFormat::ASTC_HDR_5x5
-                | TextureFormat::ASTC_HDR_6x6
-                | TextureFormat::ASTC_HDR_8x8
-                | TextureFormat::ASTC_HDR_10x10
-                | TextureFormat::ASTC_HDR_12x12 => {
-                    let width = self.get_width() as usize;
-                    let height = self.get_height() as usize;
-                    let size = width * height;
-                    let mut output = vec![[0u8; 4]; size];
-                    let footprint = match self.get_texture_format() {
-                        TextureFormat::ASTC_RGB_4x4
-                        | TextureFormat::ASTC_RGBA_4x4
-                        | TextureFormat::ASTC_HDR_4x4 => astc_decode::Footprint::new(4, 4),
-                        TextureFormat::ASTC_RGB_5x5
-                        | TextureFormat::ASTC_RGBA_5x5
-                        | TextureFormat::ASTC_HDR_5x5 => astc_decode::Footprint::new(5, 5),
-                        TextureFormat::ASTC_RGB_6x6
-                        | TextureFormat::ASTC_RGBA_6x6
-                        | TextureFormat::ASTC_HDR_6x6 => astc_decode::Footprint::new(6, 6),
-                        TextureFormat::ASTC_RGB_8x8
-                        | TextureFormat::ASTC_RGBA_8x8
-                        | TextureFormat::ASTC_HDR_8x8 => astc_decode::Footprint::new(8, 8),
-                        TextureFormat::ASTC_RGB_10x10
-                        | TextureFormat::ASTC_RGBA_10x10
-                        | TextureFormat::ASTC_HDR_10x10 => astc_decode::Footprint::new(10, 10),
-                        TextureFormat::ASTC_RGB_12x12
-                        | TextureFormat::ASTC_RGBA_12x12
-                        | TextureFormat::ASTC_HDR_12x12 => astc_decode::Footprint::new(12, 12),
-                        _ => unreachable!(),
-                    };
-                    astc_decode::astc_decode(
-                        &**data,
-                        width as u32,
-                        height as u32,
-                        footprint,
-                        |x, y, color| {
-                            output[(x as usize + y as usize * width)] = color;
-                        },
-                    )
-                    .unwrap();
-                    let result =
-                        RgbaImage::from_raw(width as u32, height as u32, output.concat()).unwrap();
-                    return Some(DynamicImage::ImageRgba8(result));
-                }
-                TextureFormat::Alpha8 => {
-                    let buff: Vec<[u8; 2]> = data.as_ref().into_iter().map(|f| [0, *f]).collect();
-                    let result = GrayAlphaImage::from_raw(
-                        self.get_width() as u32,
-                        self.get_height() as u32,
-                        buff.concat(),
-                    )
-                    .unwrap();
-                    return Some(DynamicImage::ImageLumaA8(result));
-                }
-                TextureFormat::RGB24 => {
-                    let result = RgbImage::from_raw(
-                        self.get_width() as u32,
-                        self.get_height() as u32,
-                        data.to_vec(),
-                    )
-                    .unwrap();
-                    return Some(DynamicImage::ImageRgb8(result));
-                }
-                TextureFormat::RGBA32 => {
-                    let result = RgbaImage::from_raw(
-                        self.get_width() as u32,
-                        self.get_height() as u32,
-                        data.to_vec(),
-                    )
-                    .unwrap();
-                    return Some(DynamicImage::ImageRgba8(result));
-                }
-                _ => println!("unsupport texture_format: {:?}", self.get_texture_format()),
+                let result =
+                    RgbaImage::from_raw(width as u32, height as u32, output).ok_or("from_raw")?;
+                Ok(DynamicImage::ImageRgba8(result))
             }
+            TextureFormat::ASTC_RGB_4x4
+            | TextureFormat::ASTC_RGB_5x5
+            | TextureFormat::ASTC_RGB_6x6
+            | TextureFormat::ASTC_RGB_8x8
+            | TextureFormat::ASTC_RGB_10x10
+            | TextureFormat::ASTC_RGB_12x12
+            | TextureFormat::ASTC_RGBA_4x4
+            | TextureFormat::ASTC_RGBA_5x5
+            | TextureFormat::ASTC_RGBA_6x6
+            | TextureFormat::ASTC_RGBA_8x8
+            | TextureFormat::ASTC_RGBA_10x10
+            | TextureFormat::ASTC_RGBA_12x12
+            | TextureFormat::ASTC_HDR_4x4
+            | TextureFormat::ASTC_HDR_5x5
+            | TextureFormat::ASTC_HDR_6x6
+            | TextureFormat::ASTC_HDR_8x8
+            | TextureFormat::ASTC_HDR_10x10
+            | TextureFormat::ASTC_HDR_12x12 => {
+                let size = width * height;
+                let mut output = vec![[0u8; 4]; size];
+                let footprint = match &texture_format {
+                    TextureFormat::ASTC_RGB_4x4
+                    | TextureFormat::ASTC_RGBA_4x4
+                    | TextureFormat::ASTC_HDR_4x4 => astc_decode::Footprint::new(4, 4),
+                    TextureFormat::ASTC_RGB_5x5
+                    | TextureFormat::ASTC_RGBA_5x5
+                    | TextureFormat::ASTC_HDR_5x5 => astc_decode::Footprint::new(5, 5),
+                    TextureFormat::ASTC_RGB_6x6
+                    | TextureFormat::ASTC_RGBA_6x6
+                    | TextureFormat::ASTC_HDR_6x6 => astc_decode::Footprint::new(6, 6),
+                    TextureFormat::ASTC_RGB_8x8
+                    | TextureFormat::ASTC_RGBA_8x8
+                    | TextureFormat::ASTC_HDR_8x8 => astc_decode::Footprint::new(8, 8),
+                    TextureFormat::ASTC_RGB_10x10
+                    | TextureFormat::ASTC_RGBA_10x10
+                    | TextureFormat::ASTC_HDR_10x10 => astc_decode::Footprint::new(10, 10),
+                    TextureFormat::ASTC_RGB_12x12
+                    | TextureFormat::ASTC_RGBA_12x12
+                    | TextureFormat::ASTC_HDR_12x12 => astc_decode::Footprint::new(12, 12),
+                    _ => unreachable!(),
+                };
+                astc_decode::astc_decode(
+                    &**data,
+                    width as u32,
+                    height as u32,
+                    footprint,
+                    |x, y, color| {
+                        output[(x as usize + y as usize * width)] = color;
+                    },
+                )
+                .map_err(|e| format!("astc_decode: {:?}", e))?;
+
+                let result = RgbaImage::from_raw(width as u32, height as u32, output.concat())
+                    .ok_or("from_raw")?;
+                Ok(DynamicImage::ImageRgba8(result))
+            }
+            TextureFormat::Alpha8 => {
+                let buff: Vec<[u8; 2]> = data.as_ref().into_iter().map(|f| [0, *f]).collect();
+                let result = GrayAlphaImage::from_raw(width as u32, height as u32, buff.concat())
+                    .ok_or("from_raw")?;
+                Ok(DynamicImage::ImageLumaA8(result))
+            }
+            TextureFormat::RGB24 => {
+                let result = RgbImage::from_raw(width as u32, height as u32, data.to_vec())
+                    .ok_or("from_raw")?;
+                Ok(DynamicImage::ImageRgb8(result))
+            }
+            TextureFormat::RGBA32 => {
+                let result = RgbaImage::from_raw(width as u32, height as u32, data.to_vec())
+                    .ok_or("from_raw")?;
+                Ok(DynamicImage::ImageRgba8(result))
+            }
+            _ => Err(format!(
+                "unsupport texture_format: {:?}",
+                self.get_texture_format()
+            )),
         }
-        None
     }
 }
 

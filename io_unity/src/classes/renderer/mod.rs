@@ -14,7 +14,7 @@ use supercow::Supercow;
 def_unity_class!(Renderer, RendererObject);
 
 pub trait RendererObject: fmt::Debug {
-    fn get_materials(&self) -> Supercow<Vec<PPtr>>;
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>>;
 }
 
 impl BinRead for Renderer {

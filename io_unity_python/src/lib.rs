@@ -145,39 +145,51 @@ impl SerializedFile {
 #[pymethods]
 impl Mesh {
     fn get_index_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<u32>> {
-        Ok(self.0.get_index_buff(sub_mesh_id))
+        self.0
+            .get_index_buff(sub_mesh_id)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
     }
 
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
-        Ok(self.0.get_vertex_buff(sub_mesh_id))
+        self.0
+            .get_vertex_buff(sub_mesh_id)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
     }
 
     fn get_normal_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
-        Ok(self.0.get_normal_buff(sub_mesh_id))
+        self.0
+            .get_normal_buff(sub_mesh_id)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
     }
 
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
-        Ok(self.0.get_uv0_buff(sub_mesh_id))
+        self.0
+            .get_uv0_buff(sub_mesh_id)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
     }
 
     fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<(Vec<f32>, Vec<u32>)>> {
         Ok(self
             .0
             .get_bone_weights_buff(sub_mesh_id)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))?
             .into_iter()
             .map(|w| (w.weight, w.bone_index))
             .collect())
     }
 
     fn get_sub_mesh_count(&self) -> PyResult<usize> {
-        Ok(self.0.get_sub_mesh_count())
+        self.0
+            .get_sub_mesh_count()
+            .ok_or(pyo3::exceptions::PyException::new_err("None"))
     }
 
     fn get_bind_pose(&self) -> PyResult<Vec<[[f32; 4]; 4]>> {
         Ok(self
             .0
             .get_bind_pose()
-            .into_iter()
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e))?
+            .iter()
             .map(|m| m.to_cols_array_2d())
             .collect())
     }
@@ -199,10 +211,13 @@ impl AudioClip {
 #[pymethods]
 impl SkinnedMeshRenderer {
     fn get_mesh(&self, py: Python, sf: &PyCell<SerializedFile>) -> PyResult<PyObject> {
-        if let Some(io_unity::classes::Class::Mesh(mesh)) = sf
-            .try_borrow()?
-            .0
-            .get_object_by_path_id(self.0.get_mesh().get_path_id())
+        if let Some(io_unity::classes::Class::Mesh(mesh)) =
+            sf.try_borrow()?.0.get_object_by_path_id(
+                self.0
+                    .get_mesh()
+                    .and_then(|m| m.get_path_id())
+                    .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
+            )
         {
             Ok(Mesh(mesh).into_py(py))
         } else {
@@ -218,28 +233,50 @@ impl SkinnedMeshRenderer {
         let mut bone_father_index_buff = Vec::new();
         let mut bone_local_mat_buff = Vec::new();
 
-        let bones = self.0.get_bones();
+        let bones = self
+            .0
+            .get_bones()
+            .ok_or(pyo3::exceptions::PyException::new_err("None"))?;
 
         for bone in &*bones {
             if let Some(io_unity::classes::Class::Transform(bone)) =
-                sf.try_borrow()?.0.get_object_by_path_id(bone.get_path_id())
+                sf.try_borrow()?.0.get_object_by_path_id(
+                    bone.get_path_id()
+                        .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
+                )
             {
                 bone_name_buff.push(
                     if let Some(io_unity::classes::Class::GameObject(go)) =
                         sf.try_borrow()?.0.get_object_by_path_id(
-                            bone.downcast().get_game_object().unwrap().get_path_id(),
+                            bone.downcast()
+                                .get_game_object()
+                                .and_then(|go| go.get_path_id())
+                                .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
                         )
                     {
-                        go.get_name().to_string()
+                        go.get_name()
+                            .ok_or(pyo3::exceptions::PyException::new_err("None"))?
+                            .to_string()
                     } else {
                         "bone".to_string()
                     },
                 );
                 let father = bones.iter().enumerate().find(|(_index, itbone)| {
-                    itbone.get_path_id() == bone.get_father().get_path_id()
+                    if let (Some(itboneid), Some(boneid)) = (
+                        itbone.get_path_id(),
+                        bone.get_father().and_then(|f| f.get_path_id()),
+                    ) {
+                        itboneid == boneid
+                    } else {
+                        false
+                    }
                 });
                 bone_father_index_buff.push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));
-                bone_local_mat_buff.push(bone.get_local_mat().to_cols_array_2d());
+                bone_local_mat_buff.push(
+                    bone.get_local_mat()
+                        .ok_or(pyo3::exceptions::PyException::new_err("None"))?
+                        .to_cols_array_2d(),
+                );
             }
         }
         Ok((bone_name_buff, bone_father_index_buff, bone_local_mat_buff))

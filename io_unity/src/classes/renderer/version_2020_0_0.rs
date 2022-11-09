@@ -7,8 +7,8 @@ use binrw::binrw;
 use supercow::Supercow;
 
 impl RendererObject for Renderer {
-    fn get_materials(&self) -> Supercow<Vec<PPtr>> {
-        Supercow::borrowed(&self.materials)
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::borrowed(&self.materials))
     }
 }
 

@@ -14,7 +14,7 @@ use supercow::Supercow;
 def_unity_class!(PPtr, PPtrObject);
 
 pub trait PPtrObject: fmt::Debug {
-    fn get_path_id(&self) -> i64;
+    fn get_path_id(&self) -> Option<i64>;
 }
 
 impl BinRead for PPtr {

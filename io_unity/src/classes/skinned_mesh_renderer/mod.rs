@@ -14,9 +14,9 @@ use supercow::Supercow;
 def_unity_class!(SkinnedMeshRenderer, SkinnedMeshRendererObject);
 
 pub trait SkinnedMeshRendererObject: fmt::Debug {
-    fn get_bones(&self) -> Supercow<Vec<PPtr>>;
-    fn get_mesh(&self) -> Supercow<PPtr>;
-    fn get_materials(&self) -> Supercow<Vec<PPtr>>;
+    fn get_bones(&self) -> Option<Supercow<Vec<PPtr>>>;
+    fn get_mesh(&self) -> Option<Supercow<PPtr>>;
+    fn get_materials(&self) -> Option<Supercow<Vec<PPtr>>>;
 }
 
 impl BinRead for SkinnedMeshRenderer {

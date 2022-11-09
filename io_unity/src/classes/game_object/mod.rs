@@ -13,7 +13,7 @@ use supercow::Supercow;
 def_unity_class!(GameObject, GameObjectObject);
 
 pub trait GameObjectObject: fmt::Debug {
-    fn get_name(&self) -> String;
+    fn get_name(&self) -> Option<String>;
 }
 
 impl BinRead for GameObject {

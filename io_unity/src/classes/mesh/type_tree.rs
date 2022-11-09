@@ -20,106 +20,126 @@ impl named_object::DownCast for Mesh<'_> {
 }
 
 impl MeshObject for Mesh<'_> {
-    fn get_index_buff(&self, sub_mesh_id: usize) -> Vec<u32> {
-        let binding = self.get_sub_meshes().unwrap();
-        let sub_mesh = binding.get(sub_mesh_id).unwrap();
+    fn get_index_buff(&self, sub_mesh_id: usize) -> Result<Vec<u32>, String> {
+        let binding = self.get_sub_meshes().ok_or("sub_meshs")?;
+        let sub_mesh = binding.get(sub_mesh_id).ok_or("sub_mesh")?;
 
-        let buff = self.get_index_buffer().unwrap();
+        let buff = self.get_index_buffer().ok_or("get_index_buffer")?;
         let mut reader = Cursor::new(buff.as_ref());
-        reader.seek(SeekFrom::Start(sub_mesh.get_first_byte().unwrap()));
-        let op = ReadOptions::new(self.inner.get_endian());
+        reader
+            .seek(SeekFrom::Start(
+                sub_mesh.get_first_byte().ok_or("get_first_byte")?,
+            ))
+            .map_err(|e| format!("buff seek: {:?}", e))?;
 
-        if self.get_index_format().unwrap() == 0 {
+        let op = ReadOptions::new(self.inner.get_endian());
+        let first_vertex = sub_mesh.get_first_vertex().ok_or("get_first_vertex")?;
+
+        if self.get_index_format().ok_or("get_index_format")? == 0 {
             let buff = <Vec<u16>>::read_options(
                 &mut reader,
                 &op,
                 VecArgs {
-                    count: sub_mesh.get_index_count().unwrap() as usize,
+                    count: sub_mesh.get_index_count().ok_or("get_index_count")? as usize,
                     inner: (),
                 },
             )
-            .unwrap();
-            buff.into_iter()
-                .map(|i| i as u32 - sub_mesh.get_first_vertex().unwrap() as u32)
-                .collect()
+            .map_err(|e| format!("buff read: {:?}", e))?;
+            Ok(buff
+                .into_iter()
+                .map(|i| i as u32 - first_vertex as u32)
+                .collect())
         } else {
             let buff = <Vec<u32>>::read_options(
                 &mut reader,
                 &op,
                 VecArgs {
-                    count: sub_mesh.get_index_count().unwrap() as usize,
+                    count: sub_mesh.get_index_count().ok_or("get_index_count")? as usize,
                     inner: (),
                 },
             )
-            .unwrap();
-            buff.into_iter()
-                .map(|i| i - sub_mesh.get_first_vertex().unwrap() as u32)
-                .collect()
+            .map_err(|e| format!("buff read: {:?}", e))?;
+            Ok(buff.into_iter().map(|i| i - first_vertex as u32).collect())
         }
     }
 
-    fn get_vertex_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
-        let binding = self.get_sub_meshes().unwrap();
-        let sub_mesh = binding.get(sub_mesh_id).unwrap();
+    fn get_vertex_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String> {
+        let binding = self.get_sub_meshes().ok_or("sub_meshs")?;
+        let sub_mesh = binding.get(sub_mesh_id).ok_or("sub_mesh")?;
 
-        match self.get_vertex_data().unwrap().get_channel(
-            &ChannelType::kShaderChannelVertex,
-            sub_mesh,
-            self.inner.get_endian(),
-        ) {
+        Ok(match self
+            .get_vertex_data()
+            .ok_or("get_vertex_data")?
+            .get_channel(
+                &ChannelType::kShaderChannelVertex,
+                sub_mesh,
+                self.inner.get_endian(),
+            )? {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
-        .concat()
+        .concat())
     }
 
-    fn get_normal_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
-        let binding = self.get_sub_meshes().unwrap();
-        let sub_mesh = binding.get(sub_mesh_id).unwrap();
+    fn get_normal_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String> {
+        let binding = self.get_sub_meshes().ok_or("sub_meshs")?;
+        let sub_mesh = binding.get(sub_mesh_id).ok_or("sub_mesh")?;
 
-        match self.get_vertex_data().unwrap().get_channel(
-            &ChannelType::kShaderChannelNormal,
-            sub_mesh,
-            self.inner.get_endian(),
-        ) {
+        Ok(match self
+            .get_vertex_data()
+            .ok_or("get_vertex_data")?
+            .get_channel(
+                &ChannelType::kShaderChannelNormal,
+                sub_mesh,
+                self.inner.get_endian(),
+            )? {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
-        .concat()
+        .concat())
     }
 
-    fn get_uv0_buff(&self, sub_mesh_id: usize) -> Vec<f32> {
-        let binding = self.get_sub_meshes().unwrap();
-        let sub_mesh = binding.get(sub_mesh_id).unwrap();
+    fn get_uv0_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String> {
+        let binding = self.get_sub_meshes().ok_or("sub_meshs")?;
+        let sub_mesh = binding.get(sub_mesh_id).ok_or("sub_mesh")?;
 
-        match self.get_vertex_data().unwrap().get_channel(
-            &ChannelType::kShaderChannelTexCoord0,
-            sub_mesh,
-            self.inner.get_endian(),
-        ) {
+        Ok(match self
+            .get_vertex_data()
+            .ok_or("get_vertex_data")?
+            .get_channel(
+                &ChannelType::kShaderChannelTexCoord0,
+                sub_mesh,
+                self.inner.get_endian(),
+            )? {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         }
-        .concat()
+        .concat())
     }
 
-    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> Vec<BoneWeights> {
-        let binding = self.get_sub_meshes().unwrap();
-        let sub_mesh = binding.get(sub_mesh_id).unwrap();
+    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> Result<Vec<BoneWeights>, String> {
+        let binding = self.get_sub_meshes().ok_or("get_sub_meshes")?;
+        let sub_mesh = binding.get(sub_mesh_id).ok_or("sub_mesh")?;
 
-        let weight_buff = match self.get_vertex_data().unwrap().get_channel(
-            &ChannelType::kShaderChannelBlendWeight,
-            sub_mesh,
-            self.inner.get_endian(),
-        ) {
+        let weight_buff = match self
+            .get_vertex_data()
+            .ok_or("get_vertex_data")?
+            .get_channel(
+                &ChannelType::kShaderChannelBlendWeight,
+                sub_mesh,
+                self.inner.get_endian(),
+            )? {
             StreamBuff::Float(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
         };
-        let bone_index_buff = match self.get_vertex_data().unwrap().get_channel(
-            &ChannelType::kShaderChannelBlendIndices,
-            sub_mesh,
-            self.inner.get_endian(),
-        ) {
+        let bone_index_buff = match self
+            .get_vertex_data()
+            .ok_or("get_vertex_data")?
+            .get_channel(
+                &ChannelType::kShaderChannelBlendIndices,
+                sub_mesh,
+                self.inner.get_endian(),
+            )? {
             StreamBuff::U32(buff) => buff,
             StreamBuff::I32(_) | StreamBuff::Float(_) => unreachable!(),
         };
@@ -128,14 +148,14 @@ impl MeshObject for Mesh<'_> {
         for (weight, bone_index) in weight_buff.into_iter().zip(bone_index_buff) {
             buff.push(BoneWeights { weight, bone_index });
         }
-        buff
+        Ok(buff)
     }
 
-    fn get_sub_mesh_count(&self) -> usize {
-        self.get_sub_meshes().unwrap().len()
+    fn get_sub_mesh_count(&self) -> Option<usize> {
+        Some(self.get_sub_meshes()?.len())
     }
 
-    fn get_bind_pose(&self) -> &Vec<crate::until::binrw_parser::Mat4> {
+    fn get_bind_pose(&self) -> Result<Supercow<Vec<crate::until::binrw_parser::Mat4>>, String> {
         todo!()
     }
 }
@@ -216,26 +236,27 @@ impl VertexData<'_> {
 }
 
 impl VertexData<'_> {
-    fn get_stream_offset(&self, stream: u8) -> usize {
+    fn get_stream_offset(&self, stream: u8) -> Result<usize, String> {
         let mut offset = 0;
         for s in 0..stream {
-            offset += self.get_stream_stride(s) * (self.get_vertex_count().unwrap() as usize);
+            offset += self.get_stream_stride(s)?
+                * (self.get_vertex_count().ok_or("get_vertex_count")? as usize);
             if offset % 16 != 0 {
                 offset += 16 - (offset % 16);
             }
         }
-        offset
+        Ok(offset)
     }
 
-    fn get_stream_stride(&self, stream: u8) -> usize {
+    fn get_stream_stride(&self, stream: u8) -> Result<usize, String> {
         let mut stride = 0u64;
-        for channel in &self.get_channels().unwrap() {
-            if channel.get_stream().unwrap() == stream as u64 {
-                stride += get_format_size(channel.get_format().unwrap()) as u64
-                    * channel.get_dimension().unwrap()
+        for channel in &self.get_channels().ok_or("get_channels")? {
+            if channel.get_stream().ok_or("get_stream")? == stream as u64 {
+                stride += get_format_size(channel.get_format().ok_or("get_format")?) as u64
+                    * channel.get_dimension().ok_or("get_dimension")?
             }
         }
-        stride as usize
+        Ok(stride as usize)
     }
 
     fn get_channel(
@@ -243,54 +264,62 @@ impl VertexData<'_> {
         channel: &ChannelType,
         sub_mesh: &SubMesh,
         endian: binrw::Endian,
-    ) -> StreamBuff {
-        let channel = &self.get_channels().unwrap()[channel.clone() as u8 as usize];
-        let offset = self.get_stream_offset(channel.get_stream().unwrap() as u8);
-        let stride = self.get_stream_stride(channel.get_stream().unwrap() as u8);
-        let buff = self.get_data().unwrap();
+    ) -> Result<StreamBuff, String> {
+        let channel = &self.get_channels().ok_or("get_channels")?[channel.clone() as u8 as usize];
+        let offset = self.get_stream_offset(channel.get_stream().ok_or("get_stream")? as u8)?;
+        let stride = self.get_stream_stride(channel.get_stream().ok_or("get_stream")? as u8)?;
+        let buff = self.get_data().ok_or("get_data")?;
         let mut reader = Cursor::new(buff.as_ref());
         let op = ReadOptions::new(endian);
-        match &channel.get_format().unwrap() {
+        match &channel.get_format().ok_or("get_format")? {
             VertexFormat::Float => {
                 let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex().unwrap()
-                    ..sub_mesh.get_vertex_count().unwrap() + sub_mesh.get_first_vertex().unwrap()
+                for i in sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
+                    ..sub_mesh.get_vertex_count().ok_or("get_vertex_count")?
+                        + sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
                 {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64 + i as u64 * stride as u64 + channel.get_offset().unwrap(),
-                    ));
+                    reader
+                        .seek(SeekFrom::Start(
+                            offset as u64
+                                + i as u64 * stride as u64
+                                + channel.get_offset().ok_or("get_offset")?,
+                        ))
+                        .map_err(|e| format!("buff seek: {:?}", e))?;
                     let sbuff = <Vec<f32>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().unwrap() as usize,
+                            count: channel.get_dimension().ok_or("get_dimension")? as usize,
                             inner: (),
                         },
                     )
-                    .unwrap();
+                    .map_err(|e| format!("buff read: {:?}", e))?;
                     buff.push(sbuff);
                 }
-                StreamBuff::Float(buff)
+                Ok(StreamBuff::Float(buff))
             }
             VertexFormat::Float16 => {
                 let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex().unwrap()
-                    ..sub_mesh.get_vertex_count().unwrap() + sub_mesh.get_first_vertex().unwrap()
+                for i in sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
+                    ..sub_mesh.get_vertex_count().ok_or("get_vertex_count")?
+                        + sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
                 {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64
-                            + i as u64 * stride as u64
-                            + channel.get_offset().unwrap() as u64,
-                    ));
+                    reader
+                        .seek(SeekFrom::Start(
+                            offset as u64
+                                + i as u64 * stride as u64
+                                + channel.get_offset().ok_or("get_offset")? as u64,
+                        ))
+                        .map_err(|e| format!("buff seek: {:?}", e))?;
                     let sbuff = <Vec<u16>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().unwrap() as usize,
+                            count: channel.get_dimension().ok_or("get_dimension")? as usize,
                             inner: (),
                         },
                     )
-                    .unwrap();
+                    .map_err(|e| format!("buff read: {:?}", e))?;
                     buff.push(
                         sbuff
                             .into_iter()
@@ -298,7 +327,7 @@ impl VertexData<'_> {
                             .collect(),
                     );
                 }
-                StreamBuff::Float(buff)
+                Ok(StreamBuff::Float(buff))
             }
             VertexFormat::UNorm8 => todo!(),
             VertexFormat::SNorm8 => todo!(),
@@ -310,26 +339,29 @@ impl VertexData<'_> {
             VertexFormat::SInt16 => todo!(),
             VertexFormat::UInt32 => {
                 let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex().unwrap()
-                    ..sub_mesh.get_vertex_count().unwrap() + sub_mesh.get_first_vertex().unwrap()
+                for i in sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
+                    ..sub_mesh.get_vertex_count().ok_or("get_vertex_count")?
+                        + sub_mesh.get_first_vertex().ok_or("get_first_vertex")?
                 {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64
-                            + i as u64 * stride as u64
-                            + channel.get_offset().unwrap() as u64,
-                    ));
+                    reader
+                        .seek(SeekFrom::Start(
+                            offset as u64
+                                + i as u64 * stride as u64
+                                + channel.get_offset().ok_or("get_offset")? as u64,
+                        ))
+                        .map_err(|e| format!("buff seek: {:?}", e))?;
                     let sbuff = <Vec<u32>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().unwrap() as usize,
+                            count: channel.get_dimension().ok_or("get_dimension")? as usize,
                             inner: (),
                         },
                     )
-                    .unwrap();
+                    .map_err(|e| format!("buff read: {:?}", e))?;
                     buff.push(sbuff);
                 }
-                StreamBuff::U32(buff)
+                Ok(StreamBuff::U32(buff))
             }
             VertexFormat::SInt32 => todo!(),
         }

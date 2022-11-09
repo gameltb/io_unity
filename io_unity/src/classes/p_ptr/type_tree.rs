@@ -6,8 +6,8 @@ use supercow::Supercow;
 def_type_tree_class!(PPtr);
 
 impl PPtrObject for PPtr<'_> {
-    fn get_path_id(&self) -> i64 {
-        self.get_path_id().unwrap()
+    fn get_path_id(&self) -> Option<i64> {
+        self.get_path_id()
     }
 }
 

@@ -102,7 +102,7 @@ fn handle<P: AsRef<Path>>(filepath: P) {
             {
                 // println!("{:#?}", &tex);
                 tex.get_image(&mut fs).and_then(|t| {
-                    Some(t.flipv().save(
+                    Ok(t.flipv().save(
                         "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap() + ".png",
                     ))
                 });
@@ -151,23 +151,28 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 let mut bone_name_buff = Vec::new();
                 let mut bone_father_index_buff = Vec::new();
 
-                for bone in &*smr.get_bones() {
+                for bone in &*smr.get_bones().unwrap() {
                     if let Some(classes::Class::Transform(bone)) =
-                        s.get_object_by_path_id(bone.get_path_id())
+                        s.get_object_by_path_id(bone.get_path_id().unwrap())
                     {
                         // println!("{:#?}", bone);
                         bone_name_buff.push(
                             if let Some(classes::Class::GameObject(go)) = s.get_object_by_path_id(
-                                bone.downcast().get_game_object().unwrap().get_path_id(),
+                                bone.downcast()
+                                    .get_game_object()
+                                    .unwrap()
+                                    .get_path_id()
+                                    .unwrap(),
                             ) {
-                                go.get_name().to_string()
+                                go.get_name().unwrap().to_string()
                             } else {
                                 "bone".to_string()
                             },
                         );
-                        let bones = smr.get_bones();
+                        let bones = smr.get_bones().unwrap();
                         let father = bones.iter().enumerate().find(|(_index, itbone)| {
-                            itbone.get_path_id() == bone.get_father().get_path_id()
+                            itbone.get_path_id().unwrap()
+                                == bone.get_father().unwrap().get_path_id().unwrap()
                         });
                         bone_father_index_buff
                             .push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));
@@ -176,12 +181,12 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 println!("{:#?}", bone_name_buff.len());
                 println!("{:#?}", bone_father_index_buff.len());
 
-                for material in &*smr.get_materials() {
-                    let material = s.get_object_by_path_id(material.get_path_id());
+                for material in &*smr.get_materials().unwrap() {
+                    let material = s.get_object_by_path_id(material.get_path_id().unwrap());
                     println!("{:#?}", material);
                 }
                 if let Some(classes::Class::Mesh(_mesh)) =
-                    s.get_object_by_path_id(smr.get_mesh().get_path_id())
+                    s.get_object_by_path_id(smr.get_mesh().unwrap().get_path_id().unwrap())
                 {
                     // println!("{:#?}", mesh.get_bind_pose());
                 }

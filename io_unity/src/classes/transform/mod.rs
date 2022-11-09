@@ -14,8 +14,8 @@ use supercow::Supercow;
 def_unity_class!(Transform, TransformObject);
 
 pub trait TransformObject: fmt::Debug + component::DownCast {
-    fn get_father(&self) -> Supercow<PPtr>;
-    fn get_local_mat(&self) -> Mat4;
+    fn get_father(&self) -> Option<Supercow<PPtr>>;
+    fn get_local_mat(&self) -> Option<Mat4>;
 }
 
 impl BinRead for Transform {
