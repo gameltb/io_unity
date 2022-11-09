@@ -3,12 +3,21 @@ use std::io::{Cursor, Seek, SeekFrom};
 
 use super::version_2020_0_0::{get_format_size, ChannelType, VertexFormat};
 use super::{BoneWeights, MeshObject, StreamBuff};
+use crate::classes::named_object::{self, NamedObjectObject};
 use crate::def_type_tree_class;
 use crate::type_tree::TypeTreeObject;
 use binrw::{BinRead, ReadOptions, VecArgs};
 use supercow::Supercow;
 
 def_type_tree_class!(Mesh);
+
+impl named_object::DownCast for Mesh<'_> {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
+            &*self.inner,
+        )))
+    }
+}
 
 impl MeshObject for Mesh<'_> {
     fn get_index_buff(&self, sub_mesh_id: usize) -> Vec<u32> {

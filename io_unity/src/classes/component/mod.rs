@@ -13,7 +13,7 @@ use supercow::Supercow;
 def_unity_class!(Component, ComponentObject);
 
 pub trait ComponentObject: fmt::Debug {
-    fn get_game_object(&self) -> Supercow<PPtr>;
+    fn get_game_object(&self) -> Option<Supercow<PPtr>>;
 }
 
 impl BinRead for Component {

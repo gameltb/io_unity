@@ -10,9 +10,11 @@ use std::{
 };
 use supercow::Supercow;
 
+use super::named_object;
+
 def_unity_class!(Material, MaterialObject);
 
-pub trait MaterialObject: fmt::Debug {}
+pub trait MaterialObject: fmt::Debug + named_object::DownCast {}
 
 impl BinRead for Material {
     type Args = SerializedFileMetadata;

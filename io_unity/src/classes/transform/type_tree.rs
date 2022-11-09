@@ -1,5 +1,5 @@
 use super::TransformObject;
-use crate::classes::component;
+use crate::classes::component::{self, ComponentObject};
 use crate::classes::p_ptr::PPtr;
 use crate::def_type_tree_class;
 use crate::type_tree::TypeTreeObject;
@@ -8,15 +8,13 @@ use supercow::Supercow;
 
 def_type_tree_class!(Transform);
 
-impl TransformObject for Transform<'_> {
-    fn get_game_object(&self) -> Supercow<PPtr> {
-        Supercow::owned(
-            component::type_tree::Component::new(&*self.inner)
-                .get_game_object()
-                .unwrap(),
-        )
+impl component::DownCast for Transform<'_> {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn ComponentObject + Send + 'a>> {
+        Supercow::owned(Box::new(component::type_tree::Component::new(&*self.inner)))
     }
+}
 
+impl TransformObject for Transform<'_> {
     fn get_father(&self) -> Supercow<PPtr> {
         Supercow::owned(self.get_father().unwrap())
     }

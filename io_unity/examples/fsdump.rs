@@ -52,7 +52,7 @@ fn handle<P: AsRef<Path>>(filepath: P) {
     let s = SerializedFile::read(cabfile_reader).unwrap();
     // println!("{:#?}", s);
 
-    let _fs = Box::new(oval) as Box<dyn FS>;
+    let mut fs = Box::new(oval) as Box<dyn FS>;
     let mut viewed = Vec::new();
     for (pathid, obj) in s.get_object_map() {
         // match obj.class {
@@ -97,18 +97,17 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         //         // panic!("")
         //     }
         // }
-        // if obj.class == ClassIDType::Texture2D {
-        //     if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
-        //     {
-        //         // println!("{:#?}", &tex);
-        //         tex.get_image(&mut fs).and_then(|t| {
-        //             Some(
-        //                 t.flipv()
-        //                     .save("/tmp/tex/".to_string() + &tex.get_image_name() + ".png"),
-        //             )
-        //         });
-        //     }
-        // }
+        if obj.class == ClassIDType::Texture2D {
+            if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
+            {
+                // println!("{:#?}", &tex);
+                tex.get_image(&mut fs).and_then(|t| {
+                    Some(t.flipv().save(
+                        "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap() + ".png",
+                    ))
+                });
+            }
+        }
         // if obj.class == ClassIDType::Transform {
         //     if let Some(classes::Class::Transform(tran)) = s.get_object_by_path_id(pathid.to_owned())
         //     {
@@ -158,9 +157,9 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                     {
                         // println!("{:#?}", bone);
                         bone_name_buff.push(
-                            if let Some(classes::Class::GameObject(go)) =
-                                s.get_object_by_path_id(bone.get_game_object().get_path_id())
-                            {
+                            if let Some(classes::Class::GameObject(go)) = s.get_object_by_path_id(
+                                bone.downcast().get_game_object().unwrap().get_path_id(),
+                            ) {
                                 go.get_name().to_string()
                             } else {
                                 "bone".to_string()

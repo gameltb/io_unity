@@ -1,7 +1,7 @@
 pub mod transform;
 pub mod type_tree;
 
-use super::p_ptr::PPtr;
+use super::{component, p_ptr::PPtr};
 use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use glam::Mat4;
@@ -13,8 +13,7 @@ use supercow::Supercow;
 
 def_unity_class!(Transform, TransformObject);
 
-pub trait TransformObject: fmt::Debug {
-    fn get_game_object(&self) -> Supercow<PPtr>;
+pub trait TransformObject: fmt::Debug + component::DownCast {
     fn get_father(&self) -> Supercow<PPtr>;
     fn get_local_mat(&self) -> Mat4;
 }

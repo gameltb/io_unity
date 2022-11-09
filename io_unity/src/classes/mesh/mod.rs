@@ -15,9 +15,11 @@ use std::{
 };
 use supercow::Supercow;
 
+use super::named_object;
+
 def_unity_class!(Mesh, MeshObject);
 
-pub trait MeshObject: fmt::Debug {
+pub trait MeshObject: fmt::Debug + named_object::DownCast {
     fn get_index_buff(&self, sub_mesh_id: usize) -> Vec<u32>;
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> Vec<f32>;
     fn get_normal_buff(&self, sub_mesh_id: usize) -> Vec<f32>;

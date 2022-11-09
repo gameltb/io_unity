@@ -1,9 +1,17 @@
 use super::{Texture2DObject, TextureFormat};
+use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
 use crate::until::binrw_parser::{AlignedString, U8Bool};
 use crate::{SerializedFileMetadata, FS};
 use binrw::binrw;
 use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
+use supercow::Supercow;
+
+impl named_object::DownCast for Texture2D {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::borrowed(&*self.name)
+    }
+}
 
 impl Texture2DObject for Texture2D {
     fn get_width(&self) -> u64 {
@@ -32,17 +40,14 @@ impl Texture2DObject for Texture2D {
         }
         None
     }
-
-    fn get_image_name(&self) -> String {
-        self.name.to_string()
-    }
 }
 
 #[binrw]
-#[brw(import_raw(_args: SerializedFileMetadata))]
+#[brw(import_raw(args: SerializedFileMetadata))]
 #[derive(Debug)]
 pub struct Texture2D {
-    name: AlignedString,
+    #[brw(args_raw = args)]
+    name: NamedObject,
 
     forced_fallback_format: i32,
     #[br(align_after(4))]

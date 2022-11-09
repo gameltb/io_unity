@@ -1,13 +1,15 @@
 use super::MeshObject;
+use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
 use crate::until::binrw_parser::AlignedString;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
+use supercow::Supercow;
 
-impl Mesh {
-    fn get_name(&self) -> &AlignedString {
-        &self.name
+impl named_object::DownCast for Mesh {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::borrowed(&*self.name)
     }
 }
 
@@ -42,10 +44,11 @@ impl MeshObject for Mesh {
 }
 
 #[binrw]
-#[brw(import_raw(_args: SerializedFileMetadata))]
+#[brw(import_raw(args: SerializedFileMetadata))]
 #[derive(Debug)]
 pub struct Mesh {
-    name: AlignedString,
+    #[brw(args_raw = args)]
+    name: NamedObject,
     sub_meshes_size: i32,
     #[br(count(sub_meshes_size))]
     sub_meshes: Vec<SubMesh>,

@@ -1,20 +1,25 @@
 use super::AnimationClipObject;
+use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 use binrw::binrw;
+use supercow::Supercow;
 
-impl AnimationClipObject for AnimationClip {
-    fn get_name(&self) -> String {
-        self.name.to_string()
+impl named_object::DownCast for AnimationClip {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::borrowed(&*self.name)
     }
 }
+
+impl AnimationClipObject for AnimationClip {}
 
 #[binrw]
 #[brw(import_raw(args: SerializedFileMetadata))]
 #[derive(Debug)]
 pub struct AnimationClip {
-    name: AlignedString,
+    #[brw(args_raw = args.clone())]
+    name: NamedObject,
     legacy: U8Bool,
     compressed: U8Bool,
     use_high_quality_curve: U8Bool,

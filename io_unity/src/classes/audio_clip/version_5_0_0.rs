@@ -1,5 +1,5 @@
 use super::AudioClipObject;
-use crate::classes::named_object::{NamedObject, NamedObjectObject, self};
+use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
 use crate::until::binrw_parser::*;
 use crate::{SerializedFileMetadata, FS};
 use binrw::binrw;

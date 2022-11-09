@@ -1,8 +1,16 @@
 use super::MaterialObject;
+use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
 use crate::classes::p_ptr::PPtr;
 use crate::until::binrw_parser::*;
 use crate::SerializedFileMetadata;
 use binrw::binrw;
+use supercow::Supercow;
+
+impl named_object::DownCast for Material {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::borrowed(&*self.name)
+    }
+}
 
 impl MaterialObject for Material {}
 
@@ -10,7 +18,8 @@ impl MaterialObject for Material {}
 #[brw(import_raw(args: SerializedFileMetadata))]
 #[derive(Debug)]
 pub struct Material {
-    name: AlignedString,
+    #[brw(args_raw = args.clone())]
+    name: NamedObject,
     #[brw(args_raw = args.clone())]
     shader: PPtr,
     shader_keywords: AlignedString,

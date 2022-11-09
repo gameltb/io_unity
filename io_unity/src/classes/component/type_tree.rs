@@ -5,8 +5,8 @@ use supercow::Supercow;
 def_type_tree_class!(Component);
 
 impl ComponentObject for Component<'_> {
-    fn get_game_object(&self) -> Supercow<PPtr> {
-        Supercow::owned(self.get_game_object().unwrap())
+    fn get_game_object(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::owned(self.get_game_object()?))
     }
 }
 

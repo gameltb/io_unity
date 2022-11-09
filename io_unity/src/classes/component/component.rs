@@ -7,8 +7,8 @@ use binrw::binrw;
 use supercow::Supercow;
 
 impl ComponentObject for Component {
-    fn get_game_object(&self) -> Supercow<PPtr> {
-        Supercow::borrowed(&self.game_object)
+    fn get_game_object(&self) -> Option<Supercow<PPtr>> {
+        Some(Supercow::borrowed(&self.game_object))
     }
 }
 

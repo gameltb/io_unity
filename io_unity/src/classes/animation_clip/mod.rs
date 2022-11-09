@@ -10,11 +10,11 @@ use std::{
 };
 use supercow::Supercow;
 
+use super::named_object;
+
 def_unity_class!(AnimationClip, AnimationClipObject);
 
-pub trait AnimationClipObject: fmt::Debug {
-    fn get_name(&self) -> String;
-}
+pub trait AnimationClipObject: fmt::Debug + named_object::DownCast {}
 
 impl BinRead for AnimationClip {
     type Args = SerializedFileMetadata;

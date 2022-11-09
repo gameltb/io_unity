@@ -10,9 +10,11 @@ use std::{
 };
 use supercow::Supercow;
 
+use super::named_object;
+
 def_unity_class!(MonoScript, MonoScriptObject);
 
-pub trait MonoScriptObject: fmt::Debug {}
+pub trait MonoScriptObject: fmt::Debug + named_object::DownCast {}
 
 impl BinRead for MonoScript {
     type Args = SerializedFileMetadata;

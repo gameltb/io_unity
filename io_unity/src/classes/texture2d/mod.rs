@@ -15,14 +15,15 @@ use std::{
 };
 use supercow::Supercow;
 
+use super::named_object;
+
 def_unity_class!(Texture2D, Texture2DObject);
 
-pub trait Texture2DObject: fmt::Debug {
+pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
     fn get_width(&self) -> u64;
     fn get_height(&self) -> u64;
     fn get_texture_format(&self) -> TextureFormat;
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>>;
-    fn get_image_name(&self) -> String;
 
     fn get_image(&self, fs: &mut Box<dyn FS>) -> Option<DynamicImage> {
         if let Some(data) = self.get_image_data(fs) {

@@ -1,4 +1,5 @@
 use super::{Texture2DObject, TextureFormat};
+use crate::classes::named_object::{self, NamedObjectObject};
 use crate::type_tree::TypeTreeObject;
 use crate::{def_type_tree_class, FS};
 use num_enum::TryFromPrimitive;
@@ -7,6 +8,14 @@ use std::io::{prelude::*, SeekFrom};
 use supercow::Supercow;
 
 def_type_tree_class!(Texture2D);
+
+impl named_object::DownCast for Texture2D<'_> {
+    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
+        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
+            &*self.inner,
+        )))
+    }
+}
 
 impl Texture2DObject for Texture2D<'_> {
     fn get_width(&self) -> u64 {
@@ -35,17 +44,9 @@ impl Texture2DObject for Texture2D<'_> {
         }
         None
     }
-
-    fn get_image_name(&self) -> String {
-        self.get_name().unwrap()
-    }
 }
 
 impl Texture2D<'_> {
-    fn get_name(&self) -> Option<String> {
-        self.inner.get_string_by_path("/Base/m_Name")
-    }
-
     fn get_width(&self) -> Option<i64> {
         self.inner.get_int_by_path("/Base/m_Width")
     }
