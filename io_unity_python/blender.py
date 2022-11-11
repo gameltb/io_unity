@@ -26,7 +26,7 @@ cabobj = cab.get_object_by_path_id(object_path_id)
 cab_mesh_bone_name, cab_mesh_bone_index, cab_mesh_bone_local_mat = cabobj.get_bone_name_index_local_mat_buff(
     cab)
 cabmesh = cabobj.get_mesh(cab)
-cab_pose = cabmesh.get_bind_pose()
+# cab_pose = cabmesh.get_bind_pose()
 
 sub_meshs = []
 
@@ -63,21 +63,27 @@ def importSkeleton(pose, bonename, boneindex, armname="test"):
     def getWorldCoordinate(bi, mat):
         ii = bi
         while boneindex[ii] != -1:
-            mat = fixmat(Matrix(pose[ii]).transposed()) @ mat
+            mat = Matrix(pose[boneindex[ii]]).transposed() @  mat 
             ii = boneindex[ii]
-        print("getWorldCoordinate", mat, mat.decompose())
+        print("getWorldCoordinate") 
+        print(mat) 
+        print(mat.decompose())
         return mat
 
     for i, bone in enumerate(pose):
         edit_bone = Skeleton.data.edit_bones.new(bonename[i])
 
         edit_bone.tail.y = 0.05
-        print("raw", bone, Matrix(bone).transposed(),
-              Matrix(bone).transposed().decompose())
+        print(i,bonename[i])
+        print("raw")  
+        print(bone)  
+        print(Matrix(bone).transposed())
+        print(Matrix(bone).transposed().decompose())
 
         edit_bone.matrix = getWorldCoordinate(
-            i, fixmat(Matrix(bone).transposed()))
-        # edit_bone.matrix = fixmat(Matrix(bone))#.transposed()
+            i,Matrix(bone).transposed())
+        # edit_bone.matrix = Matrix(bone).transposed()
+        print("------")
 
     for i, bone in enumerate(pose):
         edit_bone = Skeleton.data.edit_bones[bonename[i]]

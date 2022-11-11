@@ -172,7 +172,7 @@ impl Mesh<'_> {
     }
 
     pub fn get_index_buffer(&self) -> Option<Cow<Vec<u8>>> {
-        self.inner.get_byte_array_by_path("/Base/m_IndexBuffer")
+        self.inner.get_byte_array_by_path("/Base/m_IndexBuffer/Array")
     }
 
     pub fn get_vertex_data(&self) -> Option<VertexData> {
