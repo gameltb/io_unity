@@ -3,6 +3,7 @@ use std::{
     fmt::Debug,
     io::{Cursor, ErrorKind, Read, Seek, SeekFrom},
     sync::Arc,
+    time::Duration,
 };
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
@@ -57,6 +58,7 @@ pub struct ArrayField {
 pub struct Field {
     field_type: Arc<Box<dyn TypeField + Send + Sync>>,
     data: FieldValue,
+    time: Duration,
 }
 
 impl Field {
@@ -66,17 +68,28 @@ impl Field {
 
     fn display_field(&self, p: &String) {
         let np = p.clone() + "/" + self.field_type.get_name();
-        println!(
-            "{}/{} : {}({})",
+        print!(
+            "{}/{} : {}({}) {:?}",
             p,
             self.field_type.get_name(),
             self.field_type.get_type(),
-            self.field_type.get_byte_size()
+            self.field_type.get_byte_size(),
+            &self.time
         );
         match &self.data {
-            FieldValue::Data(_) => (),
-            FieldValue::Fields(fls) => fls.into_iter().map(|f| f.display_field(&np)).collect(),
+            FieldValue::Data(v) => {
+                if v.len() <= 4 {
+                    println!(" data : {:?}", v);
+                } else {
+                    println!(" data : {:?}", &v[..4]);
+                }
+            }
+            FieldValue::Fields(fls) => {
+                println!("");
+                fls.into_iter().map(|f| f.display_field(&np)).collect()
+            }
             FieldValue::Array(ar) => {
+                println!("");
                 ar.array_size.display_field(&np);
                 match &ar.data {
                     FieldValue::Fields(ai) => {
@@ -169,7 +182,32 @@ impl Field {
                 FieldValue::Array(array_field) => match &array_field.data {
                     FieldValue::Data(array) => {
                         if array.len() > 0 {
-                            return Some(Value::ByteArray(Cow::Borrowed(array)));
+                            if array_field.item_type_fields.len() == 1 {
+                                return Some(Value::ByteArray(Cow::Borrowed(array)));
+                            } else {
+                                if let Some(Value::Int32(size)) =
+                                    array_field.array_size.get_value(&[], endian)
+                                {
+                                    let mut obj_array = vec![];
+                                    let mut reader = Cursor::new(array);
+                                    let options = ReadOptions::new(endian.clone());
+                                    let args = TypeTreeObjectBinReadArgs::new(
+                                        0,
+                                        array_field.item_type_fields.clone(),
+                                    );
+                                    for _ in 0..size {
+                                        obj_array.push(
+                                            TypeTreeObject::read_options(
+                                                &mut reader,
+                                                &options,
+                                                args.clone(),
+                                            )
+                                            .ok()?,
+                                        )
+                                    }
+                                    return Some(Value::Array(obj_array));
+                                }
+                            }
                         }
                     }
                     FieldValue::Fields(array_object) => {
@@ -441,6 +479,7 @@ impl BinRead for TypeTreeObject {
             type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
         ) -> BinResult<Field> {
+            let time = std::time::Instant::now();
             let field = type_fields
                 .get(*field_index)
                 .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
@@ -470,20 +509,21 @@ impl BinRead for TypeTreeObject {
                     *field_index += 1;
                 }
 
-                if item_type_fields.len() == 1 {
-                    let item_type = item_type_fields
-                        .get(0)
-                        .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
-
-                    let mut byte_size = item_type.get_byte_size() as usize;
-
-                    if item_type.is_align() {
-                        let i = byte_size % 4;
-                        if i != 0 {
-                            byte_size = byte_size - i + 4
-                        }
+                let pos = reader.seek(SeekFrom::Current(0))?;
+                let is_pos_aligned = (pos % 4) == 0;
+                let fix_item_size = calc_no_array_fields_size(&item_type_fields, &mut 0);
+                let mut buf_read_flag = false;
+                if let Some(byte_size) = fix_item_size {
+                    if is_pos_aligned && ((byte_size % 4) == 0) {
+                        buf_read_flag = true;
+                    } else if item_type_fields.len() == 1
+                        && (item_type_fields.get(0).unwrap().is_align() == false)
+                    {
+                        buf_read_flag = true;
                     }
+                }
 
+                if let (Some(byte_size), true) = (fix_item_size, buf_read_flag) {
                     let array = <Vec<u8>>::read_options(
                         reader,
                         options,
@@ -503,6 +543,7 @@ impl BinRead for TypeTreeObject {
                             }
                             .into(),
                         ),
+                        time: time.elapsed(),
                     }
                 } else {
                     let mut array = Vec::new();
@@ -521,6 +562,7 @@ impl BinRead for TypeTreeObject {
                             }
                             .into(),
                         ),
+                        time: time.elapsed(),
                     }
                 }
             } else if let Some(next_field) = type_fields.get(*field_index + 1) {
@@ -540,6 +582,7 @@ impl BinRead for TypeTreeObject {
                     Field {
                         field_type: field.clone(),
                         data: FieldValue::Fields(fields),
+                        time: time.elapsed(),
                     }
                 } else {
                     Field::read_options(reader, options, field.clone())?
@@ -589,6 +632,47 @@ impl BinRead for Field {
         Ok(Field {
             field_type: args,
             data: FieldValue::Data(buff),
+            time: Duration::from_secs(0),
         })
     }
+}
+
+fn calc_no_array_fields_size(
+    type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
+    field_index: &mut usize,
+) -> Option<usize> {
+    let field = type_fields.get(*field_index)?;
+    let field_level = field.get_level();
+    let read_size = if field.is_array() {
+        None
+    } else if let Some(next_field) = type_fields.get(*field_index + 1) {
+        if next_field.get_level() == field_level + 1 {
+            let mut read_size = 0;
+            while let Some(next_field) = type_fields.get(*field_index + 1) {
+                if next_field.get_level() == field_level + 1 {
+                    *field_index += 1;
+                    read_size += calc_no_array_fields_size(type_fields, field_index)?;
+                } else if next_field.get_level() <= field_level {
+                    break;
+                } else {
+                    panic!("{:#?} {:#?} ", next_field.get_level(), field);
+                }
+            }
+
+            Some(read_size)
+        } else {
+            Some(field.get_byte_size() as usize)
+        }
+    } else {
+        Some(field.get_byte_size() as usize)
+    };
+
+    read_size.and_then(|mut size| {
+        if field.is_align() {
+            if size % 4 != 0 {
+                size = size - (size % 4) + 4
+            }
+        }
+        Some(size)
+    })
 }
