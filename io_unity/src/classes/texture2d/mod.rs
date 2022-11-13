@@ -25,11 +25,11 @@ pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
     fn get_texture_format(&self) -> Option<TextureFormat>;
     fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>>;
 
-    fn get_image(&self, fs: &mut Box<dyn FS>) -> Result<DynamicImage, String> {
-        let data = self.get_image_data(fs).ok_or("data")?;
-        let texture_format = self.get_texture_format().ok_or("texture_format")?;
-        let width = self.get_width().ok_or("width")? as usize;
-        let height = self.get_height().ok_or("height")? as usize;
+    fn get_image(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<DynamicImage> {
+        let data = self.get_image_data(fs).ok_or(anyhow!("data"))?;
+        let texture_format = self.get_texture_format().ok_or(anyhow!("texture_format"))?;
+        let width = self.get_width().ok_or(anyhow!("width"))? as usize;
+        let height = self.get_height().ok_or(anyhow!("height"))? as usize;
 
         match &texture_format {
             TextureFormat::DXT1
@@ -64,12 +64,12 @@ pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
                     | TextureFormat::BC7
                     | TextureFormat::DXT1Crunched
                     | TextureFormat::DXT5Crunched => {
-                        return Err(format!("unsupport {:?}", self.get_texture_format()))
+                        return Err(anyhow!("unsupport {:?}", self.get_texture_format()))
                     }
                     _ => unreachable!(),
                 }
-                let result =
-                    RgbaImage::from_raw(width as u32, height as u32, output).ok_or("from_raw")?;
+                let result = RgbaImage::from_raw(width as u32, height as u32, output)
+                    .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageRgba8(result))
             }
             TextureFormat::ASTC_RGB_4x4
@@ -121,30 +121,29 @@ pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
                     |x, y, color| {
                         output[(x as usize + y as usize * width)] = color;
                     },
-                )
-                .map_err(|e| format!("astc_decode: {:?}", e))?;
+                )?;
 
                 let result = RgbaImage::from_raw(width as u32, height as u32, output.concat())
-                    .ok_or("from_raw")?;
+                    .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageRgba8(result))
             }
             TextureFormat::Alpha8 => {
                 let buff: Vec<[u8; 2]> = data.as_ref().into_iter().map(|f| [0, *f]).collect();
                 let result = GrayAlphaImage::from_raw(width as u32, height as u32, buff.concat())
-                    .ok_or("from_raw")?;
+                    .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageLumaA8(result))
             }
             TextureFormat::RGB24 => {
                 let result = RgbImage::from_raw(width as u32, height as u32, data.to_vec())
-                    .ok_or("from_raw")?;
+                    .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageRgb8(result))
             }
             TextureFormat::RGBA32 => {
                 let result = RgbaImage::from_raw(width as u32, height as u32, data.to_vec())
-                    .ok_or("from_raw")?;
+                    .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageRgba8(result))
             }
-            _ => Err(format!(
+            _ => Err(anyhow!(
                 "unsupport texture_format: {:?}",
                 self.get_texture_format()
             )),

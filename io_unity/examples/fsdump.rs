@@ -98,7 +98,8 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         //     }
         // }
         if obj.class == ClassIDType::Texture2D {
-            if let Some(classes::Class::Texture2D(tex)) = s.get_object_by_path_id(pathid.to_owned())
+            if let Some(classes::Class::Texture2D(tex)) =
+                s.get_object_by_path_id(pathid.to_owned()).unwrap()
             {
                 // println!("{:#?}", &tex);
                 tex.get_image(&mut fs).and_then(|t| {
@@ -108,24 +109,25 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 });
             }
         }
-        // if obj.class == ClassIDType::Transform {
-        //     if let Some(classes::Class::Transform(tran)) = s.get_object_by_path_id(pathid.to_owned())
-        //     {
-        //         println!("{:#?}", &tran.get_local_mat());
-        //     }
-        // }
+        if obj.class == ClassIDType::Transform {
+            if let Some(classes::Class::Transform(tran)) =
+                s.get_object_by_path_id(pathid.to_owned()).unwrap()
+            {
+                println!("{:?}", &tran.get_local_mat());
+            }
+        }
         if obj.class == ClassIDType::TextAsset {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
             tt_o.display_tree();
             println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
         }
-        // if obj.class == ClassIDType::MonoBehaviour {
-        //     let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
-        //     tt_o.display_tree();
-        //     println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
-        // }
+        if obj.class == ClassIDType::MonoBehaviour {
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
+            tt_o.display_tree();
+            println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
+        }
         if obj.class == ClassIDType::MonoScript {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
             // tt_o.display_tree();
             println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
             println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
@@ -133,37 +135,41 @@ fn handle<P: AsRef<Path>>(filepath: P) {
             println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
         }
         if !viewed.contains(&obj.class) {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
+            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
             println!("class {:?}", &obj.class);
             tt_o.display_tree();
-            println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+            // println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
             // println!("{:#?}", s.get_tt_object_by_path_id(*pathid));
             viewed.push(obj.class.clone());
         }
-        continue;
+        // continue;
         if obj.class == ClassIDType::SkinnedMeshRenderer {
-            println!("{:#?}", pathid);
+            println!("{:?}", pathid);
             // continue;
             if let Some(classes::Class::SkinnedMeshRenderer(smr)) =
-                s.get_object_by_path_id(pathid.to_owned())
+                s.get_object_by_path_id(pathid.to_owned()).unwrap()
             {
                 // println!("{:#?}", smr);
                 let mut bone_name_buff = Vec::new();
                 let mut bone_father_index_buff = Vec::new();
 
                 for bone in &*smr.get_bones().unwrap() {
-                    if let Some(classes::Class::Transform(bone)) =
-                        s.get_object_by_path_id(bone.get_path_id().unwrap())
+                    if let Some(classes::Class::Transform(bone)) = s
+                        .get_object_by_path_id(bone.get_path_id().unwrap())
+                        .unwrap()
                     {
                         // println!("{:#?}", bone);
                         bone_name_buff.push(
-                            if let Some(classes::Class::GameObject(go)) = s.get_object_by_path_id(
-                                bone.downcast()
-                                    .get_game_object()
-                                    .unwrap()
-                                    .get_path_id()
-                                    .unwrap(),
-                            ) {
+                            if let Some(classes::Class::GameObject(go)) = s
+                                .get_object_by_path_id(
+                                    bone.downcast()
+                                        .get_game_object()
+                                        .unwrap()
+                                        .get_path_id()
+                                        .unwrap(),
+                                )
+                                .unwrap()
+                            {
                                 go.get_name().unwrap().to_string()
                             } else {
                                 "bone".to_string()
@@ -182,15 +188,15 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 println!("{:#?}", bone_father_index_buff.len());
 
                 for material in &*smr.get_materials().unwrap() {
-                    let material = s.get_object_by_path_id(material.get_path_id().unwrap());
-                    println!("{:#?}", material);
+                    let _material = s.get_object_by_path_id(material.get_path_id().unwrap());
+                    // println!("{:#?}", material);
                 }
-                if let Some(classes::Class::Mesh(_mesh)) =
-                    s.get_object_by_path_id(smr.get_mesh().unwrap().get_path_id().unwrap())
+                if let Some(classes::Class::Mesh(_mesh)) = s
+                    .get_object_by_path_id(smr.get_mesh().unwrap().get_path_id().unwrap())
+                    .unwrap()
                 {
                     // println!("{:#?}", mesh.get_bind_pose());
                 }
-                break;
             }
         }
     }

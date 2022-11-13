@@ -82,6 +82,7 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
             for (pathid, obj) in cab.get_object_map() {
                 let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();
                 let name = tt_o
+                    .unwrap()
                     .get_string_by_path("/Base/m_Name")
                     .unwrap_or("".to_owned());
                 objects.push(Object {
@@ -103,6 +104,7 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
                 for (pathid, obj) in cab.get_object_map() {
                     let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();
                     let name = tt_o
+                        .unwrap()
                         .get_string_by_path("/Base/m_Name")
                         .unwrap_or("".to_owned());
                     objects.push(Object {

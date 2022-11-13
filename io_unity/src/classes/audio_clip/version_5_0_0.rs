@@ -15,7 +15,7 @@ impl named_object::DownCast for AudioClip {
 }
 
 impl AudioClipObject for AudioClip {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>> {
         if let Some(data) = &self.audio_data {
             return Ok(Cow::Borrowed(data));
         } else {
@@ -26,7 +26,7 @@ impl AudioClipObject for AudioClip {
                 return Ok(Cow::Owned(data));
             }
         }
-        Err(std::io::Error::from(ErrorKind::NotFound))
+        Err(std::io::Error::from(ErrorKind::NotFound).into())
     }
 }
 

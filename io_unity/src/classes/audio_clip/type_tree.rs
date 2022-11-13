@@ -20,7 +20,7 @@ impl named_object::DownCast for AudioClip<'_> {
 }
 
 impl AudioClipObject for AudioClip<'_> {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>> {
         let resource_source = self
             .get_resource_source()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
@@ -37,7 +37,7 @@ impl AudioClipObject for AudioClip<'_> {
             file.read_exact(&mut data)?;
             return Ok(Cow::Owned(data));
         }
-        Err(std::io::Error::from(ErrorKind::NotFound))
+        Err(std::io::Error::from(ErrorKind::NotFound).into())
     }
 }
 

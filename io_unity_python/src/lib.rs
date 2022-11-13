@@ -60,7 +60,7 @@ impl UnityFS {
         let file = BufReader::new(file);
         Ok(UnityFS(
             io_unity::UnityFS::read(Box::new(file), file_path)
-                .or(Err(pyo3::exceptions::PyException::new_err("")))?,
+                .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?,
         ))
     }
 
@@ -70,7 +70,7 @@ impl UnityFS {
                 self.0
                     .get_cab_path()
                     .get(0)
-                    .ok_or(pyo3::exceptions::PyException::new_err(""))?,
+                    .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
             )?,
         )?)
     }
@@ -83,7 +83,7 @@ impl SerializedFile {
         let cabfile_reader = Box::new(Cursor::new(cabfile));
         Ok(SerializedFile(
             io_unity::SerializedFile::read(cabfile_reader)
-                .or(Err(pyo3::exceptions::PyException::new_err("")))?,
+                .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?,
         ))
     }
 
@@ -95,13 +95,14 @@ impl SerializedFile {
         let obj = match self
             .0
             .get_object_by_index(index)
-            .ok_or(pyo3::exceptions::PyException::new_err(""))?
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
+            .ok_or(pyo3::exceptions::PyException::new_err("None"))?
         {
             io_unity::classes::Class::AssetBundle(ab) => AssetBundle(ab).into_py(py),
             io_unity::classes::Class::AudioClip(ac) => AudioClip(ac).into_py(py),
             io_unity::classes::Class::Texture2D(tex) => Texture2D(tex).into_py(py),
             io_unity::classes::Class::Mesh(mesh) => Mesh(mesh).into_py(py),
-            _ => return Err(pyo3::exceptions::PyException::new_err("")),
+            _ => return Err(pyo3::exceptions::PyException::new_err("None")),
         };
         Ok(obj)
     }
@@ -112,8 +113,8 @@ impl SerializedFile {
             ($($x:ident($y:path)),+) => {
                 match self
                     .0
-                    .get_object_by_path_id(path_id)
-                    .ok_or(pyo3::exceptions::PyException::new_err(""))?
+                    .get_object_by_path_id(path_id).map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
+                    .ok_or(pyo3::exceptions::PyException::new_err("None"))?
                 {
                     $(io_unity::classes::Class::$x(o) => $x(o).into_py(py),)+
                 }
@@ -147,32 +148,32 @@ impl Mesh {
     fn get_index_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<u32>> {
         self.0
             .get_index_buff(sub_mesh_id)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
     }
 
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
         self.0
             .get_vertex_buff(sub_mesh_id)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
     }
 
     fn get_normal_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
         self.0
             .get_normal_buff(sub_mesh_id)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
     }
 
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<f32>> {
         self.0
             .get_uv0_buff(sub_mesh_id)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
     }
 
     fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> PyResult<Vec<(Vec<f32>, Vec<u32>)>> {
         Ok(self
             .0
             .get_bone_weights_buff(sub_mesh_id)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))?
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
             .into_iter()
             .map(|w| (w.weight, w.bone_index))
             .collect())
@@ -188,7 +189,7 @@ impl Mesh {
         Ok(self
             .0
             .get_bind_pose()
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e))?
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
             .iter()
             .map(|m| m.to_cols_array_2d())
             .collect())
@@ -199,7 +200,10 @@ impl Mesh {
 impl AudioClip {
     fn get_audio_data(&self, py: Python, fs: &PyCell<UnityFS>) -> PyResult<PyObject> {
         let mut fs = Box::new(fs.try_borrow_mut()?.0.clone()) as Box<dyn io_unity::FS>;
-        let data = self.0.get_audio_data(&mut fs)?;
+        let data = self
+            .0
+            .get_audio_data(&mut fs)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?;
         Ok(PyBytes::new(py, &data).into())
     }
 
@@ -211,17 +215,19 @@ impl AudioClip {
 #[pymethods]
 impl SkinnedMeshRenderer {
     fn get_mesh(&self, py: Python, sf: &PyCell<SerializedFile>) -> PyResult<PyObject> {
-        if let Some(io_unity::classes::Class::Mesh(mesh)) =
-            sf.try_borrow()?.0.get_object_by_path_id(
-                self.0
-                    .get_mesh()
-                    .and_then(|m| m.get_path_id())
-                    .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
-            )
+        if let Some(io_unity::classes::Class::Mesh(mesh)) = sf
+            .try_borrow()?
+            .0
+            .get_object_by_path_id(self.0.get_mesh().and_then(|m| m.get_path_id()).ok_or(
+                pyo3::exceptions::PyException::new_err("SkinnedMesh Mesh is None"),
+            )?)
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
         {
             Ok(Mesh(mesh).into_py(py))
         } else {
-            Err(pyo3::exceptions::PyException::new_err(""))
+            Err(pyo3::exceptions::PyException::new_err(
+                "Can't find object in the SerializedFile",
+            ))
         }
     }
 
@@ -239,20 +245,26 @@ impl SkinnedMeshRenderer {
             .ok_or(pyo3::exceptions::PyException::new_err("None"))?;
 
         for bone in &*bones {
-            if let Some(io_unity::classes::Class::Transform(bone)) =
-                sf.try_borrow()?.0.get_object_by_path_id(
+            if let Some(io_unity::classes::Class::Transform(bone)) = sf
+                .try_borrow()?
+                .0
+                .get_object_by_path_id(
                     bone.get_path_id()
                         .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
                 )
+                .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
             {
                 bone_name_buff.push(
-                    if let Some(io_unity::classes::Class::GameObject(go)) =
-                        sf.try_borrow()?.0.get_object_by_path_id(
+                    if let Some(io_unity::classes::Class::GameObject(go)) = sf
+                        .try_borrow()?
+                        .0
+                        .get_object_by_path_id(
                             bone.downcast()
                                 .get_game_object()
                                 .and_then(|go| go.get_path_id())
                                 .ok_or(pyo3::exceptions::PyException::new_err("None"))?,
                         )
+                        .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
                     {
                         go.get_name()
                             .ok_or(pyo3::exceptions::PyException::new_err("None"))?

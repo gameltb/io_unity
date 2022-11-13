@@ -81,7 +81,7 @@ impl Field {
                 if v.len() <= 4 {
                     println!(" data : {:?}", v);
                 } else {
-                    println!(" data : {:?}", &v[..4]);
+                    println!(" data : {:?}...", &v[..4]);
                 }
             }
             FieldValue::Fields(fls) => {

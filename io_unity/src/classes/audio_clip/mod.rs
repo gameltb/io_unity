@@ -16,7 +16,7 @@ use supercow::Supercow;
 def_unity_class!(AudioClip, AudioClipObject);
 
 pub trait AudioClipObject: fmt::Debug + named_object::DownCast {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> std::io::Result<Cow<Vec<u8>>>;
+    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>>;
 }
 
 impl BinRead for AudioClip {

@@ -436,26 +436,41 @@ impl SerializedFile {
         &self.object_map
     }
 
-    pub fn get_object_by_index(&self, index: u32) -> Option<Class> {
-        self.content.get_raw_object_by_index(index).and_then(|obj| {
-            self.content
-                .get_object(&mut *self.file_reader.borrow_mut(), &obj)
-        })
+    pub fn get_object_by_index(&self, index: u32) -> anyhow::Result<Option<Class>> {
+        self.content
+            .get_raw_object_by_index(index)
+            .and_then(|obj| {
+                Some(
+                    self.content
+                        .get_object(&mut *self.file_reader.borrow_mut(), &obj),
+                )
+            })
+            .transpose()
     }
 
-    pub fn get_object_by_path_id(&self, path_id: i64) -> Option<Class> {
-        self.object_map.get(&path_id).and_then(|obj| {
-            self.content
-                .get_object(&mut *self.file_reader.borrow_mut(), obj)
-        })
+    pub fn get_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<Class>> {
+        self.object_map
+            .get(&path_id)
+            .and_then(|obj| {
+                Some(
+                    self.content
+                        .get_object(&mut *self.file_reader.borrow_mut(), obj),
+                )
+            })
+            .transpose()
     }
 
-    pub fn get_tt_object_by_path_id(&self, path_id: i64) -> Option<TypeTreeObject> {
-        self.object_map.get(&path_id).and_then(|obj| {
-            self.content
-                .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj)
-                .ok()
-        })
+    pub fn get_tt_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<TypeTreeObject>> {
+        Ok(self
+            .object_map
+            .get(&path_id)
+            .and_then(|obj| {
+                Some(
+                    self.content
+                        .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj),
+                )
+            })
+            .transpose()?)
     }
 }
 
@@ -484,9 +499,10 @@ pub trait Serialized: fmt::Debug {
         &self,
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         index: u32,
-    ) -> Option<Class> {
+    ) -> anyhow::Result<Option<Class>> {
         self.get_raw_object_by_index(index)
-            .and_then(|obj| self.get_object(reader, &obj))
+            .and_then(|obj| Some(self.get_object(reader, &obj)))
+            .transpose()
     }
 
     fn get_type_tree_object(
@@ -517,10 +533,8 @@ pub trait Serialized: fmt::Debug {
         &self,
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
-    ) -> Option<Class> {
-        reader
-            .seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))
-            .ok()?;
+    ) -> anyhow::Result<Class> {
+        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 
         let op = ReadOptions::new(match self.get_endianess() {
             Endian::Little => binrw::Endian::Little,
@@ -533,9 +547,8 @@ pub trait Serialized: fmt::Debug {
                 ($($x:ident($y:path)),+) => {
                     match obj.class {
                         $(ClassIDType::$x => {
-                            if let Ok(type_tree_object) = self.get_type_tree_object(reader, obj){
-                                return Some(Class::$x($x::new(type_tree_object)));
-                            }
+                            let type_tree_object = self.get_type_tree_object(reader, obj)?;
+                            return Ok(Class::$x($x::new(type_tree_object)));
                         },)+
                         _ => (),
                     }
@@ -566,15 +579,11 @@ pub trait Serialized: fmt::Debug {
             ($($x:ident($y:path)),+) => {
                 match obj.class {
                     $(ClassIDType::$x => {
-                            if let Ok(o) = $x::read_options(reader, &op, self.get_metadata()) {
-                                Some(Class::$x(o))
-                            } else {
-                                None
-                            }
+                            let o = $x::read_options(reader, &op, self.get_metadata())?;
+                            Ok(Class::$x(o))
                         },)+
                     _ => {
-                        println!("{:?}", &obj.class);
-                        None
+                        Err(anyhow!("{:?}", &obj.class))
                     }
                 }
             };
@@ -599,14 +608,17 @@ pub trait Serialized: fmt::Debug {
         )
     }
 
-    fn get_asset_bundle(&self, reader: &mut Box<dyn UnityResource + Send + Sync>) -> Option<Class> {
+    fn get_asset_bundle(
+        &self,
+        reader: &mut Box<dyn UnityResource + Send + Sync>,
+    ) -> anyhow::Result<Option<Class>> {
         for i in 0..self.get_object_count() {
             if let Some(obj) = self.get_raw_object_by_index(i as u32) {
                 if obj.class == ClassIDType::AssetBundle {
-                    return self.get_object(reader, &obj);
+                    return Some(self.get_object(reader, &obj)).transpose();
                 }
             }
         }
-        None
+        Ok(None)
     }
 }

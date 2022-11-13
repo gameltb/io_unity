@@ -20,13 +20,13 @@ use super::named_object;
 def_unity_class!(Mesh, MeshObject);
 
 pub trait MeshObject: fmt::Debug + named_object::DownCast {
-    fn get_index_buff(&self, sub_mesh_id: usize) -> Result<Vec<u32>, String>;
-    fn get_vertex_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String>;
-    fn get_normal_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String>;
-    fn get_uv0_buff(&self, sub_mesh_id: usize) -> Result<Vec<f32>, String>;
+    fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>>;
+    fn get_vertex_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
+    fn get_normal_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
+    fn get_uv0_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
     fn get_sub_mesh_count(&self) -> Option<usize>;
-    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> Result<Vec<BoneWeights>, String>;
-    fn get_bind_pose(&self) -> Result<Supercow<Vec<Mat4>>, String>;
+    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<BoneWeights>>;
+    fn get_bind_pose(&self) -> anyhow::Result<Supercow<Vec<Mat4>>>;
 }
 
 impl BinRead for Mesh {
