@@ -7,6 +7,13 @@ io_unity is a lib for read unity assets, which supports parsing UnityFS file now
 
 [io_unity/examples/live2dextractor.rs](io_unity/examples/live2dextractor.rs)
 
+```sh
+# build 
+cargo build --example live2dextractor
+# run
+cargo run --example live2dextractor -- help
+```
+
 ## simple python bind
 
 [io_unity_python](io_unity_python/README.md)
