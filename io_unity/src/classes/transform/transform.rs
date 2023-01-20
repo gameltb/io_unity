@@ -46,4 +46,8 @@ impl TransformObject for Transform {
             *self.local_position,
         ))
     }
+
+    fn get_children(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::borrowed(&self.children))
+    }
 }

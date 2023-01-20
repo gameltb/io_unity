@@ -153,6 +153,14 @@ impl UnityFS {
         paths
     }
 
+    pub fn get_file_paths(&self) -> Vec<String> {
+        let mut paths = vec![];
+        for file in self.get_files() {
+            paths.push(file.path());
+        }
+        paths
+    }
+
     pub fn read(
         mut file: Box<dyn UnityResource + Send>,
         search_path: Option<String>,

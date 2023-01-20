@@ -20,6 +20,7 @@ pub mod version7;
 pub mod version8;
 pub mod version9;
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -46,9 +47,11 @@ use crate::classes::skinned_mesh_renderer::SkinnedMeshRenderer;
 use crate::classes::texture2d::Texture2D;
 use crate::classes::transform::Transform;
 use crate::classes::{Class, ClassIDType};
-use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs};
+use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs, TypeTreeObjectBinReadClassArgs};
 use crate::until::{Endian, UnityVersion};
 use crate::UnityResource;
+
+use self::version17::FileIdentifier;
 
 #[binrw]
 #[brw(repr = u32)]
@@ -322,6 +325,7 @@ pub struct SerializedFileMetadata {
     pub unity_version: UnityVersion,
     pub target_platform: BuildTarget,
     pub enable_type_tree: bool,
+    pub serialized_file_id: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -337,6 +341,7 @@ pub struct SerializedFile {
     content: Box<dyn Serialized + Send + Sync>,
     file_reader: RefCell<Box<dyn UnityResource + Send + Sync>>,
     object_map: BTreeMap<i64, Object>,
+    serialized_file_id: i64,
 }
 
 impl fmt::Debug for SerializedFile {
@@ -348,7 +353,10 @@ impl fmt::Debug for SerializedFile {
 }
 
 impl SerializedFile {
-    pub fn read(mut reader: Box<dyn UnityResource + Send + Sync>) -> BinResult<Self> {
+    pub fn read(
+        mut reader: Box<dyn UnityResource + Send + Sync>,
+        serialized_file_id: i64,
+    ) -> BinResult<Self> {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0))?;
         let file: Box<dyn Serialized + Send + Sync> = match head.version {
@@ -425,6 +433,7 @@ impl SerializedFile {
             content: file,
             file_reader: RefCell::new(reader),
             object_map,
+            serialized_file_id,
         })
     }
 
@@ -436,26 +445,15 @@ impl SerializedFile {
         &self.object_map
     }
 
-    pub fn get_object_by_index(&self, index: u32) -> anyhow::Result<Option<Class>> {
-        self.content
-            .get_raw_object_by_index(index)
-            .and_then(|obj| {
-                Some(
-                    self.content
-                        .get_object(&mut *self.file_reader.borrow_mut(), &obj),
-                )
-            })
-            .transpose()
-    }
-
     pub fn get_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<Class>> {
         self.object_map
             .get(&path_id)
             .and_then(|obj| {
-                Some(
-                    self.content
-                        .get_object(&mut *self.file_reader.borrow_mut(), obj),
-                )
+                Some(self.content.get_object(
+                    &mut *self.file_reader.borrow_mut(),
+                    obj,
+                    self.serialized_file_id,
+                ))
             })
             .transpose()
     }
@@ -465,12 +463,17 @@ impl SerializedFile {
             .object_map
             .get(&path_id)
             .and_then(|obj| {
-                Some(
-                    self.content
-                        .get_type_tree_object(&mut *self.file_reader.borrow_mut(), obj),
-                )
+                Some(self.content.get_type_tree_object(
+                    &mut *self.file_reader.borrow_mut(),
+                    obj,
+                    self.serialized_file_id,
+                ))
             })
             .transpose()?)
+    }
+
+    pub fn get_externals(&self) -> Cow<Vec<FileIdentifier>> {
+        self.content.get_externals()
     }
 }
 
@@ -479,11 +482,15 @@ pub trait Serialized: fmt::Debug {
     fn get_data_offset(&self) -> u64;
     fn get_endianess(&self) -> &Endian;
     fn get_raw_object_by_index(&self, index: u32) -> Option<Object>;
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs>;
+    fn get_type_object_args_by_type_id(
+        &self,
+        type_id: usize,
+    ) -> Option<TypeTreeObjectBinReadClassArgs>;
     fn get_object_count(&self) -> i32;
     fn get_unity_version(&self) -> String;
     fn get_target_platform(&self) -> &BuildTarget;
     fn get_enable_type_tree(&self) -> bool;
+    fn get_externals(&self) -> Cow<Vec<FileIdentifier>>;
 
     fn get_metadata(&self) -> SerializedFileMetadata {
         SerializedFileMetadata {
@@ -492,27 +499,21 @@ pub trait Serialized: fmt::Debug {
             unity_version: UnityVersion::from_str(&self.get_unity_version()).unwrap(),
             target_platform: self.get_target_platform().clone(),
             enable_type_tree: self.get_enable_type_tree(),
+            serialized_file_id: 0,
         }
-    }
-
-    fn get_object_by_index(
-        &self,
-        reader: &mut Box<dyn UnityResource + Send + Sync>,
-        index: u32,
-    ) -> anyhow::Result<Option<Class>> {
-        self.get_raw_object_by_index(index)
-            .and_then(|obj| Some(self.get_object(reader, &obj)))
-            .transpose()
     }
 
     fn get_type_tree_object(
         &self,
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
+        serialized_file_id: i64,
     ) -> BinResult<TypeTreeObject> {
-        let args = self
+        let class_args = self
             .get_type_object_args_by_type_id(obj.type_id)
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, class_args);
+
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 
         let options = ReadOptions::new(match self.get_endianess() {
@@ -533,6 +534,7 @@ pub trait Serialized: fmt::Debug {
         &self,
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
+        serialized_file_id: i64,
     ) -> anyhow::Result<Class> {
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 
@@ -547,7 +549,7 @@ pub trait Serialized: fmt::Debug {
                 ($($x:ident($y:path)),+) => {
                     match obj.class {
                         $(ClassIDType::$x => {
-                            let type_tree_object = self.get_type_tree_object(reader, obj)?;
+                            let type_tree_object = self.get_type_tree_object(reader, obj, serialized_file_id)?;
                             return Ok(Class::$x($x::new(type_tree_object)));
                         },)+
                         _ => (),
@@ -579,7 +581,9 @@ pub trait Serialized: fmt::Debug {
             ($($x:ident($y:path)),+) => {
                 match obj.class {
                     $(ClassIDType::$x => {
-                            let o = $x::read_options(reader, &op, self.get_metadata())?;
+                            let mut metadata = self.get_metadata();
+                            metadata.serialized_file_id = serialized_file_id;
+                            let o = $x::read_options(reader, &op, metadata)?;
                             Ok(Class::$x(o))
                         },)+
                     _ => {
@@ -606,19 +610,5 @@ pub trait Serialized: fmt::Debug {
             Animator(animator::Animator),
             Avatar(avatar::Avatar)
         )
-    }
-
-    fn get_asset_bundle(
-        &self,
-        reader: &mut Box<dyn UnityResource + Send + Sync>,
-    ) -> anyhow::Result<Option<Class>> {
-        for i in 0..self.get_object_count() {
-            if let Some(obj) = self.get_raw_object_by_index(i as u32) {
-                if obj.class == ClassIDType::AssetBundle {
-                    return Some(self.get_object(reader, &obj)).transpose();
-                }
-            }
-        }
-        Ok(None)
     }
 }

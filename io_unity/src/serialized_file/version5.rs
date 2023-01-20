@@ -1,10 +1,11 @@
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
 use binrw::{binrw, NullString};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
+use crate::type_tree::{TypeField, TypeTreeObjectBinReadClassArgs};
 use crate::until::Endian;
 use crate::version11::{SerializedType, TypeTree, TypeTreeNode};
 use crate::version6::Object;
@@ -63,7 +64,10 @@ impl Serialized for SerializedFile {
         true
     }
 
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs> {
+    fn get_type_object_args_by_type_id(
+        &self,
+        type_id: usize,
+    ) -> Option<TypeTreeObjectBinReadClassArgs> {
         let stypetree = self
             .content
             .types
@@ -92,10 +96,24 @@ impl Serialized for SerializedFile {
             }
         }
         build_type_fields(&mut type_fields, type_tree);
-        Some(TypeTreeObjectBinReadArgs::new(
+        Some(TypeTreeObjectBinReadClassArgs::new(
             stypetree.class_id,
             type_fields,
         ))
+    }
+    fn get_externals(&self) -> Cow<Vec<crate::version17::FileIdentifier>> {
+        let externals = self
+            .content
+            .externals
+            .iter()
+            .map(|o| crate::version17::FileIdentifier {
+                temp_empty: NullString::default(),
+                guid: o.guid.clone(),
+                r#type: o.r#type,
+                path: o.path.clone(),
+            })
+            .collect();
+        return Cow::Owned(externals);
     }
 }
 
@@ -117,7 +135,7 @@ struct SerializedFileContent {
 #[binrw]
 #[derive(Debug, PartialEq)]
 pub struct FileIdentifier {
-    guid: [u8; 16],
-    r#type: i32,
-    path: NullString,
+    pub guid: [u8; 16],
+    pub r#type: i32,
+    pub path: NullString,
 }

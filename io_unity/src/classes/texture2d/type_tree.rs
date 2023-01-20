@@ -29,7 +29,7 @@ impl Texture2DObject for Texture2D<'_> {
         TextureFormat::try_from_primitive(self.get_texture_format()? as u32).ok()
     }
 
-    fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>> {
+    fn get_image_data(&self, fs: &dyn FS) -> Option<Cow<Vec<u8>>> {
         if let Some(data) = self.get_image_data() {
             return Some(data);
         } else {

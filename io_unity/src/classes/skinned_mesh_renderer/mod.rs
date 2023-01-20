@@ -2,7 +2,7 @@ pub mod type_tree;
 pub mod version_4_3_0;
 
 use super::p_ptr::PPtr;
-use crate::type_tree::TypeTreeObject;
+
 use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{

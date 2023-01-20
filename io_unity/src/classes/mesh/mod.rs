@@ -2,7 +2,6 @@ pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_0_0;
 
-use crate::type_tree::TypeTreeObject;
 use crate::{
     def_unity_class,
     until::{binrw_parser::Mat4, UnityVersion},

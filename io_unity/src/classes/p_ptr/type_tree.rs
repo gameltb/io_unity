@@ -9,6 +9,14 @@ impl PPtrObject for PPtr<'_> {
     fn get_path_id(&self) -> Option<i64> {
         self.get_path_id()
     }
+
+    fn get_file_id(&self) -> Option<i64> {
+        self.get_file_id()
+    }
+
+    fn get_serialized_file_id(&self) -> i64 {
+        self.get_serialized_file_id()
+    }
 }
 
 impl PPtr<'_> {
@@ -18,5 +26,9 @@ impl PPtr<'_> {
 
     fn get_path_id(&self) -> Option<i64> {
         self.inner.get_int_by_path("/Base/m_PathID")
+    }
+
+    fn get_serialized_file_id(&self) -> i64 {
+        self.inner.serialized_file_id
     }
 }

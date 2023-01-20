@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -5,7 +6,7 @@ use binrw::io::Cursor;
 use binrw::{binrw, NullString};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
+use crate::type_tree::{TypeField, TypeTreeObjectBinReadClassArgs};
 use crate::until::{binrw_parser::*, Endian};
 use crate::version17::{FileIdentifier, ScriptType, TypeTree, TypeTreeNode};
 use crate::{Serialized, SerializedFileFormatVersion};
@@ -63,7 +64,10 @@ impl Serialized for SerializedFile {
         *self.content.enable_type_tree
     }
 
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs> {
+    fn get_type_object_args_by_type_id(
+        &self,
+        type_id: usize,
+    ) -> Option<TypeTreeObjectBinReadClassArgs> {
         let stypetree = self
             .content
             .types
@@ -81,10 +85,13 @@ impl Serialized for SerializedFile {
             }) as Box<dyn TypeField + Send + Sync>))
         }
 
-        Some(TypeTreeObjectBinReadArgs::new(
+        Some(TypeTreeObjectBinReadClassArgs::new(
             stypetree.class_id,
             type_fields,
         ))
+    }
+    fn get_externals(&self) -> Cow<Vec<FileIdentifier>> {
+        return Cow::Borrowed(&self.content.externals);
     }
 }
 

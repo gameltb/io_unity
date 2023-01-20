@@ -26,6 +26,10 @@ impl TransformObject for Transform<'_> {
             self.get_local_position()?,
         ))
     }
+
+    fn get_children(&self) -> Option<Supercow<Vec<PPtr>>> {
+        Some(Supercow::owned(self.get_children()?))
+    }
 }
 
 impl Transform<'_> {
@@ -45,5 +49,11 @@ impl Transform<'_> {
 
     fn get_local_scale(&self) -> Option<glam::Vec3> {
         self.inner.get_vec3f_by_path("/Base/m_LocalScale")
+    }
+
+    fn get_children(&self) -> Option<Vec<PPtr>> {
+        self.inner
+            .get_array_object_by_path("/Base/m_Children/Array")
+            .and_then(|ov| Some(ov.into_iter().map(|po| PPtr::new(po)).collect()))
     }
 }

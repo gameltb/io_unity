@@ -29,9 +29,7 @@ macro_rules! def_unity_class {
         #[derive(Debug)]
         pub struct $x(Box<dyn $y + Send>);
 
-        use std::ops::Deref;
-
-        impl Deref for $x {
+        impl std::ops::Deref for $x {
             type Target = Box<dyn $y + Send>;
 
             fn deref(&self) -> &Box<dyn $y + Send> {
@@ -40,13 +38,13 @@ macro_rules! def_unity_class {
         }
 
         impl $x {
-            pub fn new(inner: TypeTreeObject) -> Self {
+            pub fn new(inner: crate::type_tree::TypeTreeObject) -> Self {
                 Self(Box::new(type_tree::$x::new(inner)))
             }
         }
 
         pub trait DownCast {
-            fn downcast<'a>(&'a self) -> Supercow<Box<dyn $y + Send + 'a>>;
+            fn downcast<'a>(&'a self) -> supercow::Supercow<Box<dyn $y + Send + 'a>>;
         }
     };
 }

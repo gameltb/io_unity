@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{prelude::*, SeekFrom};
@@ -7,7 +8,7 @@ use binrw::{binrw, NullString};
 use binrw::{io::Cursor, BinRead};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObjectBinReadArgs};
+use crate::type_tree::{TypeField, TypeTreeObjectBinReadClassArgs};
 use crate::until::{binrw_parser::*, Endian};
 use crate::{Serialized, SerializedFileFormatVersion};
 
@@ -71,7 +72,10 @@ impl Serialized for SerializedFile {
         *self.content.enable_type_tree
     }
 
-    fn get_type_object_args_by_type_id(&self, type_id: usize) -> Option<TypeTreeObjectBinReadArgs> {
+    fn get_type_object_args_by_type_id(
+        &self,
+        type_id: usize,
+    ) -> Option<TypeTreeObjectBinReadClassArgs> {
         let stypetree = &self.content.types.get(type_id)?;
         let type_tree = stypetree.type_tree.as_ref()?;
         let mut type_fields = Vec::new();
@@ -85,10 +89,13 @@ impl Serialized for SerializedFile {
             }) as Box<dyn TypeField + Send + Sync>))
         }
 
-        Some(TypeTreeObjectBinReadArgs::new(
+        Some(TypeTreeObjectBinReadClassArgs::new(
             stypetree.class_id,
             type_fields,
         ))
+    }
+    fn get_externals(&self) -> Cow<Vec<FileIdentifier>> {
+        return Cow::Borrowed(&self.content.externals);
     }
 }
 
@@ -219,12 +226,12 @@ pub struct ScriptType {
 }
 
 #[binrw]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FileIdentifier {
-    temp_empty: NullString,
-    guid: [u8; 16],
-    r#type: i32,
-    path: NullString,
+    pub temp_empty: NullString,
+    pub guid: [u8; 16],
+    pub r#type: i32,
+    pub path: NullString,
 }
 
 #[derive(Debug, PartialEq)]

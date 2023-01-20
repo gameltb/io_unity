@@ -1,14 +1,12 @@
 pub mod type_tree;
 pub mod version_5_6_0;
 
-use crate::type_tree::TypeTreeObject;
 use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, SeekFrom, Write},
 };
-use supercow::Supercow;
 
 use super::named_object;
 

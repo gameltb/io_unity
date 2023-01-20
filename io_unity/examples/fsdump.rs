@@ -49,12 +49,12 @@ fn handle<P: AsRef<Path>>(filepath: P) {
     // outfile.write_all(&cabfile);
 
     let cabfile_reader = Box::new(Cursor::new(cabfile));
-    let s = SerializedFile::read(cabfile_reader).unwrap();
+    let s = SerializedFile::read(cabfile_reader, 0).unwrap();
     // println!("{:#?}", s);
 
-    let mut fs = Box::new(oval) as Box<dyn FS>;
     let mut viewed = Vec::new();
     for (pathid, obj) in s.get_object_map() {
+        // println!("path id {}",pathid);
         // match obj.class {
         //     ClassIDType::Texture2D
         //     | ClassIDType::AudioClip
@@ -102,20 +102,20 @@ fn handle<P: AsRef<Path>>(filepath: P) {
                 s.get_object_by_path_id(pathid.to_owned()).unwrap()
             {
                 // println!("{:#?}", &tex);
-                tex.get_image(&mut fs).and_then(|t| {
+                tex.get_image(&oval as &dyn FS).and_then(|t| {
                     Ok(t.flipv().save(
                         "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap() + ".png",
                     ))
                 });
             }
         }
-        if obj.class == ClassIDType::Transform {
-            if let Some(classes::Class::Transform(tran)) =
-                s.get_object_by_path_id(pathid.to_owned()).unwrap()
-            {
-                println!("{:?}", &tran.get_local_mat());
-            }
-        }
+        // if obj.class == ClassIDType::Transform {
+        //     if let Some(classes::Class::Transform(tran)) =
+        //         s.get_object_by_path_id(pathid.to_owned()).unwrap()
+        //     {
+        //         println!("{:?}", &tran.get_local_mat());
+        //     }
+        // }
         if obj.class == ClassIDType::TextAsset {
             let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
             tt_o.display_tree();
@@ -136,6 +136,7 @@ fn handle<P: AsRef<Path>>(filepath: P) {
         }
         if !viewed.contains(&obj.class) {
             let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
+            println!("path id {}", pathid);
             println!("class {:?}", &obj.class);
             tt_o.display_tree();
             // println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));

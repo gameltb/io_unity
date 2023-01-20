@@ -6,6 +6,14 @@ impl PPtrObject for PPtr {
     fn get_path_id(&self) -> Option<i64> {
         Some(self.path_id as i64)
     }
+
+    fn get_file_id(&self) -> Option<i64> {
+        Some(self.file_id as i64)
+    }
+
+    fn get_serialized_file_id(&self) -> i64 {
+        0
+    }
 }
 #[binrw]
 #[brw(import_raw(_args: SerializedFileMetadata))]

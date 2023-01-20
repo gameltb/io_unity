@@ -25,7 +25,7 @@ impl Texture2DObject for Texture2D {
         Some(self.texture_format.clone())
     }
 
-    fn get_image_data(&self, fs: &mut Box<dyn FS>) -> Option<Cow<Vec<u8>>> {
+    fn get_image_data(&self, fs: &dyn FS) -> Option<Cow<Vec<u8>>> {
         if let Some(data) = &self.image_data {
             return Some(Cow::Borrowed(data));
         } else {

@@ -19,6 +19,7 @@ pub fn endian_parser<R: Read + Seek>(
 ) -> BinResult<binrw::Endian> {
     Ok(ro.endian())
 }
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct U8Bool(bool);
 

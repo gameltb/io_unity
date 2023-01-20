@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    collections::HashMap,
     fmt::Debug,
     io::{Cursor, ErrorKind, Read, Seek, SeekFrom},
     sync::Arc,
@@ -38,6 +39,11 @@ pub enum Value<'a> {
     Array(Vec<TypeTreeObject>),
     Object(TypeTreeObject),
     ByteArray(Cow<'a, Vec<u8>>),
+    FloatArray(Vec<f32>),
+    DoubleArray(Vec<f64>),
+    UInt16Array(Vec<u16>),
+    UInt32Array(Vec<u32>),
+    UInt64Array(Vec<u64>),
 }
 
 #[derive(Debug, Clone)]
@@ -78,10 +84,15 @@ impl Field {
         );
         match &self.data {
             FieldValue::Data(v) => {
-                if v.len() <= 4 {
+                if self.field_type.get_type() == "SInt64" {
+                    println!(
+                        " data : {:?}",
+                        i64::from_le_bytes(v.as_slice().try_into().unwrap())
+                    );
+                } else if v.len() <= 8 {
                     println!(" data : {:?}", v);
                 } else {
-                    println!(" data : {:?}...", &v[..4]);
+                    println!(" data : {:?}...", &v[..8]);
                 }
             }
             FieldValue::Fields(fls) => {
@@ -114,7 +125,12 @@ impl Field {
         }
     }
 
-    fn get_value(&self, path: &[String], endian: &binrw::Endian) -> Option<Value> {
+    fn get_value(
+        &self,
+        path: &[String],
+        endian: &binrw::Endian,
+        serialized_file_id: i64,
+    ) -> Option<Value> {
         if path.len() == 0 {
             match &self.data {
                 FieldValue::Data(data) => {
@@ -182,18 +198,85 @@ impl Field {
                 FieldValue::Array(array_field) => match &array_field.data {
                     FieldValue::Data(array) => {
                         if array.len() > 0 {
-                            if array_field.item_type_fields.len() == 1 {
+                            if array_field.item_type_fields.len() == 1
+                                && array_field.item_type_fields.get(0).unwrap().get_byte_size() == 1
+                            {
                                 return Some(Value::ByteArray(Cow::Borrowed(array)));
                             } else {
-                                if let Some(Value::Int32(size)) =
-                                    array_field.array_size.get_value(&[], endian)
-                                {
+                                if let Some(Value::Int32(size)) = array_field.array_size.get_value(
+                                    &[],
+                                    endian,
+                                    serialized_file_id,
+                                ) {
                                     let mut obj_array = vec![];
                                     let mut reader = Cursor::new(array);
                                     let options = ReadOptions::new(endian.clone());
-                                    let args = TypeTreeObjectBinReadArgs::new(
+
+                                    if array_field.item_type_fields.len() == 1 {
+                                        let item_type_field =
+                                            array_field.item_type_fields.get(0).unwrap();
+                                        match item_type_field.get_type().as_str() {
+                                            "float" => {
+                                                let array = <Vec<f32>>::read_options(
+                                                    &mut reader,
+                                                    &options,
+                                                    VecArgs {
+                                                        count: size as usize,
+                                                        inner: (),
+                                                    },
+                                                )
+                                                .ok()?;
+                                                return Some(Value::FloatArray(array));
+                                            }
+                                            &_ => (),
+                                        }
+                                        match item_type_field.get_byte_size() {
+                                            2 => {
+                                                let array = <Vec<u16>>::read_options(
+                                                    &mut reader,
+                                                    &options,
+                                                    VecArgs {
+                                                        count: size as usize,
+                                                        inner: (),
+                                                    },
+                                                )
+                                                .ok()?;
+                                                return Some(Value::UInt16Array(array));
+                                            }
+                                            4 => {
+                                                let array = <Vec<u32>>::read_options(
+                                                    &mut reader,
+                                                    &options,
+                                                    VecArgs {
+                                                        count: size as usize,
+                                                        inner: (),
+                                                    },
+                                                )
+                                                .ok()?;
+                                                return Some(Value::UInt32Array(array));
+                                            }
+                                            8 => {
+                                                let array = <Vec<u64>>::read_options(
+                                                    &mut reader,
+                                                    &options,
+                                                    VecArgs {
+                                                        count: size as usize,
+                                                        inner: (),
+                                                    },
+                                                )
+                                                .ok()?;
+                                                return Some(Value::UInt64Array(array));
+                                            }
+                                            _ => (),
+                                        }
+                                    }
+                                    let class_args = TypeTreeObjectBinReadClassArgs::new(
                                         0,
                                         array_field.item_type_fields.clone(),
+                                    );
+                                    let args = TypeTreeObjectBinReadArgs::new(
+                                        serialized_file_id,
+                                        class_args,
                                     );
                                     for _ in 0..size {
                                         obj_array.push(
@@ -217,6 +300,7 @@ impl Field {
                                 .map(|f| TypeTreeObject {
                                     endian: endian.clone(),
                                     class_id: 0,
+                                    serialized_file_id,
                                     data: f.clone(),
                                 })
                                 .collect();
@@ -238,6 +322,7 @@ impl Field {
                     return Some(Value::Object(TypeTreeObject {
                         endian: endian.clone(),
                         class_id: 0,
+                        serialized_file_id,
                         data: self.clone(),
                     }));
                 }
@@ -248,7 +333,7 @@ impl Field {
                     if let Some((name, path)) = path.split_first() {
                         for field in fields {
                             if name == field.get_name() {
-                                return field.get_value(path, endian);
+                                return field.get_value(path, endian, serialized_file_id);
                             }
                         }
                     }
@@ -273,7 +358,8 @@ impl Field {
 #[derive(Debug, Clone)]
 pub struct TypeTreeObject {
     endian: binrw::Endian,
-    class_id: i32,
+    pub class_id: i32,
+    pub serialized_file_id: i64,
     data: Field,
 }
 
@@ -296,7 +382,8 @@ impl TypeTreeObject {
         if path.len() < 1 {
             return None;
         }
-        self.data.get_value(&path[1..], &self.endian)
+        self.data
+            .get_value(&path[1..], &self.endian, self.serialized_file_id)
     }
 
     pub fn get_string_by_path(&self, path: &str) -> Option<String> {
@@ -322,6 +409,62 @@ impl TypeTreeObject {
             if let Value::Array(ao) = v {
                 return Some(ao);
             }
+        }
+        None
+    }
+
+    pub fn get_array_float_by_path(&self, path: &str) -> Option<Vec<f32>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::FloatArray(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_array_uint16_by_path(&self, path: &str) -> Option<Vec<u16>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::UInt16Array(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_array_uint32_by_path(&self, path: &str) -> Option<Vec<u32>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::UInt32Array(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_array_uint64_by_path(&self, path: &str) -> Option<Vec<u64>> {
+        if let Some(v) = self.get_value_by_path(path) {
+            if let Value::UInt64Array(ao) = v {
+                return Some(ao);
+            }
+        }
+        None
+    }
+
+    pub fn get_string_key_map_by_path(
+        &self,
+        path: &str,
+    ) -> Option<HashMap<String, TypeTreeObject>> {
+        if let Some(map_vec) = self.get_array_object_by_path(path) {
+            let mut map = HashMap::new();
+            for entry in map_vec {
+                let key = entry.get_string_by_path("/Base/first");
+                let value = entry.get_object_by_path("/Base/second");
+                if let Some(key) = key {
+                    if let Some(value) = value {
+                        map.insert(key, value);
+                    }
+                }
+            }
+            return Some(map);
         }
         None
     }
@@ -452,11 +595,26 @@ impl TypeTreeObject {
 
 #[derive(Debug, Clone)]
 pub struct TypeTreeObjectBinReadArgs {
+    serialized_file_id: i64,
+    class_args: TypeTreeObjectBinReadClassArgs,
+}
+
+impl TypeTreeObjectBinReadArgs {
+    pub fn new(serialized_file_id: i64, class_args: TypeTreeObjectBinReadClassArgs) -> Self {
+        Self {
+            serialized_file_id,
+            class_args,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeTreeObjectBinReadClassArgs {
     class_id: i32,
     type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
 }
 
-impl TypeTreeObjectBinReadArgs {
+impl TypeTreeObjectBinReadClassArgs {
     pub fn new(class_id: i32, type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>) -> Self {
         Self {
             class_id,
@@ -602,11 +760,12 @@ impl BinRead for TypeTreeObject {
         }
 
         let mut index = 0;
-        let data = read(reader, options, &args.type_fields, &mut index)?;
+        let data = read(reader, options, &args.class_args.type_fields, &mut index)?;
 
         Ok(TypeTreeObject {
             endian: options.endian(),
-            class_id: args.class_id,
+            class_id: args.class_args.class_id,
+            serialized_file_id: args.serialized_file_id,
             data,
         })
     }

@@ -1,13 +1,12 @@
 pub mod behaviour;
 pub mod type_tree;
 
-use crate::{def_unity_class, type_tree::TypeTreeObject, SerializedFileMetadata};
+use crate::{def_unity_class, SerializedFileMetadata};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     fmt,
     io::{Read, Seek, Write},
 };
-use supercow::Supercow;
 
 def_unity_class!(Behaviour, BehaviourObject);
 
