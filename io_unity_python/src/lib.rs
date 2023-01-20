@@ -82,29 +82,13 @@ impl SerializedFile {
     pub fn read(cabfile: Vec<u8>) -> PyResult<Self> {
         let cabfile_reader = Box::new(Cursor::new(cabfile));
         Ok(SerializedFile(
-            io_unity::SerializedFile::read(cabfile_reader)
+            io_unity::SerializedFile::read(cabfile_reader, 0)
                 .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?,
         ))
     }
 
     pub fn get_object_count(&self) -> i32 {
         self.0.get_object_count()
-    }
-
-    pub fn get_raw_object_by_index(&self, py: Python, index: u32) -> PyResult<PyObject> {
-        let obj = match self
-            .0
-            .get_object_by_index(index)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?
-            .ok_or(pyo3::exceptions::PyException::new_err("None"))?
-        {
-            io_unity::classes::Class::AssetBundle(ab) => AssetBundle(ab).into_py(py),
-            io_unity::classes::Class::AudioClip(ac) => AudioClip(ac).into_py(py),
-            io_unity::classes::Class::Texture2D(tex) => Texture2D(tex).into_py(py),
-            io_unity::classes::Class::Mesh(mesh) => Mesh(mesh).into_py(py),
-            _ => return Err(pyo3::exceptions::PyException::new_err("None")),
-        };
-        Ok(obj)
     }
 
     pub fn get_object_by_path_id(&self, py: Python, path_id: i64) -> PyResult<PyObject> {
