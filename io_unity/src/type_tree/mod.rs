@@ -111,11 +111,12 @@ impl Field {
                     FieldValue::Data(_) => {
                         for item in &ar.item_type_fields {
                             println!(
-                                "{}/{} : {}({})",
+                                "{}/?/{} : {}({}) at level [{}]",
                                 np,
                                 item.get_name(),
                                 item.get_type(),
-                                item.get_byte_size()
+                                item.get_byte_size(),
+                                item.get_level(),
                             );
                         }
                     }

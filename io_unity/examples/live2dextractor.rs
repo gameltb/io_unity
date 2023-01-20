@@ -335,6 +335,46 @@ mod CubismMotion3Json {
     }
 }
 
+mod CubismExp3Json {
+    #![allow(non_snake_case)]
+
+    use std::collections::HashMap;
+
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Default, Serialize, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct CubismExp3Json {
+        pub Type: String,
+
+        pub FadeInTime: f32,
+
+        pub FadeOutTime: f32,
+
+        pub Parameters: Vec<SerializableExpressionParameter>,
+    }
+
+    impl CubismExp3Json {
+        pub fn new() -> Self {
+            let mut new = Self::default();
+            new.Type = "Live2D Expression".to_owned();
+            new.FadeInTime = 1.0;
+            new.FadeOutTime = 1.0;
+            new
+        }
+    }
+
+    #[derive(Default, Serialize, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SerializableExpressionParameter {
+        pub Id: String,
+
+        pub Value: f32,
+
+        pub Blend: String,
+    }
+}
+
 /// live2dextractor
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -408,6 +448,7 @@ fn main() -> anyhow::Result<()> {
             let mut cubism_model3_dir_path_and_name = None;
             let mut cubism_motion3_json_map = HashMap::new();
             let mut cubism_physics3_json = None;
+            let mut cubism_exp3_json_map = HashMap::new();
 
             for (container_path, _) in &unity_asset_viewer.container_maps {
                 if container_path.starts_with(filter_path) {
@@ -548,14 +589,55 @@ fn main() -> anyhow::Result<()> {
                         .Textures
                         .push(tex_path.to_string_lossy().to_string())
                 } else if obj.class_id == ClassIDType::AnimationClip as i32 {
-                    let mut cubism_motion3_json = CubismMotion3Json::CubismMotion3Json::new();
-                    let mut keyframe_curves = Vec::new();
-
                     let name = obj.get_string_by_path("/Base/m_Name").unwrap();
                     let name = PathBuf::from(name);
                     let name = name.file_stem().unwrap().to_string_lossy().to_string();
                     println!("AnimationClip : {}", &name);
 
+                    let m_Clip = obj.get_object_by_path("/Base/m_MuscleClip/m_Clip").unwrap();
+                    let m_ClipBindingConstant = obj
+                        .get_object_by_path("/Base/m_ClipBindingConstant")
+                        .unwrap();
+                    let stream_count = m_Clip
+                        .get_uint_by_path("/Base/data/m_StreamedClip/curveCount")
+                        .unwrap();
+                    let m_DenseClip = m_Clip.get_object_by_path("/Base/data/m_DenseClip").unwrap();
+                    let m_DenseClip_m_CurveCount =
+                        m_DenseClip.get_uint_by_path("/Base/m_CurveCount").unwrap();
+
+                    if stream_count == 0 && m_DenseClip_m_CurveCount == 0 {
+                        let mut cubism_exp3_json = CubismExp3Json::CubismExp3Json::new();
+                        let m_ConstantClip = m_Clip
+                            .get_object_by_path("/Base/data/m_ConstantClip")
+                            .unwrap();
+                        let m_ConstantClip_data = m_ConstantClip
+                            .get_array_float_by_path("/Base/data/Array")
+                            .unwrap_or(Vec::new());
+                        // println!("{:?}", &m_ConstantClip_data);
+                        for curve_index in 0..m_ConstantClip_data.len() {
+                            let index = curve_index;
+                            let binding = animation_clip_binding_constant_find_binding(
+                                &m_ClipBindingConstant,
+                                index,
+                            )
+                            .unwrap();
+                            let (live2d_target, live2d_id) =
+                                get_live2d_path(&unity_asset_viewer, &path_hash_map, &binding);
+                            let mut serializable_expression_parameter =
+                                CubismExp3Json::SerializableExpressionParameter::default();
+                            serializable_expression_parameter.Id = live2d_id;
+                            serializable_expression_parameter.Value =
+                                m_ConstantClip_data[curve_index];
+                            cubism_exp3_json
+                                .Parameters
+                                .push(serializable_expression_parameter);
+                        }
+                        cubism_exp3_json_map.insert(name, cubism_exp3_json);
+                        continue;
+                    }
+
+                    let mut cubism_motion3_json = CubismMotion3Json::CubismMotion3Json::new();
+                    let mut keyframe_curves = Vec::new();
                     cubism_motion3_json.Meta.Duration = obj
                         .get_float_by_path("/Base/m_MuscleClip/m_StopTime")
                         .unwrap();
@@ -564,11 +646,8 @@ fn main() -> anyhow::Result<()> {
                     cubism_motion3_json.Meta.Loop = true;
                     cubism_motion3_json.Meta.AreBeziersRestricted = true;
                     cubism_motion3_json.Meta.CurveCount = 0;
-
-                    let m_Clip = obj.get_object_by_path("/Base/m_MuscleClip/m_Clip").unwrap();
-                    let m_ClipBindingConstant = obj
-                        .get_object_by_path("/Base/m_ClipBindingConstant")
-                        .unwrap();
+                    cubism_motion3_json.Meta.FadeInTime = 1.0;
+                    cubism_motion3_json.Meta.FadeOutTime = 1.0;
 
                     let streamed_frames = m_Clip
                         .get_object_by_path("/Base/data/m_StreamedClip")
@@ -577,9 +656,7 @@ fn main() -> anyhow::Result<()> {
                         .get_array_uint32_by_path("/Base/data/Array")
                         .unwrap_or(Vec::new());
                     let streamed_frames = streamed_clip_read_u32_buff(&streamed_clip_buff).unwrap();
-                    let stream_count = m_Clip
-                        .get_uint_by_path("/Base/data/m_StreamedClip/curveCount")
-                        .unwrap();
+
                     for curve_index in 0..stream_count {
                         let binding = animation_clip_binding_constant_find_binding(
                             &m_ClipBindingConstant,
@@ -609,13 +686,10 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    let m_DenseClip = m_Clip.get_object_by_path("/Base/data/m_DenseClip").unwrap();
                     let m_DenseClip_m_BeginTime =
                         m_DenseClip.get_float_by_path("/Base/m_BeginTime").unwrap();
                     let m_DenseClip_m_SampleRate =
                         m_DenseClip.get_float_by_path("/Base/m_SampleRate").unwrap();
-                    let m_DenseClip_m_CurveCount =
-                        m_DenseClip.get_uint_by_path("/Base/m_CurveCount").unwrap();
                     let m_DenseClip_m_FrameCount =
                         m_DenseClip.get_int_by_path("/Base/m_FrameCount").unwrap();
                     let m_DenseClip_m_SampleArray = m_DenseClip
@@ -809,6 +883,24 @@ fn main() -> anyhow::Result<()> {
                         .Motions
                         .insert(motion_name, vec![serializable_motion]);
                 }
+
+                create_dir_all(cubism_model3_dir_path.join("expressions"));
+                for (exp_name, cubism_exp3_json) in cubism_exp3_json_map {
+                    let cubism_exp3_json_path = cubism_model3_dir_path
+                        .join("expressions")
+                        .join(exp_name.clone() + ".exp3.json");
+                    println!("writing {:?}", &cubism_exp3_json_path);
+                    let exp_json_file = File::create(cubism_exp3_json_path)?;
+                    serde_json::to_writer(exp_json_file, &cubism_exp3_json)?;
+                    let mut serializable_exp = CubismModel3Json::SerializableExpression::default();
+                    serializable_exp.File = "expressions/".to_string() + &exp_name + ".exp3.json";
+
+                    cubism_model3_json
+                        .FileReferences
+                        .Expressions
+                        .push(serializable_exp);
+                }
+
                 let cubism_model3_json_path = cubism_model3_dir_path.join(name + ".model3.json");
                 println!("writing {:?}", &cubism_model3_json_path);
                 let model_json_file = File::create(cubism_model3_json_path)?;

@@ -139,7 +139,7 @@ pub fn animation_clip_binding_constant_find_binding(
     {
         curves += if b.get_int_by_path("/Base/typeID").unwrap() == ClassIDType::Transform as i64 {
             // 1 kBindTransformPosition
-            // 2kBindTransformRotation
+            // 2 kBindTransformRotation
             // 3 kBindTransformScale
             // 4 kBindTransformEuler
             match b.get_uint_by_path("/Base/attribute").unwrap() {
