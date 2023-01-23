@@ -68,13 +68,7 @@ pub trait PPtrObject: fmt::Debug {
             .serialized_file_map
             .get(&self.get_serialized_file_id())
         {
-            if let Some(path_id) = self.get_path_id() {
-                if let Some(serialized_file) =
-                    self.get_serialized_file(self_serialized_file, Some(viewer))
-                {
-                    return serialized_file.get_tt_object_by_path_id(path_id);
-                }
-            }
+            return self.get_type_tree_object(self_serialized_file, Some(viewer));
         }
         Ok(None)
     }

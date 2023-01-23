@@ -1,7 +1,8 @@
 use super::{Texture2DObject, TextureFormat};
 use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
+use crate::unity_asset_view::UnityAssetViewer;
 use crate::until::binrw_parser::{AlignedString, U8Bool};
-use crate::{SerializedFileMetadata, FS};
+use crate::SerializedFileMetadata;
 use binrw::binrw;
 use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
@@ -25,13 +26,14 @@ impl Texture2DObject for Texture2D {
         Some(self.texture_format.clone())
     }
 
-    fn get_image_data(&self, fs: &dyn FS) -> Option<Cow<Vec<u8>>> {
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Cow<Vec<u8>>> {
         if let Some(data) = &self.image_data {
             return Some(Cow::Borrowed(data));
         } else {
-            if let Some(mut file) =
-                fs.get_resource_file_by_path(self.stream_data.path.to_string(), None)
-            {
+            if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
+                0,
+                &self.stream_data.path.to_string(),
+            ) {
                 file.seek(SeekFrom::Start(self.stream_data.offset as u64))
                     .ok()?;
                 let mut data = vec![0u8; self.stream_data.size as usize];

@@ -2,10 +2,14 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs::OpenOptions,
     io::{BufReader, Cursor},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
-use crate::{classes::p_ptr::PPtr, type_tree::TypeTreeObject, SerializedFile, UnityFS};
+use walkdir::WalkDir;
+
+use crate::{
+    classes::p_ptr::PPtr, type_tree::TypeTreeObject, SerializedFile, UnityFS, UnityResource,
+};
 
 pub struct UnityAssetViewer {
     pub cab_maps: HashMap<String, i64>,
@@ -32,71 +36,128 @@ impl UnityAssetViewer {
         }
     }
 
-    pub fn read_dir<P: AsRef<Path>>(&mut self, dir_path: P) -> anyhow::Result<()> {
-        let dirs = std::fs::read_dir(dir_path)?;
-        for entry in dirs {
+    pub fn read_bundle_dir<P: AsRef<Path>>(&mut self, dir_path: P) -> anyhow::Result<()> {
+        for entry in WalkDir::new(dir_path) {
             if let Ok(entry) = entry {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_file() {
-                        let file = OpenOptions::new().read(true).open(entry.path())?;
-                        let file = BufReader::new(file);
+                if entry.file_type().is_file() {
+                    let file = OpenOptions::new().read(true).open(entry.path())?;
+                    let file = BufReader::new(file);
 
-                        let unity_fs = UnityFS::read(Box::new(file), None)?;
+                    let unity_fs = if let Ok(unity_fs) = UnityFS::read(
+                        Box::new(file),
+                        Some(entry.path().parent().unwrap().to_string_lossy().to_string()),
+                    ) {
+                        unity_fs
+                    } else {
+                        continue;
+                    };
 
-                        let unity_fs_id = self.unity_fs_count;
-                        self.unity_fs_count = self.unity_fs_count + 1;
+                    let unity_fs_id = self.unity_fs_count;
+                    self.unity_fs_count = self.unity_fs_count + 1;
 
-                        for cab_path in unity_fs.get_cab_path() {
-                            let cab_buff = unity_fs.get_file_by_path(&cab_path)?;
+                    for cab_path in unity_fs.get_cab_path() {
+                        let cab_buff = unity_fs.get_file_by_path(&cab_path)?;
+                        let cab_buff_reader = Box::new(Cursor::new(cab_buff));
 
-                            let serialized_file_id = self.serialized_file_count;
-                            self.serialized_file_count = self.serialized_file_count + 1;
+                        let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
+                        self.serialized_file_to_unity_fs_map
+                            .insert(serialized_file_id, unity_fs_id);
+                        self.cab_maps.insert(cab_path, serialized_file_id);
+                    }
 
-                            let cab_buff_reader = Box::new(Cursor::new(cab_buff));
-                            let serialized_file =
-                                SerializedFile::read(cab_buff_reader, serialized_file_id)?;
+                    self.unity_fs_map.insert(unity_fs_id, unity_fs);
+                }
+            }
+        }
+        Ok(())
+    }
 
-                            if let Ok(Some(asset_bundle)) =
-                                serialized_file.get_tt_object_by_path_id(1)
-                            {
-                                if let Some(containers) = asset_bundle
-                                    .get_string_key_map_by_path("/Base/m_Container/Array")
-                                {
-                                    let mut name_map = HashMap::new();
-                                    for (name, asset_info) in containers {
-                                        if let Some(pptr) =
-                                            asset_info.get_object_by_path("/Base/asset")
-                                        {
-                                            let pptr = PPtr::new(pptr);
-                                            if let Some(path_id) = pptr.get_path_id() {
-                                                name_map.insert(path_id, name.clone());
-                                            }
+    fn add_serialized_file(
+        &mut self,
+        serialized_file_reader: Box<dyn UnityResource + Send + Sync>,
+        resource_search_path: Option<String>,
+    ) -> anyhow::Result<i64> {
+        let serialized_file_id = self.serialized_file_count;
+        self.serialized_file_count = self.serialized_file_count + 1;
 
-                                            if let Some(objs) = self.container_maps.get_mut(&name) {
-                                                objs.push((serialized_file_id, pptr));
-                                            } else {
-                                                self.container_maps
-                                                    .insert(name, vec![(serialized_file_id, pptr)]);
-                                            }
-                                        }
-                                    }
-                                    self.container_name_maps
-                                        .insert(serialized_file_id, name_map);
-                                }
-                            }
-
-                            self.serialized_file_map
-                                .insert(serialized_file_id, serialized_file);
-                            self.serialized_file_to_unity_fs_map
-                                .insert(serialized_file_id, unity_fs_id);
-                            self.cab_maps.insert(cab_path, serialized_file_id);
+        let serialized_file = SerializedFile::read(
+            serialized_file_reader,
+            serialized_file_id,
+            resource_search_path,
+        )?;
+        if let Ok(Some(asset_bundle)) = serialized_file.get_tt_object_by_path_id(1) {
+            if let Some(containers) =
+                asset_bundle.get_string_key_map_by_path("/Base/m_Container/Array")
+            {
+                let mut name_map = HashMap::new();
+                for (name, asset_info) in containers {
+                    if let Some(pptr) = asset_info.get_object_by_path("/Base/asset") {
+                        let pptr = PPtr::new(pptr);
+                        if let Some(path_id) = pptr.get_path_id() {
+                            name_map.insert(path_id, name.clone());
                         }
 
-                        self.unity_fs_map.insert(unity_fs_id, unity_fs);
+                        if let Some(objs) = self.container_maps.get_mut(&name) {
+                            objs.push((serialized_file_id, pptr));
+                        } else {
+                            self.container_maps
+                                .insert(name, vec![(serialized_file_id, pptr)]);
+                        }
                     }
-                } else {
-                    println!("Couldn't get file type for {:?}", entry.path());
                 }
+                self.container_name_maps
+                    .insert(serialized_file_id, name_map);
+            }
+        }
+        self.serialized_file_map
+            .insert(serialized_file_id, serialized_file);
+        Ok(serialized_file_id)
+    }
+
+    pub fn read_data_dir<P: AsRef<Path>>(&mut self, data_dir_path: P) -> anyhow::Result<()> {
+        for i in 0..u8::MAX {
+            let file_name = format!("level{}", i);
+            if let Ok(file) = OpenOptions::new()
+                .read(true)
+                .open(data_dir_path.as_ref().join(file_name))
+            {
+                self.add_serialized_file(
+                    Box::new(BufReader::new(file)),
+                    Some(data_dir_path.as_ref().to_string_lossy().to_string()),
+                )?;
+            } else {
+                break;
+            }
+        }
+        for i in 0..u8::MAX {
+            let file_name = format!("sharedassets{}.assets", i);
+            if let Ok(file) = OpenOptions::new()
+                .read(true)
+                .open(data_dir_path.as_ref().join(file_name))
+            {
+                self.add_serialized_file(
+                    Box::new(BufReader::new(file)),
+                    Some(data_dir_path.as_ref().to_string_lossy().to_string()),
+                )?;
+            } else {
+                break;
+            }
+        }
+
+        let file_names = [
+            "resources.assets",
+            "globalgamemanagers.assets",
+            "globalgamemanagers",
+        ];
+        for file_name in file_names {
+            if let Ok(file) = OpenOptions::new()
+                .read(true)
+                .open(data_dir_path.as_ref().join(file_name))
+            {
+                self.add_serialized_file(
+                    Box::new(BufReader::new(file)),
+                    Some(data_dir_path.as_ref().to_string_lossy().to_string()),
+                )?;
             }
         }
         Ok(())
@@ -200,4 +261,69 @@ impl UnityAssetViewer {
         }
         None
     }
+
+    pub fn get_resource_file_by_serialized_file_id_and_path(
+        &self,
+        serialized_file_id: i64,
+        path: &String,
+    ) -> Option<Box<dyn UnityResource>> {
+        get_resource_file_by_path(
+            path,
+            self.serialized_file_map.get(&serialized_file_id),
+            self.serialized_file_to_unity_fs_map
+                .get(&serialized_file_id)
+                .and_then(|fs_id| self.unity_fs_map.get(fs_id)),
+            None,
+        )
+    }
+}
+
+pub fn get_resource_file_by_path(
+    path: &String,
+    serialized_file: Option<&SerializedFile>,
+    unityfs: Option<&UnityFS>,
+    search_path: Option<&String>,
+) -> Option<Box<dyn UnityResource>> {
+    if let Some(file_name) = PathBuf::from(&path)
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+    {
+        if path.starts_with("archive:/") {
+            if let Some(unityfs) = unityfs {
+                if let Ok(file) = unityfs.get_file_by_path(&file_name) {
+                    let file_reader = Cursor::new(file);
+                    return Some(Box::new(file_reader));
+                }
+            }
+        } else {
+            if let Some(search_path) = search_path {
+                let path = PathBuf::from(search_path).join(&file_name);
+                if let Ok(file) = OpenOptions::new().read(true).open(path) {
+                    return Some(Box::new(BufReader::new(file)));
+                }
+            }
+            if let Some(serialized_file) = serialized_file {
+                if let Some(search_path) = &serialized_file.resource_search_path {
+                    let path = PathBuf::from(search_path).join(&file_name);
+                    if let Ok(file) = OpenOptions::new().read(true).open(path) {
+                        return Some(Box::new(BufReader::new(file)));
+                    }
+                }
+            }
+            if let Some(unityfs) = unityfs {
+                if let Some(search_path) = &unityfs.resource_search_path {
+                    let path = PathBuf::from(search_path).join(&file_name);
+                    if let Ok(file) = OpenOptions::new().read(true).open(path) {
+                        return Some(Box::new(BufReader::new(file)));
+                    }
+                }
+            }
+            let path = PathBuf::from(".").join(&file_name);
+            if let Ok(file) = OpenOptions::new().read(true).open(path) {
+                return Some(Box::new(BufReader::new(file)));
+            }
+        }
+    }
+
+    None
 }

@@ -1,7 +1,8 @@
 use super::AudioClipObject;
 use crate::classes::named_object::{self, NamedObject, NamedObjectObject};
+use crate::unity_asset_view::UnityAssetViewer;
 use crate::until::binrw_parser::*;
-use crate::{SerializedFileMetadata, FS};
+use crate::SerializedFileMetadata;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
@@ -15,11 +16,13 @@ impl named_object::DownCast for AudioClip {
 }
 
 impl AudioClipObject for AudioClip {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>> {
         if let Some(data) = &self.audio_data {
             return Ok(Cow::Borrowed(data));
         } else {
-            if let Some(mut file) = fs.get_resource_file_by_path(self.source.to_string(), None) {
+            if let Some(mut file) =
+                viewer.get_resource_file_by_serialized_file_id_and_path(0, &self.source.to_string())
+            {
                 file.seek(SeekFrom::Start(self.offset as u64))?;
                 let mut data = vec![0u8; self.size as usize];
                 file.read_exact(&mut data)?;

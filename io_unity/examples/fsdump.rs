@@ -1,204 +1,101 @@
 extern crate io_unity;
 
-use std::{
-    fs::OpenOptions,
-    io::{BufReader, Cursor},
-    path::Path,
-};
+use clap::{arg, Parser, Subcommand};
+use std::collections::HashSet;
 
-use io_unity::classes::ClassIDType;
+use io_unity::{
+    classes::ClassIDType, type_tree::type_tree_json::set_info_json_tar_path,
+    unity_asset_view::UnityAssetViewer,
+};
 
 use io_unity::*;
 
-fn main() {
-    let path = "/tmp/files/aa/Android/";
-    let dirs = std::fs::read_dir(path).unwrap();
-    for entry in dirs {
-        if let Ok(entry) = entry {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_file()
-                    && entry
-                        .path()
-                        .to_string_lossy()
-                        .to_lowercase()
-                        .ends_with(".bundle")
-                {
-                    println!("{}", entry.path().display());
-                    handle(entry.path());
-                }
-            } else {
-                println!("Couldn't get file type for {:?}", entry.path());
-            }
-        }
-    }
+/// unity extractor
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+pub struct Args {
+    /// The dir contain AssetBundle files.
+    #[arg(short, long)]
+    bundle_dir: String,
+    /// The tar zstd compressed file contain type tree info json files
+    /// for read file without typetree info.
+    /// see https://github.com/DaZombieKiller/TypeTreeDumper
+    /// aslo https://github.com/AssetRipper/TypeTreeDumps.
+    /// File create by "tar -caf InfoJson.tar.zst InfoJson"
+    /// or "tar -c InfoJson | zstd --ultra -22 -o InfoJson.tar.zst"  
+    /// whitch can be less then 5MiB.
+    /// contain file path like /InfoJson/x.x.x.json.
+    #[arg(short, long)]
+    info_json_tar_path: Option<String>,
+    #[command(subcommand)]
+    pub command: Commands,
 }
 
-fn handle<P: AsRef<Path>>(filepath: P) {
-    let file = OpenOptions::new().read(true).open(filepath).unwrap();
-    let file = BufReader::new(file);
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// List container path
+    List {
+        /// filter path
+        #[arg(value_parser)]
+        filter_path: Option<String>,
+    },
+    /// Extract one model, Assets under the filter path will be treated as one model.
+    Extract {
+        /// filter path
+        #[arg(value_parser)]
+        filter_path: String,
+    },
+}
 
-    let oval = UnityFS::read(Box::new(file), None).unwrap();
-    for p in oval.get_files() {
-        println!("{}", p.path());
+fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
+    if let Some(path) = args.info_json_tar_path {
+        set_info_json_tar_path(path);
     }
 
-    let cabfile = oval
-        .get_file_by_path(oval.get_cab_path().get(0).unwrap())
-        .unwrap();
-    // let mut outfile = File::create("test").unwrap();
-    // outfile.write_all(&cabfile);
+    let time = std::time::Instant::now();
 
-    let cabfile_reader = Box::new(Cursor::new(cabfile));
-    let s = SerializedFile::read(cabfile_reader, 0).unwrap();
-    // println!("{:#?}", s);
+    let mut unity_asset_viewer = UnityAssetViewer::new();
+    unity_asset_viewer.read_data_dir(args.bundle_dir)?;
 
-    let mut viewed = Vec::new();
-    for (pathid, obj) in s.get_object_map() {
-        // println!("path id {}",pathid);
-        // match obj.class {
-        //     ClassIDType::Texture2D
-        //     | ClassIDType::AudioClip
-        //     | ClassIDType::TextAsset
-        //     | ClassIDType::CanvasRenderer
-        //     | ClassIDType::RectTransform
-        //     | ClassIDType::GameObject
-        //     | ClassIDType::Animation
-        //     | ClassIDType::Sprite
-        //     | ClassIDType::ParticleSystemRenderer
-        //     | ClassIDType::ParticleSystem
-        //     | ClassIDType::AnimationClip
-        //     | ClassIDType::Material
-        //     | ClassIDType::Shader
-        //     | ClassIDType::Animator
-        //     | ClassIDType::PlayableDirector
-        //     | ClassIDType::Canvas
-        //     | ClassIDType::SpriteAtlas
-        //     | ClassIDType::CanvasGroup
-        //     | ClassIDType::Transform
-        //     | ClassIDType::MeshFilter
-        //     | ClassIDType::MeshRenderer
-        //     | ClassIDType::Font
-        //     | ClassIDType::TrailRenderer
-        //     | ClassIDType::Camera
-        //     | ClassIDType::AudioListener
-        //     | ClassIDType::AnimatorController
-        //     | ClassIDType::AudioSource
-        //     | ClassIDType::AudioMixerGroupController
-        //     | ClassIDType::AudioMixerController
-        //     | ClassIDType::AudioMixerSnapshotController
-        //     | ClassIDType::MonoBehaviour
-        //     | ClassIDType::AssetBundle => {
-        //         continue;
-        //     }
-        //     _ => {
-        //         // let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap();
-        //         // tt_o.display_tree();
-        //         // println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
-        //         // panic!("")
-        //     }
-        // }
-        if obj.class == ClassIDType::Texture2D {
-            if let Some(classes::Class::Texture2D(tex)) =
-                s.get_object_by_path_id(pathid.to_owned()).unwrap()
-            {
-                // println!("{:#?}", &tex);
-                tex.get_image(&oval as &dyn FS).and_then(|t| {
-                    Ok(t.flipv().save(
-                        "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap() + ".png",
-                    ))
-                });
-            }
-        }
-        // if obj.class == ClassIDType::Transform {
-        //     if let Some(classes::Class::Transform(tran)) =
-        //         s.get_object_by_path_id(pathid.to_owned()).unwrap()
-        //     {
-        //         println!("{:?}", &tran.get_local_mat());
-        //     }
-        // }
-        if obj.class == ClassIDType::TextAsset {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
-            tt_o.display_tree();
-            println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
-        }
-        if obj.class == ClassIDType::MonoBehaviour {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
-            tt_o.display_tree();
-            println!("{:?}", tt_o.get_value_by_path("/Base/m_Script"));
-        }
-        if obj.class == ClassIDType::MonoScript {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
-            // tt_o.display_tree();
-            println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
-            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
-            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
-            println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
-        }
-        if !viewed.contains(&obj.class) {
-            let tt_o = s.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
-            println!("path id {}", pathid);
-            println!("class {:?}", &obj.class);
-            tt_o.display_tree();
-            // println!("{:?}", tt_o.get_value_by_path("/Base/m_Name"));
-            // println!("{:#?}", s.get_tt_object_by_path_id(*pathid));
-            viewed.push(obj.class.clone());
-        }
-        // continue;
-        if obj.class == ClassIDType::SkinnedMeshRenderer {
-            println!("{:?}", pathid);
-            // continue;
-            if let Some(classes::Class::SkinnedMeshRenderer(smr)) =
-                s.get_object_by_path_id(pathid.to_owned()).unwrap()
-            {
-                // println!("{:#?}", smr);
-                let mut bone_name_buff = Vec::new();
-                let mut bone_father_index_buff = Vec::new();
+    println!("Read use {:?}", time.elapsed());
 
-                for bone in &*smr.get_bones().unwrap() {
-                    if let Some(classes::Class::Transform(bone)) = s
-                        .get_object_by_path_id(bone.get_path_id().unwrap())
-                        .unwrap()
-                    {
-                        // println!("{:#?}", bone);
-                        bone_name_buff.push(
-                            if let Some(classes::Class::GameObject(go)) = s
-                                .get_object_by_path_id(
-                                    bone.downcast()
-                                        .get_game_object()
-                                        .unwrap()
-                                        .get_path_id()
-                                        .unwrap(),
-                                )
-                                .unwrap()
-                            {
-                                go.get_name().unwrap().to_string()
-                            } else {
-                                "bone".to_string()
-                            },
-                        );
-                        let bones = smr.get_bones().unwrap();
-                        let father = bones.iter().enumerate().find(|(_index, itbone)| {
-                            itbone.get_path_id().unwrap()
-                                == bone.get_father().unwrap().get_path_id().unwrap()
-                        });
-                        bone_father_index_buff
-                            .push(father.and_then(|e| Some(e.0 as i32)).unwrap_or(-1));
+    match &args.command {
+        Commands::List { filter_path } => {
+            for (container_path, _) in &unity_asset_viewer.container_maps {
+                if let Some(filter_path) = filter_path {
+                    if container_path.starts_with(filter_path) {
+                        println!("{}", container_path);
                     }
-                }
-                println!("{:#?}", bone_name_buff.len());
-                println!("{:#?}", bone_father_index_buff.len());
-
-                for material in &*smr.get_materials().unwrap() {
-                    let _material = s.get_object_by_path_id(material.get_path_id().unwrap());
-                    // println!("{:#?}", material);
-                }
-                if let Some(classes::Class::Mesh(_mesh)) = s
-                    .get_object_by_path_id(smr.get_mesh().unwrap().get_path_id().unwrap())
-                    .unwrap()
-                {
-                    // println!("{:#?}", mesh.get_bind_pose());
+                } else {
+                    println!("{}", container_path);
                 }
             }
+
+            let mut object_types = HashSet::new();
+            for (_, sf) in &unity_asset_viewer.serialized_file_map {
+                for (pathid, obj) in sf.get_object_map() {
+                    if obj.class == ClassIDType::Texture2D {
+                        if let Some(classes::Class::Texture2D(_tex)) =
+                            sf.get_object_by_path_id(pathid.to_owned()).unwrap()
+                        {
+                            // println!("{:#?}", &tex);
+                        }
+                    } else if obj.class == ClassIDType::MonoScript {
+                        let tt_o = sf.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
+                        println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
+                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
+                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
+                    }
+                    object_types.insert(obj.class.clone());
+                }
+            }
+            println!("object_types : {:?}", object_types);
         }
+        Commands::Extract { filter_path: _ } => {}
     }
+
+    Ok(())
 }

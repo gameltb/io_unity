@@ -1,7 +1,8 @@
 use super::{Texture2DObject, TextureFormat};
 use crate::classes::named_object::{self, NamedObjectObject};
+use crate::def_type_tree_class;
 use crate::type_tree::TypeTreeObject;
-use crate::{def_type_tree_class, FS};
+use crate::unity_asset_view::UnityAssetViewer;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
@@ -29,12 +30,14 @@ impl Texture2DObject for Texture2D<'_> {
         TextureFormat::try_from_primitive(self.get_texture_format()? as u32).ok()
     }
 
-    fn get_image_data(&self, fs: &dyn FS) -> Option<Cow<Vec<u8>>> {
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Cow<Vec<u8>>> {
         if let Some(data) = self.get_image_data() {
             return Some(data);
         } else {
-            if let Some(mut file) = fs.get_resource_file_by_path(self.get_stream_data_path()?, None)
-            {
+            if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
+                self.get_serialized_file_id(),
+                &self.get_stream_data_path()?,
+            ) {
                 file.seek(SeekFrom::Start(self.get_stream_data_offset()?))
                     .ok()?;
                 let mut data = vec![0u8; self.get_stream_data_size()? as usize];

@@ -1,6 +1,6 @@
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
-use std::path::PathBuf;
+
 use std::sync::{Arc, Mutex};
 
 use binrw::{binrw, BinResult, NullString, ReadOptions};
@@ -16,14 +16,6 @@ pub trait UnityResource: std::io::Read + std::io::Seek {}
 
 impl UnityResource for std::io::Cursor<Vec<u8>> {}
 impl UnityResource for BufReader<File> {}
-
-pub trait FS {
-    fn get_resource_file_by_path(
-        &self,
-        path: String,
-        search_path: Option<&String>,
-    ) -> Option<Box<dyn UnityResource>>;
-}
 
 #[bitfield]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -69,14 +61,14 @@ enum CompressionType {
 pub struct UnityFS {
     content: UnityFSFile,
     file_reader: Arc<Mutex<Box<dyn UnityResource + Send>>>,
-    search_path: Option<String>,
+    pub resource_search_path: Option<String>,
 }
 
 #[binrw]
-#[br(big)]
+#[brw(big)]
+#[brw(magic = b"UnityFS\0")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnityFSFile {
-    signature: NullString,
     version: u32,
     unity_version: NullString,
     unity_revision: NullString,
@@ -163,49 +155,13 @@ impl UnityFS {
 
     pub fn read(
         mut file: Box<dyn UnityResource + Send>,
-        search_path: Option<String>,
+        resource_search_path: Option<String>,
     ) -> BinResult<UnityFS> {
         Ok(UnityFS {
             content: UnityFSFile::read(&mut file)?,
             file_reader: Arc::new(Mutex::new(file)),
-            search_path,
+            resource_search_path,
         })
-    }
-}
-
-impl FS for UnityFS {
-    fn get_resource_file_by_path(
-        &self,
-        path: String,
-        search_path: Option<&String>,
-    ) -> Option<Box<dyn UnityResource>> {
-        let s = ".".to_owned();
-        let search_path = if let Some(p) = search_path {
-            p
-        } else if let Some(p) = &self.search_path {
-            p
-        } else {
-            &s
-        };
-
-        if let Some(file_name) = PathBuf::from(&path)
-            .file_name()
-            .map(|f| f.to_string_lossy().into_owned())
-        {
-            if path.starts_with("archive:/") {
-                if let Ok(file) = self.get_file_by_path(&file_name) {
-                    let file_reader = Cursor::new(file);
-                    return Some(Box::new(file_reader));
-                }
-            } else {
-                let path = PathBuf::from(search_path).join(file_name);
-                if let Ok(file) = OpenOptions::new().read(true).open(path) {
-                    return Some(Box::new(BufReader::new(file)));
-                }
-            }
-        }
-
-        None
     }
 }
 

@@ -30,6 +30,7 @@ use binrw::{binrw, BinResult};
 use binrw::{BinRead, ReadOptions};
 
 use num_enum::TryFromPrimitive;
+use once_cell::sync::Lazy;
 
 use crate::classes::animation_clip::AnimationClip;
 use crate::classes::animator::Animator;
@@ -47,6 +48,7 @@ use crate::classes::skinned_mesh_renderer::SkinnedMeshRenderer;
 use crate::classes::texture2d::Texture2D;
 use crate::classes::transform::Transform;
 use crate::classes::{Class, ClassIDType};
+use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs, TypeTreeObjectBinReadClassArgs};
 use crate::until::{Endian, UnityVersion};
 use crate::UnityResource;
@@ -191,8 +193,8 @@ pub enum BuildTarget {
     UnknownPlatform = 9999,
 }
 
-lazy_static! {
-    static ref COMMON_STRING: HashMap<u32, &'static str> = [
+static COMMON_STRING: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
+    [
         (0, "AABB"),
         (5, "AnimationClip"),
         (19, "AnimationCurve"),
@@ -305,8 +307,8 @@ lazy_static! {
     ]
     .iter()
     .copied()
-    .collect();
-}
+    .collect()
+});
 
 #[binrw]
 #[brw(big)]
@@ -342,6 +344,7 @@ pub struct SerializedFile {
     file_reader: RefCell<Box<dyn UnityResource + Send + Sync>>,
     object_map: BTreeMap<i64, Object>,
     serialized_file_id: i64,
+    pub resource_search_path: Option<String>,
 }
 
 impl fmt::Debug for SerializedFile {
@@ -356,6 +359,7 @@ impl SerializedFile {
     pub fn read(
         mut reader: Box<dyn UnityResource + Send + Sync>,
         serialized_file_id: i64,
+        resource_search_path: Option<String>,
     ) -> BinResult<Self> {
         let head = SerializedFileCommonHeader::read(&mut reader)?;
         reader.seek(SeekFrom::Start(0))?;
@@ -434,6 +438,7 @@ impl SerializedFile {
             file_reader: RefCell::new(reader),
             object_map,
             serialized_file_id,
+            resource_search_path,
         })
     }
 
@@ -509,9 +514,16 @@ pub trait Serialized: fmt::Debug {
         obj: &Object,
         serialized_file_id: i64,
     ) -> BinResult<TypeTreeObject> {
-        let class_args = self
-            .get_type_object_args_by_type_id(obj.type_id)
-            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let class_args = if self.get_enable_type_tree() {
+            self.get_type_object_args_by_type_id(obj.type_id)
+        } else {
+            get_type_object_args_by_version_class_id(
+                &self.get_unity_version(),
+                obj.class.clone() as i32,
+            )
+        }
+        .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+
         let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, class_args);
 
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
@@ -523,10 +535,14 @@ pub trait Serialized: fmt::Debug {
 
         let type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
         let apos = reader.seek(SeekFrom::Current(0))?;
-        assert_eq!(
-            apos - (self.get_data_offset() + obj.byte_start),
-            obj.byte_size as u64
-        );
+        if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
+            println!(
+                "{} readed, {} object size. class id {:?}",
+                apos - (self.get_data_offset() + obj.byte_start),
+                obj.byte_size,
+                obj.class
+            )
+        }
         Ok(type_tree_object)
     }
 

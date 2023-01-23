@@ -1,3 +1,5 @@
+pub mod type_tree_json;
+
 use std::{
     borrow::Cow,
     collections::HashMap,

@@ -18,11 +18,9 @@ use io_unity::{
         transform::{get_bone_path_hash_map, Transform},
         ClassIDType,
     },
-    type_tree::TypeTreeObject,
+    type_tree::{type_tree_json::set_info_json_tar_path, TypeTreeObject},
     unity_asset_view::UnityAssetViewer,
 };
-
-use io_unity::*;
 
 mod CubismModel3Json {
     #![allow(non_snake_case)]
@@ -338,8 +336,6 @@ mod CubismMotion3Json {
 mod CubismExp3Json {
     #![allow(non_snake_case)]
 
-    use std::collections::HashMap;
-
     use serde::{Deserialize, Serialize};
 
     #[derive(Default, Serialize, Deserialize)]
@@ -375,13 +371,23 @@ mod CubismExp3Json {
     }
 }
 
-/// live2dextractor
+/// live2d extractor
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
     /// The dir contain AssetBundle files.
     #[arg(short, long)]
     bundle_dir: String,
+    /// The tar zstd compressed file contain type tree info json files
+    /// for read file without typetree info.
+    /// see https://github.com/DaZombieKiller/TypeTreeDumper
+    /// aslo https://github.com/AssetRipper/TypeTreeDumps.
+    /// File create by "tar -caf InfoJson.tar.zst InfoJson"
+    /// or "tar -c InfoJson | zstd --ultra -22 -o InfoJson.tar.zst"  
+    /// whitch can be less then 5MiB.
+    /// contain file path like /InfoJson/x.x.x.json.
+    #[arg(short, long)]
+    info_json_tar_path: Option<String>,
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -421,10 +427,14 @@ struct Keyframe {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    if let Some(path) = args.info_json_tar_path {
+        set_info_json_tar_path(path);
+    }
+
     let time = std::time::Instant::now();
 
     let mut unity_asset_viewer = UnityAssetViewer::new();
-    unity_asset_viewer.read_dir(args.bundle_dir)?;
+    unity_asset_viewer.read_bundle_dir(args.bundle_dir)?;
 
     println!("Read use {:?}", time.elapsed());
 
@@ -571,16 +581,13 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         obj
                     };
-                    let unity_fs = unity_asset_viewer
-                        .get_unity_fs_by_type_tree_object(&texture2d)
-                        .unwrap();
 
                     let container_path = PathBuf::from(container_path);
 
                     let tex = Texture2D::new(texture2d);
                     create_dir_all(container_path.parent().unwrap());
                     let tex_path = container_path.parent().unwrap().join(texture_name + ".png");
-                    if let Ok(img) = tex.get_image(unity_fs as &dyn FS) {
+                    if let Ok(img) = tex.get_image(&unity_asset_viewer) {
                         img.flipv().save(&tex_path);
                     }
 
@@ -621,7 +628,7 @@ fn main() -> anyhow::Result<()> {
                                 index,
                             )
                             .unwrap();
-                            let (live2d_target, live2d_id) =
+                            let (_live2d_target, live2d_id) =
                                 get_live2d_path(&unity_asset_viewer, &path_hash_map, &binding);
                             let mut serializable_expression_parameter =
                                 CubismExp3Json::SerializableExpressionParameter::default();

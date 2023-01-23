@@ -2,7 +2,10 @@ pub mod type_tree;
 pub mod version_5_0_0;
 
 use super::named_object;
-use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata, FS};
+use crate::{
+    def_unity_class, unity_asset_view::UnityAssetViewer, until::UnityVersion,
+    SerializedFileMetadata,
+};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use std::{
     borrow::Cow,
@@ -13,7 +16,7 @@ use std::{
 def_unity_class!(AudioClip, AudioClipObject);
 
 pub trait AudioClipObject: fmt::Debug + named_object::DownCast {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>>;
+    fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>>;
 }
 
 impl BinRead for AudioClip {

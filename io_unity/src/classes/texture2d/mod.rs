@@ -2,7 +2,10 @@ pub mod type_tree;
 pub mod version_2018_2_0;
 pub mod version_2020_2_0;
 
-use crate::{def_unity_class, until::UnityVersion, SerializedFileMetadata, FS};
+use crate::{
+    def_unity_class, unity_asset_view::UnityAssetViewer, until::UnityVersion,
+    SerializedFileMetadata,
+};
 use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use image::{DynamicImage, GrayAlphaImage, RgbImage, RgbaImage};
 use num_enum::TryFromPrimitive;
@@ -20,10 +23,10 @@ pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
     fn get_width(&self) -> Option<u64>;
     fn get_height(&self) -> Option<u64>;
     fn get_texture_format(&self) -> Option<TextureFormat>;
-    fn get_image_data(&self, fs: &dyn FS) -> Option<Cow<Vec<u8>>>;
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Cow<Vec<u8>>>;
 
-    fn get_image(&self, fs: &dyn FS) -> anyhow::Result<DynamicImage> {
-        let data = self.get_image_data(fs).ok_or(anyhow!("data"))?;
+    fn get_image(&self, viewer: &UnityAssetViewer) -> anyhow::Result<DynamicImage> {
+        let data = self.get_image_data(viewer).ok_or(anyhow!("data"))?;
         let texture_format = self.get_texture_format().ok_or(anyhow!("texture_format"))?;
         let width = self.get_width().ok_or(anyhow!("width"))? as usize;
         let height = self.get_height().ok_or(anyhow!("height"))? as usize;

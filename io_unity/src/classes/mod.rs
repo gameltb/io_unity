@@ -67,6 +67,10 @@ macro_rules! def_type_tree_class {
             pub fn inner(self) -> Supercow<'a, TypeTreeObject> {
                 self.inner
             }
+
+            pub fn get_serialized_file_id(&self) -> i64 {
+                self.inner.serialized_file_id
+            }
         }
     };
 }
@@ -90,7 +94,7 @@ pub enum Class {
     Avatar(avatar::Avatar),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive, Hash)]
 #[repr(i32)]
 pub enum ClassIDType {
     UnknownType = -1,

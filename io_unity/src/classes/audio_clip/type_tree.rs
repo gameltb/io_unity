@@ -1,8 +1,9 @@
 use super::AudioClipObject;
 use crate::classes::named_object;
 use crate::classes::named_object::NamedObjectObject;
+use crate::def_type_tree_class;
 use crate::type_tree::TypeTreeObject;
-use crate::{def_type_tree_class, FS};
+use crate::unity_asset_view::UnityAssetViewer;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
@@ -20,7 +21,7 @@ impl named_object::DownCast for AudioClip<'_> {
 }
 
 impl AudioClipObject for AudioClip<'_> {
-    fn get_audio_data(&self, fs: &mut Box<dyn FS>) -> anyhow::Result<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>> {
         let resource_source = self
             .get_resource_source()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
@@ -31,7 +32,10 @@ impl AudioClipObject for AudioClip<'_> {
             .get_resource_size()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
 
-        if let Some(mut file) = fs.get_resource_file_by_path(resource_source, None) {
+        if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
+            self.get_serialized_file_id(),
+            &resource_source,
+        ) {
             file.seek(SeekFrom::Start(resource_offset))?;
             let mut data = vec![0u8; resource_size as usize];
             file.read_exact(&mut data)?;

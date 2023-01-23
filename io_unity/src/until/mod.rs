@@ -4,6 +4,7 @@ use std::error::Error;
 
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -21,10 +22,8 @@ impl UnityVersion {
     }
 
     pub fn from_str(version: &str) -> Result<Self, Box<dyn Error>> {
-        lazy_static! {
-            static ref BUILD_TYPE_REGEX: Regex = Regex::new(r"([^\d.])").unwrap();
-            static ref VERSION_REGEX: Regex = Regex::new(r"\D").unwrap();
-        };
+        static BUILD_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"([^\d.])").unwrap());
+        static VERSION_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\D").unwrap());
 
         Ok(UnityVersion {
             version: VERSION_REGEX

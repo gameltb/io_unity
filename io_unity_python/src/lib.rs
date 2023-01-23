@@ -82,7 +82,7 @@ impl SerializedFile {
     pub fn read(cabfile: Vec<u8>) -> PyResult<Self> {
         let cabfile_reader = Box::new(Cursor::new(cabfile));
         Ok(SerializedFile(
-            io_unity::SerializedFile::read(cabfile_reader, 0)
+            io_unity::SerializedFile::read(cabfile_reader, 0, None)
                 .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?,
         ))
     }
@@ -182,15 +182,6 @@ impl Mesh {
 
 #[pymethods]
 impl AudioClip {
-    fn get_audio_data(&self, py: Python, fs: &PyCell<UnityFS>) -> PyResult<PyObject> {
-        let mut fs = Box::new(fs.try_borrow_mut()?.0.clone()) as Box<dyn io_unity::FS>;
-        let data = self
-            .0
-            .get_audio_data(&mut fs)
-            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))?;
-        Ok(PyBytes::new(py, &data).into())
-    }
-
     fn get_name(&self) -> String {
         self.0.downcast().get_name().unwrap()
     }
