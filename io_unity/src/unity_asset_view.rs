@@ -8,7 +8,9 @@ use std::{
 use walkdir::WalkDir;
 
 use crate::{
-    classes::p_ptr::PPtr, type_tree::TypeTreeObject, SerializedFile, UnityFS, UnityResource,
+    classes::{p_ptr::PPtr, ClassIDType},
+    type_tree::TypeTreeObject,
+    SerializedFile, UnityFS, UnityResource,
 };
 
 pub struct UnityAssetViewer {
@@ -109,6 +111,36 @@ impl UnityAssetViewer {
                     .insert(serialized_file_id, name_map);
             }
         }
+
+        for (path_id, obj) in serialized_file.get_object_map() {
+            if obj.class == ClassIDType::ResourceManager {
+                if let Ok(Some(resource_manager)) =
+                    serialized_file.get_tt_object_by_path_id(*path_id)
+                {
+                    if let Some(containers) =
+                        resource_manager.get_string_key_map_by_path("/Base/m_Container/Array")
+                    {
+                        let mut name_map = HashMap::new();
+                        for (name, pptr) in containers {
+                            let pptr = PPtr::new(pptr);
+                            if let Some(path_id) = pptr.get_path_id() {
+                                name_map.insert(path_id, name.clone());
+                            }
+
+                            if let Some(objs) = self.container_maps.get_mut(&name) {
+                                objs.push((serialized_file_id, pptr));
+                            } else {
+                                self.container_maps
+                                    .insert(name, vec![(serialized_file_id, pptr)]);
+                            }
+                        }
+                        self.container_name_maps
+                            .insert(serialized_file_id, name_map);
+                    }
+                }
+            }
+        }
+
         self.serialized_file_map
             .insert(serialized_file_id, serialized_file);
         Ok(serialized_file_id)
@@ -119,12 +151,13 @@ impl UnityAssetViewer {
             let file_name = format!("level{}", i);
             if let Ok(file) = OpenOptions::new()
                 .read(true)
-                .open(data_dir_path.as_ref().join(file_name))
+                .open(data_dir_path.as_ref().join(&file_name))
             {
-                self.add_serialized_file(
+                let serialized_file_id = self.add_serialized_file(
                     Box::new(BufReader::new(file)),
                     Some(data_dir_path.as_ref().to_string_lossy().to_string()),
                 )?;
+                self.cab_maps.insert(file_name, serialized_file_id);
             } else {
                 break;
             }
@@ -133,12 +166,13 @@ impl UnityAssetViewer {
             let file_name = format!("sharedassets{}.assets", i);
             if let Ok(file) = OpenOptions::new()
                 .read(true)
-                .open(data_dir_path.as_ref().join(file_name))
+                .open(data_dir_path.as_ref().join(&file_name))
             {
-                self.add_serialized_file(
+                let serialized_file_id = self.add_serialized_file(
                     Box::new(BufReader::new(file)),
                     Some(data_dir_path.as_ref().to_string_lossy().to_string()),
                 )?;
+                self.cab_maps.insert(file_name, serialized_file_id);
             } else {
                 break;
             }
@@ -154,10 +188,12 @@ impl UnityAssetViewer {
                 .read(true)
                 .open(data_dir_path.as_ref().join(file_name))
             {
-                self.add_serialized_file(
+                let serialized_file_id = self.add_serialized_file(
                     Box::new(BufReader::new(file)),
                     Some(data_dir_path.as_ref().to_string_lossy().to_string()),
                 )?;
+                self.cab_maps
+                    .insert(file_name.to_owned(), serialized_file_id);
             }
         }
         Ok(())
