@@ -36,7 +36,7 @@ impl Transform<'_> {
     fn get_father(&self) -> Option<PPtr> {
         self.inner
             .get_object_by_path("/Base/m_Father")
-            .and_then(|f| Some(PPtr::new(f)))
+            .and_then(|po| Some(PPtr::new(po)))
     }
 
     fn get_local_rotation(&self) -> Option<glam::Quat> {

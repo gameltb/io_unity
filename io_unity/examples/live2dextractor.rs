@@ -377,7 +377,10 @@ mod CubismExp3Json {
 pub struct Args {
     /// The dir contain AssetBundle files.
     #[arg(short, long)]
-    bundle_dir: String,
+    bundle_dir: Option<String>,
+    /// The dir contain data files.
+    #[arg(short, long)]
+    data_dir: Option<String>,
     /// The tar zstd compressed file contain type tree info json files
     /// for read file without typetree info.
     /// see https://github.com/DaZombieKiller/TypeTreeDumper
@@ -434,7 +437,13 @@ fn main() -> anyhow::Result<()> {
     let time = std::time::Instant::now();
 
     let mut unity_asset_viewer = UnityAssetViewer::new();
-    unity_asset_viewer.read_bundle_dir(args.bundle_dir)?;
+
+    if let Some(bundle_dir) = args.bundle_dir {
+        unity_asset_viewer.read_bundle_dir(bundle_dir)?;
+    }
+    if let Some(data_dir) = args.data_dir {
+        unity_asset_viewer.read_data_dir(data_dir)?;
+    }
 
     println!("Read use {:?}", time.elapsed());
 

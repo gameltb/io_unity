@@ -468,17 +468,30 @@ impl SerializedFile {
             .object_map
             .get(&path_id)
             .and_then(|obj| {
-                Some(self.content.get_type_tree_object(
-                    &mut *self.file_reader.borrow_mut(),
-                    obj,
-                    self.serialized_file_id,
-                ))
+                Some(
+                    self.content
+                        .get_type_tree_object(
+                            &mut *self.file_reader.borrow_mut(),
+                            obj,
+                            self.serialized_file_id,
+                        )
+                        .map_err(|err| {
+                            anyhow!(format!(
+                                "error while read object.data_offset: {} object : {:?} error : {}",
+                                self.content.get_data_offset(), obj, err
+                            ))
+                        }),
+                )
             })
             .transpose()?)
     }
 
     pub fn get_externals(&self) -> Cow<Vec<FileIdentifier>> {
         self.content.get_externals()
+    }
+
+    pub fn get_serialized_file_id(&self) -> i64 {
+        self.serialized_file_id
     }
 }
 

@@ -672,7 +672,7 @@ impl BinRead for TypeTreeObject {
 
                 let pos = reader.seek(SeekFrom::Current(0))?;
                 let is_pos_aligned = (pos % 4) == 0;
-                let fix_item_size = calc_no_array_fields_size(&item_type_fields, &mut 0);
+                let fix_item_size = calc_no_array_field_size(&item_type_fields, &mut 0, &mut 0);
                 let mut buf_read_flag = false;
                 if let Some(byte_size) = fix_item_size {
                     if is_pos_aligned && ((byte_size % 4) == 0) {
@@ -758,7 +758,9 @@ impl BinRead for TypeTreeObject {
                     reader.seek(SeekFrom::Current((4 - (pos % 4)) as i64))?;
                 }
             }
-
+            // println!("pos {:?}",reader.seek(SeekFrom::Current(0)));
+            // println!("{:?}",&field_value.data);
+            // field_value.display_field(&"".to_owned());
             Ok(field_value)
         }
 
@@ -799,42 +801,38 @@ impl BinRead for Field {
     }
 }
 
-fn calc_no_array_fields_size(
+fn calc_no_array_field_size(
     type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
     field_index: &mut usize,
+    read_size: &mut usize,
 ) -> Option<usize> {
     let field = type_fields.get(*field_index)?;
     let field_level = field.get_level();
-    let read_size = if field.is_array() {
-        None
+    if field.is_array() {
+        return None;
     } else if let Some(next_field) = type_fields.get(*field_index + 1) {
         if next_field.get_level() == field_level + 1 {
-            let mut read_size = 0;
             while let Some(next_field) = type_fields.get(*field_index + 1) {
                 if next_field.get_level() == field_level + 1 {
                     *field_index += 1;
-                    read_size += calc_no_array_fields_size(type_fields, field_index)?;
+                    calc_no_array_field_size(type_fields, field_index, read_size)?;
                 } else if next_field.get_level() <= field_level {
                     break;
                 } else {
                     panic!("{:#?} {:#?} ", next_field.get_level(), field);
                 }
             }
-
-            Some(read_size)
         } else {
-            Some(field.get_byte_size() as usize)
+            *read_size += field.get_byte_size() as usize;
         }
     } else {
-        Some(field.get_byte_size() as usize)
+        *read_size += field.get_byte_size() as usize;
     };
 
-    read_size.and_then(|mut size| {
-        if field.is_align() {
-            if size % 4 != 0 {
-                size = size - (size % 4) + 4
-            }
+    if field.is_align() {
+        if *read_size % 4 != 0 {
+            *read_size = *read_size + 4 - (*read_size % 4)
         }
-        Some(size)
-    })
+    }
+    Some(*read_size)
 }

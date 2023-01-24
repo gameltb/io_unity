@@ -43,38 +43,41 @@ impl UnityAssetViewer {
             if let Ok(entry) = entry {
                 if entry.file_type().is_file() {
                     let file = OpenOptions::new().read(true).open(entry.path())?;
-                    let file = BufReader::new(file);
-
-                    let unity_fs = if let Ok(unity_fs) = UnityFS::read(
-                        Box::new(file),
-                        Some(entry.path().parent().unwrap().to_string_lossy().to_string()),
-                    ) {
-                        unity_fs
-                    } else {
-                        continue;
-                    };
-
-                    let unity_fs_id = self.unity_fs_count;
-                    self.unity_fs_count = self.unity_fs_count + 1;
-
-                    for cab_path in unity_fs.get_cab_path() {
-                        let cab_buff = unity_fs.get_file_by_path(&cab_path)?;
-                        let cab_buff_reader = Box::new(Cursor::new(cab_buff));
-
-                        let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
-                        self.serialized_file_to_unity_fs_map
-                            .insert(serialized_file_id, unity_fs_id);
-                        self.cab_maps.insert(cab_path, serialized_file_id);
-                    }
-
-                    self.unity_fs_map.insert(unity_fs_id, unity_fs);
+                    let file = Box::new(BufReader::new(file));
+                    let unity_fs_id = self
+                        .add_bundle_file(
+                            file,
+                            Some(entry.path().parent().unwrap().to_string_lossy().to_string()),
+                        )
+                        .unwrap_or_default();
                 }
             }
         }
         Ok(())
     }
 
-    fn add_serialized_file(
+    pub fn add_bundle_file(
+        &mut self,
+        bundle_file_reader: Box<dyn UnityResource + Send + Sync>,
+        resource_search_path: Option<String>,
+    ) -> anyhow::Result<i64> {
+        let unity_fs = UnityFS::read(bundle_file_reader, resource_search_path)?;
+        let unity_fs_id = self.unity_fs_count;
+        self.unity_fs_count = self.unity_fs_count + 1;
+        for cab_path in unity_fs.get_cab_path() {
+            let cab_buff = unity_fs.get_file_by_path(&cab_path)?;
+            let cab_buff_reader = Box::new(Cursor::new(cab_buff));
+
+            let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
+            self.serialized_file_to_unity_fs_map
+                .insert(serialized_file_id, unity_fs_id);
+            self.cab_maps.insert(cab_path, serialized_file_id);
+        }
+        self.unity_fs_map.insert(unity_fs_id, unity_fs);
+        Ok(unity_fs_id)
+    }
+
+    pub fn add_serialized_file(
         &mut self,
         serialized_file_reader: Box<dyn UnityResource + Send + Sync>,
         resource_search_path: Option<String>,
@@ -215,6 +218,18 @@ impl UnityAssetViewer {
                 if let Some(unity_fs) = self.unity_fs_map.get(unity_fs_id) {
                     return Some(unity_fs);
                 }
+            }
+        }
+        None
+    }
+
+    pub fn get_unity_fs_by_serialized_file(&self, serialized_file: &SerializedFile) -> Option<&UnityFS> {
+        if let Some(unity_fs_id) = self
+            .serialized_file_to_unity_fs_map
+            .get(&serialized_file.get_serialized_file_id())
+        {
+            if let Some(unity_fs) = self.unity_fs_map.get(unity_fs_id) {
+                return Some(unity_fs);
             }
         }
         None
