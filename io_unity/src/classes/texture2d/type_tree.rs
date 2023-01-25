@@ -63,9 +63,7 @@ impl Texture2D<'_> {
     }
 
     fn get_image_data(&self) -> Option<Cow<Vec<u8>>> {
-        if let Some(crate::type_tree::Value::ByteArray(data)) =
-            self.inner.get_value_by_path("/Base/image data")
-        {
+        if let Some(data) = self.inner.get_byte_array_by_path("/Base/image data") {
             return Some(data);
         }
         None

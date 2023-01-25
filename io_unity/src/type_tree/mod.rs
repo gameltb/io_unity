@@ -24,34 +24,11 @@ pub trait TypeField: Debug {
     fn get_name(&self) -> &String;
 }
 
-#[derive(Debug)]
-pub enum Value<'a> {
-    Bool(bool),
-    Int8(i8),
-    UInt8(u8),
-    Int16(i16),
-    UInt16(u16),
-    Int32(i32),
-    UInt32(u32),
-    Int64(i64),
-    UInt64(u64),
-    Float(f32),
-    Double(f64),
-    String(String),
-    Array(Vec<TypeTreeObject>),
-    Object(TypeTreeObject),
-    ByteArray(Cow<'a, Vec<u8>>),
-    FloatArray(Vec<f32>),
-    DoubleArray(Vec<f64>),
-    UInt16Array(Vec<u16>),
-    UInt32Array(Vec<u32>),
-    UInt64Array(Vec<u64>),
-}
-
 #[derive(Debug, Clone)]
 pub enum FieldValue {
     Data(Vec<u8>),
-    Fields(Vec<Field>),
+    Fields(HashMap<String, Field>),
+    ArrayFields(Vec<Field>),
     Array(Box<ArrayField>),
 }
 
@@ -67,6 +44,403 @@ pub struct Field {
     field_type: Arc<Box<dyn TypeField + Send + Sync>>,
     data: FieldValue,
     time: Duration,
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldCastArgs {
+    endian: binrw::Endian,
+    serialized_file_id: i64,
+}
+
+pub trait TryCast<T>: Sized {
+    type Error;
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<T, Self::Error>;
+}
+
+pub trait TryCastFrom<T>: Sized {
+    type Error;
+
+    fn try_cast_from(value: &T, path: &str) -> Result<Self, Self::Error>;
+}
+
+impl<T> TryCastFrom<TypeTreeObject> for T
+where
+    Field: TryCast<T>,
+{
+    type Error = ();
+
+    fn try_cast_from(value: &TypeTreeObject, path: &str) -> Result<Self, Self::Error> {
+        value
+            .get_field_by_path(path)
+            .and_then(|f| f.try_cast_to(&value.get_field_cast_args()).ok())
+            .ok_or(())
+    }
+}
+
+impl TryCast<bool> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<bool, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            if ["bool"].contains(&self.field_type.get_type().as_str()) {
+                if let Some(i) = data.get(0) {
+                    return Ok(*i != 0);
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<i8> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<i8, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            if ["SInt8"].contains(&self.field_type.get_type().as_str()) {
+                return <i8>::read(&mut Cursor::new(data)).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<i16> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<i16, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["SInt16", "short"].contains(&self.field_type.get_type().as_str()) {
+                return <i16>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<i32> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<i32, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
+                return <i32>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<i64> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<i64, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["SInt64", "long long"].contains(&self.field_type.get_type().as_str()) {
+                return <i64>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<u8> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<u8, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            if ["UInt8", "char"].contains(&self.field_type.get_type().as_str()) {
+                return <u8>::read(&mut Cursor::new(data)).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<u16> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<u16, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["UInt16", "unsigned short"].contains(&self.field_type.get_type().as_str()) {
+                return <u16>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<u32> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<u32, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["UInt32", "unsigned int"].contains(&self.field_type.get_type().as_str()) {
+                return <u32>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<u64> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<u64, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["UInt64", "unsigned long long"].contains(&self.field_type.get_type().as_str()) {
+                return <u64>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<f32> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<f32, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["float"].contains(&self.field_type.get_type().as_str()) {
+                return <f32>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<f64> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<f64, Self::Error> {
+        if let FieldValue::Data(data) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if ["double"].contains(&self.field_type.get_type().as_str()) {
+                return <f64>::read_options(&mut Cursor::new(data), &op, ()).map_err(|_| ());
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<TypeTreeObject> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<TypeTreeObject, Self::Error> {
+        Ok(TypeTreeObject {
+            endian: field_cast_args.endian.clone(),
+            class_id: 0,
+            serialized_file_id: field_cast_args.serialized_file_id,
+            data: self.clone(),
+        })
+    }
+}
+
+impl TryCast<Vec<TypeTreeObject>> for Field {
+    type Error = ();
+
+    fn try_cast_to(
+        &self,
+        field_cast_args: &FieldCastArgs,
+    ) -> Result<Vec<TypeTreeObject>, Self::Error> {
+        match &self.data {
+            FieldValue::Array(array_field) => match &array_field.data {
+                FieldValue::Data(array_data_buff) => {
+                    let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                    let class_args = TypeTreeObjectBinReadClassArgs::new(
+                        0,
+                        array_field.item_type_fields.clone(),
+                    );
+                    let mut obj_array = vec![];
+                    let op = ReadOptions::new(field_cast_args.endian.clone());
+
+                    let args = TypeTreeObjectBinReadArgs::new(
+                        field_cast_args.serialized_file_id,
+                        class_args,
+                    );
+                    for _ in 0..size {
+                        obj_array.push(
+                            TypeTreeObject::read_options(
+                                &mut Cursor::new(array_data_buff),
+                                &op,
+                                args.clone(),
+                            )
+                            .map_err(|_| ())?,
+                        )
+                    }
+                    return Ok(obj_array);
+                }
+                FieldValue::ArrayFields(array_fields) => {
+                    return Ok(array_fields
+                        .iter()
+                        .map(|f| TypeTreeObject {
+                            endian: field_cast_args.endian.clone(),
+                            class_id: 0,
+                            serialized_file_id: field_cast_args.serialized_file_id,
+                            data: f.clone(),
+                        })
+                        .collect());
+                }
+                _ => (),
+            },
+            _ => (),
+        }
+        Err(())
+    }
+}
+
+impl<'a> TryCast<Cow<'a, Vec<u8>>> for &'a Field {
+    type Error = ();
+
+    fn try_cast_to(
+        &self,
+        field_cast_args: &FieldCastArgs,
+    ) -> Result<Cow<'a, Vec<u8>>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            if let FieldValue::Data(array) = &array_field.data {
+                return Ok(Cow::Borrowed(array));
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<Vec<f32>> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<Vec<f32>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if let FieldValue::Data(array) = &array_field.data {
+                let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                if array_field.item_type_fields.len() == 1 {
+                    let item_type_field = array_field.item_type_fields.get(0).unwrap();
+                    if item_type_field.get_type().as_str() == "float" {
+                        return <Vec<f32>>::read_options(
+                            &mut Cursor::new(array),
+                            &op,
+                            VecArgs {
+                                count: size as usize,
+                                inner: (),
+                            },
+                        )
+                        .map_err(|_| ());
+                    }
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<Vec<u16>> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<Vec<u16>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if let FieldValue::Data(array) = &array_field.data {
+                let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                if array_field.item_type_fields.len() == 1 {
+                    let item_type_field = array_field.item_type_fields.get(0).unwrap();
+                    if item_type_field.get_byte_size() == 2 {
+                        return <Vec<u16>>::read_options(
+                            &mut Cursor::new(array),
+                            &op,
+                            VecArgs {
+                                count: size as usize,
+                                inner: (),
+                            },
+                        )
+                        .map_err(|_| ());
+                    }
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<Vec<u32>> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<Vec<u32>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if let FieldValue::Data(array) = &array_field.data {
+                let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                if array_field.item_type_fields.len() == 1 {
+                    let item_type_field = array_field.item_type_fields.get(0).unwrap();
+                    if item_type_field.get_byte_size() == 4 {
+                        return <Vec<u32>>::read_options(
+                            &mut Cursor::new(array),
+                            &op,
+                            VecArgs {
+                                count: size as usize,
+                                inner: (),
+                            },
+                        )
+                        .map_err(|_| ());
+                    }
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<Vec<u64>> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<Vec<u64>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if let FieldValue::Data(array) = &array_field.data {
+                let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                if array_field.item_type_fields.len() == 1 {
+                    let item_type_field = array_field.item_type_fields.get(0).unwrap();
+                    if item_type_field.get_byte_size() == 8 {
+                        return <Vec<u64>>::read_options(
+                            &mut Cursor::new(array),
+                            &op,
+                            VecArgs {
+                                count: size as usize,
+                                inner: (),
+                            },
+                        )
+                        .map_err(|_| ());
+                    }
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<String> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<String, Self::Error> {
+        if let FieldValue::Fields(fields) = &self.data {
+            if "string" == self.field_type.get_type() {
+                if let Some(array) = fields.values().next() {
+                    let data: Cow<Vec<u8>> = (&array).try_cast_to(field_cast_args)?;
+                    if let Ok(string) = String::from_utf8(data.to_vec()) {
+                        return Ok(string);
+                    }
+                }
+            }
+        }
+        Err(())
+    }
 }
 
 impl Field {
@@ -99,13 +473,13 @@ impl Field {
             }
             FieldValue::Fields(fls) => {
                 println!("");
-                fls.into_iter().map(|f| f.display_field(&np)).collect()
+                fls.into_iter().map(|(n, f)| f.display_field(&np)).collect()
             }
             FieldValue::Array(ar) => {
                 println!("");
                 ar.array_size.display_field(&np);
                 match &ar.data {
-                    FieldValue::Fields(ai) => {
+                    FieldValue::ArrayFields(ai) => {
                         if let Some(aii) = ai.get(0) {
                             aii.display_field(&np);
                         }
@@ -125,233 +499,24 @@ impl Field {
                     _ => (),
                 }
             }
+            FieldValue::ArrayFields(_) => todo!(),
         }
     }
 
-    fn get_value(
-        &self,
-        path: &[String],
-        endian: &binrw::Endian,
-        serialized_file_id: i64,
-    ) -> Option<Value> {
+    fn get_field(&self, path: &[String]) -> Option<&Self> {
         if path.len() == 0 {
-            match &self.data {
-                FieldValue::Data(data) => {
-                    let op = ReadOptions::new(endian.clone());
-                    match self.field_type.get_type().as_str() {
-                        "bool" => {
-                            if let Some(i) = data.get(0) {
-                                return Some(Value::Bool(*i != 0));
-                            }
-                        }
-                        "SInt8" => {
-                            if let Ok(i) = <i8>::read(&mut Cursor::new(data)) {
-                                return Some(Value::Int8(i));
-                            }
-                        }
-                        "SInt16" | "short" => {
-                            if let Ok(i) = <i16>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::Int16(i));
-                            }
-                        }
-                        "SInt32" | "int" => {
-                            if let Ok(i) = <i32>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::Int32(i));
-                            }
-                        }
-                        "SInt64" | "long long" => {
-                            if let Ok(i) = <i64>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::Int64(i));
-                            }
-                        }
-                        "UInt8" | "char" => {
-                            if let Ok(i) = <u8>::read(&mut Cursor::new(data)) {
-                                return Some(Value::UInt8(i));
-                            }
-                        }
-                        "UInt16" | "unsigned short" => {
-                            if let Ok(i) = <u16>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::UInt16(i));
-                            }
-                        }
-                        "UInt32" | "unsigned int" => {
-                            if let Ok(i) = <u32>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::UInt32(i));
-                            }
-                        }
-                        "UInt64" | "unsigned long long" | "FileSize" => {
-                            if let Ok(i) = <u64>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::UInt64(i));
-                            }
-                        }
-                        "float" => {
-                            if let Ok(i) = <f32>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::Float(i));
-                            }
-                        }
-                        "double" => {
-                            if let Ok(i) = <f64>::read_options(&mut Cursor::new(data), &op, ()) {
-                                return Some(Value::Double(i));
-                            }
-                        }
-                        &_ => (),
-                    }
-                    return Some(Value::ByteArray(Cow::Borrowed(data)));
-                }
-                FieldValue::Array(array_field) => match &array_field.data {
-                    FieldValue::Data(array) => {
-                        if array.len() > 0 {
-                            if array_field.item_type_fields.len() == 1
-                                && array_field.item_type_fields.get(0).unwrap().get_byte_size() == 1
-                            {
-                                return Some(Value::ByteArray(Cow::Borrowed(array)));
-                            } else {
-                                if let Some(Value::Int32(size)) = array_field.array_size.get_value(
-                                    &[],
-                                    endian,
-                                    serialized_file_id,
-                                ) {
-                                    let mut obj_array = vec![];
-                                    let mut reader = Cursor::new(array);
-                                    let options = ReadOptions::new(endian.clone());
-
-                                    if array_field.item_type_fields.len() == 1 {
-                                        let item_type_field =
-                                            array_field.item_type_fields.get(0).unwrap();
-                                        match item_type_field.get_type().as_str() {
-                                            "float" => {
-                                                let array = <Vec<f32>>::read_options(
-                                                    &mut reader,
-                                                    &options,
-                                                    VecArgs {
-                                                        count: size as usize,
-                                                        inner: (),
-                                                    },
-                                                )
-                                                .ok()?;
-                                                return Some(Value::FloatArray(array));
-                                            }
-                                            &_ => (),
-                                        }
-                                        match item_type_field.get_byte_size() {
-                                            2 => {
-                                                let array = <Vec<u16>>::read_options(
-                                                    &mut reader,
-                                                    &options,
-                                                    VecArgs {
-                                                        count: size as usize,
-                                                        inner: (),
-                                                    },
-                                                )
-                                                .ok()?;
-                                                return Some(Value::UInt16Array(array));
-                                            }
-                                            4 => {
-                                                let array = <Vec<u32>>::read_options(
-                                                    &mut reader,
-                                                    &options,
-                                                    VecArgs {
-                                                        count: size as usize,
-                                                        inner: (),
-                                                    },
-                                                )
-                                                .ok()?;
-                                                return Some(Value::UInt32Array(array));
-                                            }
-                                            8 => {
-                                                let array = <Vec<u64>>::read_options(
-                                                    &mut reader,
-                                                    &options,
-                                                    VecArgs {
-                                                        count: size as usize,
-                                                        inner: (),
-                                                    },
-                                                )
-                                                .ok()?;
-                                                return Some(Value::UInt64Array(array));
-                                            }
-                                            _ => (),
-                                        }
-                                    }
-                                    let class_args = TypeTreeObjectBinReadClassArgs::new(
-                                        0,
-                                        array_field.item_type_fields.clone(),
-                                    );
-                                    let args = TypeTreeObjectBinReadArgs::new(
-                                        serialized_file_id,
-                                        class_args,
-                                    );
-                                    for _ in 0..size {
-                                        obj_array.push(
-                                            TypeTreeObject::read_options(
-                                                &mut reader,
-                                                &options,
-                                                args.clone(),
-                                            )
-                                            .ok()?,
-                                        )
-                                    }
-                                    return Some(Value::Array(obj_array));
-                                }
-                            }
-                        }
-                    }
-                    FieldValue::Fields(array_object) => {
-                        if array_object.len() > 0 {
-                            let array = array_object
-                                .into_iter()
-                                .map(|f| TypeTreeObject {
-                                    endian: endian.clone(),
-                                    class_id: 0,
-                                    serialized_file_id,
-                                    data: f.clone(),
-                                })
-                                .collect();
-                            return Some(Value::Array(array));
-                        }
-                    }
-                    _ => (),
-                },
-                FieldValue::Fields(fields) => {
-                    if "string" == self.field_type.get_type() {
-                        if let Some(array) = fields.get(0) {
-                            if let Some(data) = array.get_sized_array_buff() {
-                                if let Ok(s) = String::from_utf8(data.to_vec()) {
-                                    return Some(Value::String(s));
-                                }
-                            }
-                        }
-                    }
-                    return Some(Value::Object(TypeTreeObject {
-                        endian: endian.clone(),
-                        class_id: 0,
-                        serialized_file_id,
-                        data: self.clone(),
-                    }));
-                }
-            }
+            return Some(self);
         } else {
             match &self.data {
                 FieldValue::Fields(fields) => {
                     if let Some((name, path)) = path.split_first() {
-                        for field in fields {
-                            if name == field.get_name() {
-                                return field.get_value(path, endian, serialized_file_id);
-                            }
+                        if let Some(field) = fields.get(name) {
+                            return field.get_field(path);
                         }
                     }
                 }
                 FieldValue::Array(_array) => (),
                 _ => (),
-            }
-        }
-        None
-    }
-
-    fn get_sized_array_buff(&self) -> Option<Cow<Vec<u8>>> {
-        if let FieldValue::Array(array) = &self.data {
-            if let FieldValue::Data(array_data) = &array.data {
-                return Some(Cow::Borrowed(&array_data));
             }
         }
         None
@@ -376,7 +541,7 @@ impl TypeTreeObject {
         self.endian.clone()
     }
 
-    pub fn get_value_by_path(&self, path: &str) -> Option<Value> {
+    pub fn get_field_by_path(&self, path: &str) -> Option<&Field> {
         let path: Vec<String> = path
             .split("/")
             .filter(|s| !s.is_empty())
@@ -385,71 +550,43 @@ impl TypeTreeObject {
         if path.len() < 1 {
             return None;
         }
-        self.data
-            .get_value(&path[1..], &self.endian, self.serialized_file_id)
+        self.data.get_field(&path[1..])
+    }
+
+    pub fn get_field_cast_args(&self) -> FieldCastArgs {
+        FieldCastArgs {
+            endian: self.endian.clone(),
+            serialized_file_id: self.serialized_file_id,
+        }
     }
 
     pub fn get_string_by_path(&self, path: &str) -> Option<String> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::String(s) = v {
-                return Some(s);
-            }
-        }
-        None
+        String::try_cast_from(self, path).ok()
     }
 
     pub fn get_byte_array_by_path(&self, path: &str) -> Option<Cow<Vec<u8>>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::ByteArray(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        // <Cow<Vec<u8>>>::try_cast_from(self, path).ok()
+        todo!()
     }
 
     pub fn get_array_object_by_path(&self, path: &str) -> Option<Vec<TypeTreeObject>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::Array(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        <Vec<TypeTreeObject>>::try_cast_from(self, path).ok()
     }
 
     pub fn get_array_float_by_path(&self, path: &str) -> Option<Vec<f32>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::FloatArray(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        <Vec<f32>>::try_cast_from(self, path).ok()
     }
 
     pub fn get_array_uint16_by_path(&self, path: &str) -> Option<Vec<u16>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::UInt16Array(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        <Vec<u16>>::try_cast_from(self, path).ok()
     }
 
     pub fn get_array_uint32_by_path(&self, path: &str) -> Option<Vec<u32>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::UInt32Array(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        <Vec<u32>>::try_cast_from(self, path).ok()
     }
 
     pub fn get_array_uint64_by_path(&self, path: &str) -> Option<Vec<u64>> {
-        if let Some(v) = self.get_value_by_path(path) {
-            if let Value::UInt64Array(ao) = v {
-                return Some(ao);
-            }
-        }
-        None
+        <Vec<u64>>::try_cast_from(self, path).ok()
     }
 
     pub fn get_string_key_map_by_path(
@@ -473,124 +610,94 @@ impl TypeTreeObject {
     }
 
     pub fn get_bool_by_path(&self, path: &str) -> Option<bool> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Bool(i) => Some(i),
-                _ => None,
-            };
-        }
-        None
+        <bool>::try_cast_from(self, path).ok()
     }
 
     pub fn get_float_by_path(&self, path: &str) -> Option<f32> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Float(i) => Some(i),
-                _ => None,
-            };
-        }
-        None
+        <f32>::try_cast_from(self, path).ok()
     }
 
     pub fn get_double_by_path(&self, path: &str) -> Option<f64> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Double(i) => Some(i),
-                _ => None,
-            };
-        }
-        None
+        <f64>::try_cast_from(self, path).ok()
     }
 
     pub fn get_int_by_path(&self, path: &str) -> Option<i64> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Int8(i) => Some(i as i64),
-                Value::Int16(i) => Some(i as i64),
-                Value::Int32(i) => Some(i as i64),
-                Value::Int64(i) => Some(i as i64),
-                _ => None,
-            };
-        }
-        None
+        // if let Some(v) = self.get_value_by_path(path) {
+        //     return match v {
+        //         Value::Int8(i) => Some(i as i64),
+        //         Value::Int16(i) => Some(i as i64),
+        //         Value::Int32(i) => Some(i as i64),
+        //         Value::Int64(i) => Some(i as i64),
+        //         _ => None,
+        //     };
+        // }
+        todo!()
     }
 
     pub fn get_uint_by_path(&self, path: &str) -> Option<u64> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::UInt8(i) => Some(i as u64),
-                Value::UInt16(i) => Some(i as u64),
-                Value::UInt32(i) => Some(i as u64),
-                Value::UInt64(i) => Some(i as u64),
-                _ => None,
-            };
-        }
-        None
+        // if let Some(v) = self.get_value_by_path(path) {
+        //     return match v {
+        //         Value::UInt8(i) => Some(i as u64),
+        //         Value::UInt16(i) => Some(i as u64),
+        //         Value::UInt32(i) => Some(i as u64),
+        //         Value::UInt64(i) => Some(i as u64),
+        //         _ => None,
+        //     };
+        // }
+        todo!()
     }
 
     pub fn get_object_by_path(&self, path: &str) -> Option<TypeTreeObject> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Object(inner) => Some(inner),
-                _ => None,
-            };
-        }
-        None
+        <TypeTreeObject>::try_cast_from(self, path).ok()
     }
 
     pub fn get_quat_by_path(&self, path: &str) -> Option<glam::Quat> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Object(inner) => Some([0f32; 4])
-                    .and_then(|_a| {
-                        inner
-                            .get_float_by_path("/Base/x")
-                            .and_then(|x| Some([x, 0.0, 0.0, 0.0]))
-                    })
-                    .and_then(|a| {
-                        inner
-                            .get_float_by_path("/Base/y")
-                            .and_then(|y| Some([a[0], y, 0.0, 0.0]))
-                    })
-                    .and_then(|a| {
-                        inner
-                            .get_float_by_path("/Base/z")
-                            .and_then(|z| Some([a[0], a[1], z, 0.0]))
-                    })
-                    .and_then(|a| {
-                        inner
-                            .get_float_by_path("/Base/w")
-                            .and_then(|w| Some([a[0], a[1], a[2], w]))
-                    })
-                    .and_then(|a| Some(glam::Quat::from_array(a))),
-                _ => None,
-            };
+        if let Some(inner) = self.get_object_by_path(path) {
+            return Some([0f32; 4])
+                .and_then(|_a| {
+                    inner
+                        .get_float_by_path("/Base/x")
+                        .and_then(|x| Some([x, 0.0, 0.0, 0.0]))
+                })
+                .and_then(|a| {
+                    inner
+                        .get_float_by_path("/Base/y")
+                        .and_then(|y| Some([a[0], y, 0.0, 0.0]))
+                })
+                .and_then(|a| {
+                    inner
+                        .get_float_by_path("/Base/z")
+                        .and_then(|z| Some([a[0], a[1], z, 0.0]))
+                })
+                .and_then(|a| {
+                    inner
+                        .get_float_by_path("/Base/w")
+                        .and_then(|w| Some([a[0], a[1], a[2], w]))
+                })
+                .and_then(|a| Some(glam::Quat::from_array(a)));
         }
         None
     }
 
     pub fn get_vec3f_by_path(&self, path: &str) -> Option<glam::Vec3> {
-        if let Some(v) = self.get_value_by_path(path) {
-            return match v {
-                Value::Object(inner) => Some([0f32; 3])
-                    .and_then(|_a| {
-                        inner
-                            .get_float_by_path("/Base/x")
-                            .and_then(|x| Some([x, 0.0, 0.0]))
-                    })
-                    .and_then(|a| {
-                        inner
-                            .get_float_by_path("/Base/y")
-                            .and_then(|y| Some([a[0], y, 0.0]))
-                    })
-                    .and_then(|a| {
-                        inner
-                            .get_float_by_path("/Base/z")
-                            .and_then(|z| Some([a[0], a[1], z]))
-                    })
-                    .and_then(|a| Some(glam::Vec3::from_array(a))),
-                _ => None,
-            };
+        if let Some(inner) = self.get_object_by_path(path) {
+            return Some([0f32; 3])
+                .and_then(|_a| {
+                    inner
+                        .get_float_by_path("/Base/x")
+                        .and_then(|x| Some([x, 0.0, 0.0]))
+                })
+                .and_then(|a| {
+                    inner
+                        .get_float_by_path("/Base/y")
+                        .and_then(|y| Some([a[0], y, 0.0]))
+                })
+                .and_then(|a| {
+                    inner
+                        .get_float_by_path("/Base/z")
+                        .and_then(|z| Some([a[0], a[1], z]))
+                })
+                .and_then(|a| Some(glam::Vec3::from_array(a)));
         }
         None
     }
@@ -719,7 +826,7 @@ impl BinRead for TypeTreeObject {
                             ArrayField {
                                 array_size: size_field,
                                 item_type_fields,
-                                data: FieldValue::Fields(array),
+                                data: FieldValue::ArrayFields(array),
                             }
                             .into(),
                         ),
@@ -728,11 +835,12 @@ impl BinRead for TypeTreeObject {
                 }
             } else if let Some(next_field) = type_fields.get(*field_index + 1) {
                 if next_field.get_level() == field_level + 1 {
-                    let mut fields = Vec::new();
+                    let mut fields = HashMap::new();
                     while let Some(next_field) = type_fields.get(*field_index + 1) {
                         if next_field.get_level() == field_level + 1 {
                             *field_index += 1;
-                            fields.push(read(reader, options, type_fields, field_index)?);
+                            let field_data = read(reader, options, type_fields, field_index)?;
+                            fields.insert(field_data.get_name().clone(), field_data);
                         } else if next_field.get_level() <= field_level {
                             break;
                         } else {

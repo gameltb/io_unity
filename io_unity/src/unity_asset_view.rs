@@ -223,7 +223,10 @@ impl UnityAssetViewer {
         None
     }
 
-    pub fn get_unity_fs_by_serialized_file(&self, serialized_file: &SerializedFile) -> Option<&UnityFS> {
+    pub fn get_unity_fs_by_serialized_file(
+        &self,
+        serialized_file: &SerializedFile,
+    ) -> Option<&UnityFS> {
         if let Some(unity_fs_id) = self
             .serialized_file_to_unity_fs_map
             .get(&serialized_file.get_serialized_file_id())

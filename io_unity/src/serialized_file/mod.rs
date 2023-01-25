@@ -478,7 +478,9 @@ impl SerializedFile {
                         .map_err(|err| {
                             anyhow!(format!(
                                 "error while read object.data_offset: {} object : {:?} error : {}",
-                                self.content.get_data_offset(), obj, err
+                                self.content.get_data_offset(),
+                                obj,
+                                err
                             ))
                         }),
                 )
@@ -554,7 +556,7 @@ pub trait Serialized: fmt::Debug {
                 apos - (self.get_data_offset() + obj.byte_start),
                 obj.byte_size,
                 obj.class
-            )
+            );
         }
         Ok(type_tree_object)
     }

@@ -1,7 +1,15 @@
 extern crate io_unity;
+#[macro_use]
+extern crate anyhow;
 
 use clap::{arg, Parser, Subcommand};
+use io_unity::classes::p_ptr::PPtr;
+use io_unity::classes::texture2d::Texture2D;
+use io_unity::type_tree::TryCastFrom;
 use std::collections::HashSet;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Write};
+use std::path::PathBuf;
 
 use io_unity::{
     classes::ClassIDType, type_tree::type_tree_json::set_info_json_tar_path,
@@ -16,7 +24,13 @@ use io_unity::*;
 pub struct Args {
     /// The dir contain AssetBundle files.
     #[arg(short, long)]
-    bundle_dir: String,
+    bundle_dir: Option<String>,
+    /// The dir contain data files.
+    #[arg(short, long)]
+    data_dir: Option<String>,
+    /// The serialized file.
+    #[arg(short, long)]
+    serialized_file: Option<String>,
     /// The tar zstd compressed file contain type tree info json files
     /// for read file without typetree info.
     /// see https://github.com/DaZombieKiller/TypeTreeDumper
@@ -43,7 +57,7 @@ pub enum Commands {
     Extract {
         /// filter path
         #[arg(value_parser)]
-        filter_path: String,
+        filter_path: Option<String>,
     },
 }
 
@@ -57,8 +71,17 @@ fn main() -> anyhow::Result<()> {
     let time = std::time::Instant::now();
 
     let mut unity_asset_viewer = UnityAssetViewer::new();
-    unity_asset_viewer.read_data_dir(args.bundle_dir)?;
-
+    if let Some(bundle_dir) = args.bundle_dir {
+        unity_asset_viewer.read_bundle_dir(bundle_dir)?;
+    }
+    if let Some(data_dir) = args.data_dir {
+        unity_asset_viewer.read_data_dir(data_dir)?;
+    }
+    if let Some(serialized_file) = args.serialized_file {
+        let file = OpenOptions::new().read(true).open(serialized_file).unwrap();
+        unity_asset_viewer
+            .add_serialized_file(Box::new(BufReader::new(file)), Some(".".to_owned()))?;
+    }
     println!("Read use {:?}", time.elapsed());
 
     match &args.command {
@@ -74,28 +97,130 @@ fn main() -> anyhow::Result<()> {
             }
 
             let mut object_types = HashSet::new();
+            let mut mono_behaviour_calss_types = HashSet::new();
             for (_, sf) in &unity_asset_viewer.serialized_file_map {
                 for (pathid, obj) in sf.get_object_map() {
-                    if obj.class == ClassIDType::Texture2D {
-                        if let Some(classes::Class::Texture2D(_tex)) =
-                            sf.get_object_by_path_id(pathid.to_owned()).unwrap()
-                        {
-                            // println!("{:#?}", &tex);
+                    if obj.class == ClassIDType::MonoScript {
+                        // let tt_o = sf.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
+                        // println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
+                        // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
+                        // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
+                        // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
+                    } else if obj.class == ClassIDType::MonoBehaviour {
+                        let obj = sf
+                            .get_tt_object_by_path_id(*pathid)
+                            .map_err(|err| {
+                                let fs_path = unity_asset_viewer
+                                    .get_unity_fs_by_serialized_file(&sf)
+                                    .and_then(|fs| {
+                                        dump_unity_fs(fs);
+                                        fs.resource_search_path.clone()
+                                    });
+
+                                anyhow!(format!(
+                                    "error while read. fs_path : {:?} sf_path: {:?} error : {}",
+                                    fs_path, sf.resource_search_path, err
+                                ))
+                            })
+                            .unwrap()
+                            .unwrap();
+
+                        if let Some(pptr_o) = obj.get_object_by_path("/Base/m_Script") {
+                            let script_pptr = PPtr::new(pptr_o);
+                            if let Some(script) =
+                                script_pptr.get_type_tree_object_in_view(&unity_asset_viewer)?
+                            {
+                                // println!("\t{:?}", script.get_string_by_path("/Base/m_ClassName"));
+                                if let Some(class_name) =
+                                    script.get_string_by_path("/Base/m_ClassName")
+                                {
+                                    mono_behaviour_calss_types.insert(class_name);
+                                }
+                            }
                         }
-                    } else if obj.class == ClassIDType::MonoScript {
-                        let tt_o = sf.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
-                        println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
-                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
-                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
-                        println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
                     }
+
                     object_types.insert(obj.class.clone());
                 }
             }
             println!("object_types : {:?}", object_types);
+            println!(
+                "mono_behaviour_calss_types : {:?}",
+                mono_behaviour_calss_types
+            );
         }
-        Commands::Extract { filter_path: _ } => {}
+        Commands::Extract { filter_path: _ } => {
+            for (_, sf) in &unity_asset_viewer.serialized_file_map {
+                for (path_id, obj_meta) in sf.get_object_map() {
+                    let obj = sf
+                        .get_tt_object_by_path_id(*path_id)
+                        .map_err(|err| {
+                            let fs_path = unity_asset_viewer
+                                .get_unity_fs_by_serialized_file(&sf)
+                                .and_then(|fs| {
+                                    dump_unity_fs(fs);
+                                    fs.resource_search_path.clone()
+                                });
+
+                            anyhow!(format!(
+                                "error while read. fs_path : {:?} sf_path: {:?} error : {}",
+                                fs_path, sf.resource_search_path, err
+                            ))
+                        })
+                        .unwrap()
+                        .unwrap();
+
+                    if let Ok(name) = String::try_cast_from(&obj, "/Base/m_Name") {
+                        println!("name {}", name);
+                        if obj_meta.class == ClassIDType::Texture2D {
+                            let tex = Texture2D::new(obj);
+
+                            let out_tex_path_base =
+                                "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap();
+                            let mut out_tex_path = out_tex_path_base.clone();
+                            let mut i = 0;
+                            while PathBuf::from(out_tex_path.clone() + ".png").exists() {
+                                out_tex_path = format!("{}.{}", out_tex_path_base, i);
+                                i += 1;
+                            }
+                            tex.get_image(&unity_asset_viewer)
+                                .and_then(|dynimg| Ok(dynimg.flipv().save(out_tex_path + ".png")));
+                        } else if obj_meta.class == ClassIDType::TextAsset {
+                            if let Some(script) = obj.get_string_by_path("/Base/m_Script") {
+                                let mut file =
+                                    File::create("/tmp/tex/".to_string() + &name + ".txt").unwrap();
+                                file.write_all(script.as_bytes());
+                            }
+                        } else if obj_meta.class == ClassIDType::AssetBundle
+                            || obj_meta.class == ClassIDType::Material
+                            || obj_meta.class == ClassIDType::GameObject
+                            || obj_meta.class == ClassIDType::MonoBehaviour
+                            || obj_meta.class == ClassIDType::AudioClip
+                            || obj_meta.class == ClassIDType::Mesh
+                        {
+                        } else {
+                            obj.display_tree();
+                            panic!()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
+}
+
+fn dump_unity_fs(unity_fs: &UnityFS) {
+    for file in unity_fs.get_file_paths() {
+        if let Ok(file_buff) = unity_fs.get_file_by_path(&file) {
+            let file_name = PathBuf::from(file)
+                .file_stem()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            let mut file = File::create(file_name).unwrap();
+            file.write_all(&*file_buff);
+        }
+    }
 }
