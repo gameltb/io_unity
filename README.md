@@ -9,7 +9,7 @@ tar zstd compressed file contain type tree info json files
 for read file without typetree info.
 see https://github.com/DaZombieKiller/TypeTreeDumper
 and https://github.com/AssetRipper/TypeTreeDumps.  
-File can create by InfoJson in TypeTreeDumps
+File can create by InfoJson in TypeTreeDumps use
 
 ```sh
 tar -caf InfoJson.tar.zst InfoJson
