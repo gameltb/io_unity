@@ -2,6 +2,7 @@ use super::AudioClipObject;
 use crate::classes::named_object;
 use crate::classes::named_object::NamedObjectObject;
 use crate::def_type_tree_class;
+use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
 use binrw::binrw;
@@ -47,15 +48,15 @@ impl AudioClipObject for AudioClip<'_> {
 
 impl AudioClip<'_> {
     fn get_resource_source(&self) -> Option<String> {
-        self.inner.get_string_by_path("/Base/m_Resource/m_Source")
+        String::try_cast_from(&self.inner, "/Base/m_Resource/m_Source").ok()
     }
 
     fn get_resource_offset(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/m_Resource/m_Offset")
+        u64::try_cast_from(&self.inner, "/Base/m_Resource/m_Offset").ok()
     }
 
     fn get_resource_size(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/m_Resource/m_Size")
+        u64::try_cast_from(&self.inner, "/Base/m_Resource/m_Size").ok()
     }
 }
 

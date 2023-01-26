@@ -1,11 +1,12 @@
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashMap};
-use std::fs::File;
 
 use std::sync::{Arc, Mutex};
 use tar::Archive;
 
-use super::{TypeField, TypeTreeObjectBinReadClassArgs};
+use crate::UnityResource;
+
+use super::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 
 mod InfoJson {
     #![allow(non_snake_case)]
@@ -111,8 +112,8 @@ impl TypeField for TypeTreeNode {
     }
 }
 
-static INFO_JSON_TAR_PATH: Lazy<Mutex<String>> =
-    Lazy::new(|| Mutex::new("InfoJson.tar.zst".to_owned()));
+static INFO_JSON_TAR_READER: Lazy<Mutex<Option<Box<dyn UnityResource + Send + Sync>>>> =
+    Lazy::new(|| Mutex::new(None));
 static INFO_JSON_CACHE_MAP: Lazy<Mutex<HashMap<String, InfoJson::InfoJson>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static TYPE_TREE_OBJECT_BIN_READ_CLASS_ARGS_CACHE_MAP: Lazy<
@@ -127,28 +128,30 @@ static TYPE_TREE_OBJECT_BIN_READ_CLASS_ARGS_CACHE_MAP: Lazy<
 /// or "tar -c InfoJson | zstd --ultra -22 -o InfoJson.tar.zst"  
 /// whitch can be less then 5MiB.
 /// contain file path like /InfoJson/x.x.x.json.
-pub fn set_info_json_tar_path(path: String) {
-    if let Ok(mut info_json_tar_path) = INFO_JSON_TAR_PATH.lock() {
-        *info_json_tar_path = path
+pub fn set_info_json_tar_reader(reader: Box<dyn UnityResource + Send + Sync>) {
+    if let Ok(mut info_json_tar_reader) = INFO_JSON_TAR_READER.lock() {
+        *info_json_tar_reader = Some(reader)
     }
 }
 
 fn read_info_json_by_version(version: &String) -> anyhow::Result<InfoJson::InfoJson> {
-    if let Ok(info_json_tar_path) = INFO_JSON_TAR_PATH.lock() {
-        let tar_file = File::open(&*info_json_tar_path)?;
-        let tar_reader = zstd::stream::read::Decoder::new(tar_file)?;
-        let mut tar = Archive::new(tar_reader);
+    if let Ok(mut info_json_tar_reader) = INFO_JSON_TAR_READER.lock() {
+        if let Some(ref mut info_json_tar_reader) = &mut *info_json_tar_reader {
+            info_json_tar_reader.seek(std::io::SeekFrom::Start(0))?;
+            let tar_reader = zstd::stream::read::Decoder::new(&mut *info_json_tar_reader)?;
+            let mut tar = Archive::new(tar_reader);
 
-        let json_path = format!("InfoJson/{}.json", version);
+            let json_path = format!("InfoJson/{}.json", version);
 
-        for file in tar.entries()? {
-            let file = file?;
+            for file in tar.entries()? {
+                let file = file?;
 
-            if let Some(path) = file.header().path()?.to_str() {
-                if path == &json_path {
-                    // files implement the Read trait
-                    let info_json: InfoJson::InfoJson = serde_json::from_reader(file)?;
-                    return Ok(info_json);
+                if let Some(path) = file.header().path()?.to_str() {
+                    if path == &json_path {
+                        // files implement the Read trait
+                        let info_json: InfoJson::InfoJson = serde_json::from_reader(file)?;
+                        return Ok(info_json);
+                    }
                 }
             }
         }

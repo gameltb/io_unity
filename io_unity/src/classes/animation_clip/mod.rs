@@ -1,6 +1,7 @@
 pub mod type_tree;
 pub mod version_2018_3_0;
 
+use crate::type_tree::convert::TryCastFrom;
 use crate::{
     def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata,
 };
@@ -99,7 +100,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
     let end_pos = reader.seek(SeekFrom::End(0))?;
     reader.seek(SeekFrom::Start(0))?;
     while end_pos > reader.seek(SeekFrom::Current(0))? {
-        streamed_frames.push(StreamedFrame::read_le(reader)?)
+        streamed_frames.push(StreamedFrame::read_ne(reader)?)
     }
     let streamed_frames_copy = streamed_frames.clone();
     for (frame_index, streamed_frame) in streamed_frames.iter_mut().enumerate() {
@@ -122,7 +123,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
 }
 
 pub fn streamed_clip_read_u32_buff(u32_buff: &Vec<u32>) -> anyhow::Result<Vec<StreamedFrame>> {
-    let byte_buff_list: Vec<[u8; 4]> = u32_buff.iter().map(|u| u.to_le_bytes()).collect();
+    let byte_buff_list: Vec<[u8; 4]> = u32_buff.iter().map(|u| u.to_ne_bytes()).collect();
     let streamed_clip_buff = byte_buff_list.concat();
     let mut streamed_clip_buff_reader = Cursor::new(streamed_clip_buff);
     streamed_clip_read_data(&mut streamed_clip_buff_reader)
@@ -133,23 +134,26 @@ pub fn animation_clip_binding_constant_find_binding(
     index: usize,
 ) -> Option<TypeTreeObject> {
     let mut curves = 0;
-    for b in animation_clip_binding_constant
-        .get_array_object_by_path("/Base/genericBindings/Array")
-        .unwrap()
+    for b in <Vec<TypeTreeObject>>::try_cast_from(
+        animation_clip_binding_constant,
+        "/Base/genericBindings/Array",
+    )
+    .unwrap()
     {
-        curves += if b.get_int_by_path("/Base/typeID").unwrap() == ClassIDType::Transform as i64 {
-            // 1 kBindTransformPosition
-            // 2 kBindTransformRotation
-            // 3 kBindTransformScale
-            // 4 kBindTransformEuler
-            match b.get_uint_by_path("/Base/attribute").unwrap() {
-                1 | 3 | 4 => 3,
-                2 => 4,
-                _ => 1,
-            }
-        } else {
-            1
-        };
+        curves +=
+            if i64::try_cast_from(&b, "/Base/typeID").unwrap() == ClassIDType::Transform as i64 {
+                // 1 kBindTransformPosition
+                // 2 kBindTransformRotation
+                // 3 kBindTransformScale
+                // 4 kBindTransformEuler
+                match u64::try_cast_from(&b, "/Base/attribute").unwrap() {
+                    1 | 3 | 4 => 3,
+                    2 => 4,
+                    _ => 1,
+                }
+            } else {
+                1
+            };
 
         if curves > index {
             return Some(b);

@@ -2,7 +2,10 @@ pub mod transform;
 pub mod type_tree;
 
 use super::{component, p_ptr::PPtr};
-use crate::{def_unity_class, unity_asset_view::UnityAssetViewer, SerializedFileMetadata};
+use crate::{
+    def_unity_class, type_tree::convert::TryCastFrom, unity_asset_view::UnityAssetViewer,
+    SerializedFileMetadata,
+};
 use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
 use crc::{Crc, CRC_32_ISO_HDLC};
 use glam::Mat4;
@@ -64,10 +67,10 @@ pub fn get_transform_path(
         if let Some(father) = father.get_type_tree_object_in_view(viewer)? {
             return Ok(get_transform_path(viewer, &Transform::new(father))?
                 + "/"
-                + &game_object.get_string_by_path("/Base/m_Name").unwrap());
+                + &String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
         }
     } else {
-        return Ok(game_object.get_string_by_path("/Base/m_Name").unwrap());
+        return Ok(String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
     }
     Ok(String::default())
 }

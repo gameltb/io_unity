@@ -1,6 +1,8 @@
 use super::{Texture2DObject, TextureFormat};
 use crate::classes::named_object::{self, NamedObjectObject};
 use crate::def_type_tree_class;
+use crate::type_tree::convert::TryCastFrom;
+use crate::type_tree::convert::TryCastRefFrom;
 use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
 use num_enum::TryFromPrimitive;
@@ -51,33 +53,32 @@ impl Texture2DObject for Texture2D<'_> {
 
 impl Texture2D<'_> {
     fn get_width(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_Width")
+        i64::try_cast_from(&self.inner, "/Base/m_Width").ok()
     }
 
     fn get_height(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_Height")
+        i64::try_cast_from(&self.inner, "/Base/m_Height").ok()
     }
 
     fn get_texture_format(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_TextureFormat")
+        i64::try_cast_from(&self.inner, "/Base/m_TextureFormat").ok()
     }
 
     fn get_image_data(&self) -> Option<Cow<Vec<u8>>> {
-        if let Some(data) = self.inner.get_byte_array_by_path("/Base/image data") {
-            return Some(data);
-        }
-        None
+        Some(Cow::Borrowed(
+            <Vec<u8>>::try_cast_as_from(&self.inner, "/Base/image data").ok()?,
+        ))
     }
 
     fn get_stream_data_path(&self) -> Option<String> {
-        self.inner.get_string_by_path("/Base/m_StreamData/path")
+        String::try_cast_from(&self.inner, "/Base/m_StreamData/path").ok()
     }
 
     fn get_stream_data_offset(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/m_StreamData/offset")
+        u64::try_cast_from(&self.inner, "/Base/m_StreamData/offset").ok()
     }
 
     fn get_stream_data_size(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/m_StreamData/size")
+        u64::try_cast_from(&self.inner, "/Base/m_StreamData/size").ok()
     }
 }

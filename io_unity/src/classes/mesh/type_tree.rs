@@ -5,6 +5,9 @@ use super::version_2020_0_0::{get_format_size, ChannelType, VertexFormat};
 use super::{BoneWeights, MeshObject, StreamBuff};
 use crate::classes::named_object::{self, NamedObjectObject};
 use crate::def_type_tree_class;
+use crate::type_tree::convert::TryCastFrom;
+use crate::type_tree::convert::TryCastRefFrom;
+
 use crate::type_tree::TypeTreeObject;
 use binrw::{BinRead, ReadOptions, VecArgs};
 use supercow::Supercow;
@@ -164,23 +167,24 @@ impl MeshObject for Mesh<'_> {
 
 impl Mesh<'_> {
     pub fn get_sub_meshes(&self) -> Option<Vec<SubMesh>> {
-        self.inner
-            .get_array_object_by_path("/Base/m_SubMeshes/Array")
+        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_SubMeshes/Array")
+            .ok()
             .and_then(|f| Some(f.into_iter().map(|i| SubMesh::new(i)).collect()))
     }
 
     pub fn get_index_format(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_IndexFormat")
+        i64::try_cast_from(&self.inner, "/Base/m_IndexFormat").ok()
     }
 
     pub fn get_index_buffer(&self) -> Option<Cow<Vec<u8>>> {
-        self.inner
-            .get_byte_array_by_path("/Base/m_IndexBuffer/Array")
+        Some(Cow::Borrowed(
+            <Vec<u8>>::try_cast_as_from(&self.inner, "/Base/m_IndexBuffer/Array").ok()?,
+        ))
     }
 
     pub fn get_vertex_data(&self) -> Option<VertexData> {
-        self.inner
-            .get_object_by_path("/Base/m_VertexData")
+        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_VertexData")
+            .ok()
             .and_then(|f| Some(VertexData::new(f)))
     }
 }
@@ -189,16 +193,16 @@ def_type_tree_class!(SubMesh);
 
 impl SubMesh<'_> {
     pub fn get_first_byte(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/firstByte")
+        u64::try_cast_from(&self.inner, "/Base/firstByte").ok()
     }
     pub fn get_index_count(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/indexCount")
+        u64::try_cast_from(&self.inner, "/Base/indexCount").ok()
     }
     pub fn get_first_vertex(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/firstVertex")
+        u64::try_cast_from(&self.inner, "/Base/firstVertex").ok()
     }
     pub fn get_vertex_count(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/vertexCount")
+        u64::try_cast_from(&self.inner, "/Base/vertexCount").ok()
     }
 }
 
@@ -207,34 +211,36 @@ def_type_tree_class!(Channel);
 
 impl Channel<'_> {
     pub fn get_stream(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/stream")
+        u64::try_cast_from(&self.inner, "/Base/stream").ok()
     }
     pub fn get_offset(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/offset")
+        u64::try_cast_from(&self.inner, "/Base/offset").ok()
     }
     pub fn get_format(&self) -> Option<VertexFormat> {
-        self.inner
-            .get_uint_by_path("/Base/format")
-            .and_then(|t| VertexFormat::try_from(t as u8).ok())
+        u8::try_cast_from(&self.inner, "/Base/format")
+            .ok()
+            .and_then(|t| VertexFormat::try_from(t).ok())
     }
     pub fn get_dimension(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/dimension")
+        u64::try_cast_from(&self.inner, "/Base/dimension").ok()
     }
 }
 
 impl VertexData<'_> {
     pub fn get_channels(&self) -> Option<Vec<Channel>> {
-        self.inner
-            .get_array_object_by_path("/Base/m_Channels/Array")
+        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Channels/Array")
+            .ok()
             .and_then(|f| Some(f.into_iter().map(|i| Channel::new(i)).collect()))
     }
 
     pub fn get_vertex_count(&self) -> Option<u64> {
-        self.inner.get_uint_by_path("/Base/m_VertexCount")
+        u64::try_cast_from(&self.inner, "/Base/m_VertexCount").ok()
     }
 
     pub fn get_data(&self) -> Option<Cow<Vec<u8>>> {
-        self.inner.get_byte_array_by_path("/Base/m_DataSize")
+        Some(Cow::Borrowed(
+            <Vec<u8>>::try_cast_as_from(&self.inner, "/Base/m_DataSize").ok()?,
+        ))
     }
 }
 

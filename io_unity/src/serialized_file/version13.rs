@@ -7,7 +7,7 @@ use binrw::{binrw, BinResult, NullString, ReadOptions};
 use binrw::{io::Cursor, BinRead};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObjectBinReadClassArgs};
+use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 use crate::until::{binrw_parser::*, Endian};
 use crate::version15::{SerializedType, SerializedTypeBinReadArgs};
 use crate::version17::{FileIdentifier, TypeTreeNode};

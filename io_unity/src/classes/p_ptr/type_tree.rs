@@ -1,5 +1,6 @@
 use super::PPtrObject;
 use crate::def_type_tree_class;
+use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObject;
 use supercow::Supercow;
 
@@ -21,10 +22,10 @@ impl PPtrObject for PPtr<'_> {
 
 impl PPtr<'_> {
     fn get_file_id(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_FileID")
+        i64::try_cast_from(&self.inner, "/Base/m_FileID").ok()
     }
 
     fn get_path_id(&self) -> Option<i64> {
-        self.inner.get_int_by_path("/Base/m_PathID")
+        i64::try_cast_from(&self.inner, "/Base/m_PathID").ok()
     }
 }

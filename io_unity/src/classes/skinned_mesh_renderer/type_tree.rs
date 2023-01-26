@@ -2,6 +2,7 @@ use super::SkinnedMeshRendererObject;
 use crate::classes::p_ptr::PPtr;
 use crate::classes::renderer;
 use crate::def_type_tree_class;
+use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObject;
 use supercow::Supercow;
 
@@ -25,14 +26,14 @@ impl SkinnedMeshRendererObject for SkinnedMeshRenderer<'_> {
 
 impl SkinnedMeshRenderer<'_> {
     pub fn get_mesh(&self) -> Option<PPtr> {
-        self.inner
-            .get_object_by_path("/Base/m_Mesh")
+        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_Mesh")
+            .ok()
             .and_then(|f| Some(PPtr::new(f)))
     }
 
     pub fn get_bones(&self) -> Option<Vec<PPtr>> {
-        self.inner
-            .get_array_object_by_path("/Base/m_Bones/Array")
+        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Bones/Array")
+            .ok()
             .and_then(|f| Some(f.into_iter().map(|i| PPtr::new(i)).collect()))
     }
 }

@@ -49,7 +49,9 @@ use crate::classes::texture2d::Texture2D;
 use crate::classes::transform::Transform;
 use crate::classes::{Class, ClassIDType};
 use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
-use crate::type_tree::{TypeTreeObject, TypeTreeObjectBinReadArgs, TypeTreeObjectBinReadClassArgs};
+use crate::type_tree::{
+    reader::TypeTreeObjectBinReadArgs, reader::TypeTreeObjectBinReadClassArgs, TypeTreeObject,
+};
 use crate::until::{Endian, UnityVersion};
 use crate::UnityResource;
 

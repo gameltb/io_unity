@@ -5,14 +5,15 @@ extern crate anyhow;
 use clap::{arg, Parser, Subcommand};
 use io_unity::classes::p_ptr::PPtr;
 use io_unity::classes::texture2d::Texture2D;
-use io_unity::type_tree::TryCastFrom;
+use io_unity::type_tree::convert::TryCastFrom;
+use io_unity::type_tree::TypeTreeObject;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 
 use io_unity::{
-    classes::ClassIDType, type_tree::type_tree_json::set_info_json_tar_path,
+    classes::ClassIDType, type_tree::type_tree_json::set_info_json_tar_reader,
     unity_asset_view::UnityAssetViewer,
 };
 
@@ -65,7 +66,8 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     if let Some(path) = args.info_json_tar_path {
-        set_info_json_tar_path(path);
+        let tar_file = File::open(path)?;
+        set_info_json_tar_reader(Box::new(BufReader::new(tar_file)));
     }
 
     let time = std::time::Instant::now();
@@ -125,14 +127,14 @@ fn main() -> anyhow::Result<()> {
                             .unwrap()
                             .unwrap();
 
-                        if let Some(pptr_o) = obj.get_object_by_path("/Base/m_Script") {
+                        if let Ok(pptr_o) = TypeTreeObject::try_cast_from(&obj, "/Base/m_Script") {
                             let script_pptr = PPtr::new(pptr_o);
                             if let Some(script) =
                                 script_pptr.get_type_tree_object_in_view(&unity_asset_viewer)?
                             {
                                 // println!("\t{:?}", script.get_string_by_path("/Base/m_ClassName"));
-                                if let Some(class_name) =
-                                    script.get_string_by_path("/Base/m_ClassName")
+                                if let Ok(class_name) =
+                                    String::try_cast_from(&script, "/Base/m_ClassName")
                                 {
                                     mono_behaviour_calss_types.insert(class_name);
                                 }
@@ -186,7 +188,7 @@ fn main() -> anyhow::Result<()> {
                             tex.get_image(&unity_asset_viewer)
                                 .and_then(|dynimg| Ok(dynimg.flipv().save(out_tex_path + ".png")));
                         } else if obj_meta.class == ClassIDType::TextAsset {
-                            if let Some(script) = obj.get_string_by_path("/Base/m_Script") {
+                            if let Ok(script) = String::try_cast_from(&obj, "/Base/m_Script") {
                                 let mut file =
                                     File::create("/tmp/tex/".to_string() + &name + ".txt").unwrap();
                                 file.write_all(script.as_bytes());

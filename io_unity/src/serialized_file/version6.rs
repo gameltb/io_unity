@@ -5,7 +5,7 @@ use std::sync::Arc;
 use binrw::{binrw, NullString};
 
 use crate::classes::ClassIDType;
-use crate::type_tree::{TypeField, TypeTreeObjectBinReadClassArgs};
+use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 use crate::until::Endian;
 use crate::version11::{SerializedType, TypeTree, TypeTreeNode};
 use crate::version17::FileIdentifier;
