@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use io_unity::type_tree::convert::TryCastFrom;
-use pyo3::prelude::*;
+use io_unity::type_tree::convert::{TryCast, TryCastFrom};
+use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
     use io_unity::classes::*;
@@ -54,11 +54,11 @@ pub mod python_unity_class {
 
 use python_unity_class::*;
 
-trait IntoPyObject<T> {
+trait IntoPyResult<T> {
     fn into_py_result(self) -> PyResult<T>;
 }
 
-impl<T, E> IntoPyObject<T> for Result<T, E>
+impl<T, E> IntoPyResult<T> for Result<T, E>
 where
     E: std::fmt::Display,
 {
@@ -67,9 +67,9 @@ where
     }
 }
 
-impl<T> IntoPyObject<T> for Option<T> {
+impl<T> IntoPyResult<T> for Option<T> {
     fn into_py_result(self) -> PyResult<T> {
-        self.ok_or(pyo3::exceptions::PyException::new_err("None"))
+        self.ok_or(pyo3::exceptions::PyException::new_err("Value is None"))
     }
 }
 
@@ -244,8 +244,153 @@ impl UnityAssetViewer {
 
 #[pymethods]
 impl TypeTreeObject {
-    fn get_string(&self, path: String) -> Option<String> {
-        String::try_cast_from(&self.0, path.as_str()).ok()
+    fn get_class_id(&self) -> i32 {
+        self.0.class_id
+    }
+
+    fn display_tree(&self) {
+        self.0.display_tree();
+    }
+
+    fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
+        let field_cast_args = self.0.get_field_cast_args();
+        let field = self
+            .0
+            .get_field_by_name(attr)
+            .ok_or(PyAttributeError::new_err(format!(
+                "field {} cannot found",
+                attr,
+            )))?;
+
+        match field.get_type().as_str() {
+            "string" => {
+                let value: String = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "bool" => {
+                let value: bool = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "SInt8" => {
+                let value: i8 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "SInt16" | "short" => {
+                let value: i16 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "SInt32" | "int" => {
+                let value: i32 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "SInt64" | "long long" => {
+                let value: i64 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "UInt8" | "char" => {
+                let value: u8 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "UInt16" | "unsigned short" => {
+                let value: u16 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "UInt32" | "unsigned int" => {
+                let value: u32 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "UInt64" | "unsigned long long" | "FileSize" => {
+                let value: u64 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "float" => {
+                let value: f32 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            "double" => {
+                let value: f64 = field.try_cast_to(&field_cast_args).map_err(|_| {
+                    PyAttributeError::new_err(format!(
+                        "field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    ))
+                })?;
+                return Ok(value.into_py(py));
+            }
+            &_ => (),
+        }
+
+        Err(PyAttributeError::new_err(format!(
+            "field {} cannot cast. Type: {}",
+            attr,
+            field.get_type().as_str()
+        )))
     }
 }
 

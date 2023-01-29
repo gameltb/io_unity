@@ -39,6 +39,22 @@ cargo run --example live2dextractor -- help
 
 [io_unity_python](io_unity_python/README.md)
 
+```python
+import io_unity_python
+
+uav = io_unity_python.UnityAssetViewer()
+uav.add_bundle_file("BUNDLE FILE PATH")
+
+for objref in uav:
+    obj = uav.deref_object_ref(objref)
+    try:
+        print(obj.m_Name)
+    except AttributeError:
+        pass
+
+print(help(obj))
+```
+
 [simple python](io_unity_python/blender.py) for blender import mesh (skeleton not work)
 
 # simple gui

@@ -25,8 +25,8 @@ pub trait TypeField: Debug {
 pub enum FieldValue {
     Data(Vec<u8>),
     Fields(HashMap<String, Field>),
-    ArrayFields(Vec<Field>),
     Array(Box<ArrayField>),
+    ArrayFields(Vec<Field>),
 }
 
 #[derive(Debug, Clone)]
@@ -44,8 +44,12 @@ pub struct Field {
 }
 
 impl Field {
-    fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &String {
         self.field_type.get_name()
+    }
+
+    pub fn get_type(&self) -> &String {
+        self.field_type.get_type()
     }
 
     fn display_field(&self, p: &String, field_cast_args: &FieldCastArgs) {
@@ -115,7 +119,6 @@ impl Field {
                         }
                     }
                 }
-                FieldValue::Array(_array) => (),
                 _ => (),
             }
         }
@@ -152,6 +155,10 @@ impl TypeTreeObject {
             return None;
         }
         self.data.get_field(&path[1..])
+    }
+
+    pub fn get_field_by_name(&self, name: &str) -> Option<&Field> {
+        self.data.get_field(&vec![name.to_string()])
     }
 
     pub fn get_field_cast_args(&self) -> FieldCastArgs {
