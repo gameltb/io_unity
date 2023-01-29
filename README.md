@@ -1,6 +1,6 @@
 # io_unity
 
-io_unity is a lib for read unity assets, which supports parsing UnityFS file now.(WIP)
+io_unity is a lib for read unity assets, which supports parsing UnityFS file and serialized file.(WIP)
 
 ## Additional type tree
 
@@ -47,6 +47,7 @@ uav.add_bundle_file("BUNDLE FILE PATH")
 
 for objref in uav:
     obj = uav.deref_object_ref(objref)
+    obj.display_tree()
     try:
         print(obj.m_Name)
     except AttributeError:

@@ -26,7 +26,7 @@ pub enum FieldValue {
     Data(Vec<u8>),
     Fields(HashMap<String, Field>),
     Array(Box<ArrayField>),
-    ArrayFields(Vec<Field>),
+    ArrayItems(Vec<Field>),
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +50,18 @@ impl Field {
 
     pub fn get_type(&self) -> &String {
         self.field_type.get_type()
+    }
+
+    pub fn try_get_buff_type_and_type_size(&self) -> Option<(&String, i32)> {
+        if let FieldValue::Array(ar) = &self.data {
+            if let FieldValue::Data(_) = &ar.data {
+                if ar.item_type_fields.len() == 1 {
+                    let item_type = &ar.item_type_fields.get(0).unwrap();
+                    return Some((item_type.get_type(), item_type.get_byte_size()));
+                }
+            }
+        }
+        None
     }
 
     fn display_field(&self, p: &String, field_cast_args: &FieldCastArgs) {
@@ -83,12 +95,12 @@ impl Field {
                 println!("");
                 ar.array_size.display_field(&np, field_cast_args);
                 match &ar.data {
-                    FieldValue::ArrayFields(ai) => {
+                    FieldValue::ArrayItems(ai) => {
                         if let Some(aii) = ai.get(0) {
                             aii.display_field(&np, field_cast_args);
                         }
                     }
-                    FieldValue::Data(_) => {
+                    _ => {
                         for item in &ar.item_type_fields {
                             println!(
                                 "{}/?/{} : {}({}) at level [{}]",
@@ -100,10 +112,9 @@ impl Field {
                             );
                         }
                     }
-                    _ => (),
                 }
             }
-            FieldValue::ArrayFields(_) => todo!(),
+            FieldValue::ArrayItems(_) => (),
         }
     }
 

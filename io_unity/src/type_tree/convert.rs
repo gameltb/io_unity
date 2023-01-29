@@ -313,7 +313,7 @@ impl TryCast<Vec<TypeTreeObject>> for Field {
                     }
                     return Ok(obj_array);
                 }
-                FieldValue::ArrayFields(array_fields) => {
+                FieldValue::ArrayItems(array_fields) => {
                     return Ok(array_fields
                         .iter()
                         .map(|f| TypeTreeObject {
@@ -360,6 +360,34 @@ impl TryCast<Vec<f32>> for Field {
                     let item_type_field = array_field.item_type_fields.get(0).unwrap();
                     if item_type_field.get_type().as_str() == "float" {
                         return <Vec<f32>>::read_options(
+                            &mut Cursor::new(array),
+                            &op,
+                            VecArgs {
+                                count: size as usize,
+                                inner: (),
+                            },
+                        )
+                        .map_err(|_| ());
+                    }
+                }
+            }
+        }
+        Err(())
+    }
+}
+
+impl TryCast<Vec<f64>> for Field {
+    type Error = ();
+
+    fn try_cast_to(&self, field_cast_args: &FieldCastArgs) -> Result<Vec<f64>, Self::Error> {
+        if let FieldValue::Array(array_field) = &self.data {
+            let op = ReadOptions::new(field_cast_args.endian.clone());
+            if let FieldValue::Data(array) = &array_field.data {
+                let size: i32 = array_field.array_size.try_cast_to(field_cast_args)?;
+                if array_field.item_type_fields.len() == 1 {
+                    let item_type_field = array_field.item_type_fields.get(0).unwrap();
+                    if item_type_field.get_type().as_str() == "double" {
+                        return <Vec<f64>>::read_options(
                             &mut Cursor::new(array),
                             &op,
                             VecArgs {

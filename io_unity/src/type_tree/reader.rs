@@ -135,7 +135,7 @@ impl BinRead for TypeTreeObject {
                             ArrayField {
                                 array_size: size_field,
                                 item_type_fields,
-                                data: FieldValue::ArrayFields(array),
+                                data: FieldValue::ArrayItems(array),
                             }
                             .into(),
                         ),

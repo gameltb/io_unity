@@ -1,10 +1,11 @@
 use std::{
+    collections::HashMap,
     fs::{File, OpenOptions},
     io::{BufReader, Cursor},
     path::{Path, PathBuf},
 };
 
-use io_unity::type_tree::convert::{TryCast, TryCastFrom};
+use io_unity::type_tree::convert::{TryCast, TryCastRef};
 use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
@@ -79,6 +80,22 @@ pub struct ObjectRef {
     serialized_file_id: i64,
     path_id: i64,
     class_id_type: io_unity::classes::ClassIDType,
+}
+
+#[pymethods]
+impl ObjectRef {
+    #[new]
+    fn new(serialized_file_id: i64, path_id: i64) -> Self {
+        ObjectRef {
+            serialized_file_id,
+            path_id,
+            class_id_type: io_unity::classes::ClassIDType::Object,
+        }
+    }
+
+    fn get_class_id(&self) -> i32 {
+        self.class_id_type.clone() as i32
+    }
 }
 
 #[pyclass]
@@ -343,7 +360,99 @@ impl TypeTreeObject {
                     .map_err(cast_error_map)?;
                 return Ok(value.into_py(py));
             }
-            &_ => (),
+            "vector" => {
+                let field = self
+                    .0
+                    .get_field_by_path(&("/Base/".to_string() + attr + "/Array"))
+                    .ok_or(PyAttributeError::new_err(format!(
+                        "Array field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    )))?;
+                if let Some((buff_type, size)) = field.try_get_buff_type_and_type_size() {
+                    match buff_type.as_str() {
+                        "float" => {
+                            let value: Vec<f32> = field
+                                .try_cast_to(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.into_py(py));
+                        }
+                        "double" => {
+                            let value: Vec<f64> = field
+                                .try_cast_to(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.into_py(py));
+                        }
+                        &_ => (),
+                    }
+
+                    match size {
+                        1 => {
+                            let value: &Vec<u8> = field
+                                .try_cast_as(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.to_owned().into_py(py));
+                        }
+                        2 => {
+                            let value: Vec<u16> = field
+                                .try_cast_to(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.into_py(py));
+                        }
+                        4 => {
+                            let value: Vec<u32> = field
+                                .try_cast_to(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.into_py(py));
+                        }
+                        8 => {
+                            let value: Vec<u64> = field
+                                .try_cast_to(&field_cast_args)
+                                .map_err(cast_error_map)?;
+                            return Ok(value.into_py(py));
+                        }
+                        _ => (),
+                    }
+
+                    return Err(PyAttributeError::new_err(format!(
+                        "Array field {} cannot cast. Type: {} Item Type : {}",
+                        attr,
+                        field.get_type().as_str(),
+                        buff_type
+                    )));
+                }
+                let value: Vec<io_unity::type_tree::TypeTreeObject> = field
+                    .try_cast_to(&field_cast_args)
+                    .map_err(cast_error_map)?;
+                let value: Vec<TypeTreeObject> =
+                    value.into_iter().map(|obj| TypeTreeObject(obj)).collect();
+                return Ok(value.into_py(py));
+            }
+            "map" => {
+                let field = self
+                    .0
+                    .get_field_by_path(&("/Base/".to_string() + attr + "/Array"))
+                    .ok_or(PyAttributeError::new_err(format!(
+                        "Map field {} cast failed. Type: {}",
+                        attr,
+                        field.get_type().as_str()
+                    )))?;
+                let value: HashMap<String, io_unity::type_tree::TypeTreeObject> = field
+                    .try_cast_to(&field_cast_args)
+                    .map_err(cast_error_map)?;
+                let value: HashMap<String, TypeTreeObject> = value
+                    .into_iter()
+                    .map(|(name, obj)| (name, TypeTreeObject(obj)))
+                    .collect();
+                return Ok(value.into_py(py));
+            }
+            &_ => {
+                let value: io_unity::type_tree::TypeTreeObject = field
+                    .try_cast_to(&field_cast_args)
+                    .map_err(cast_error_map)?;
+                let value = TypeTreeObject(value);
+                return Ok(value.into_py(py));
+            }
         }
 
         Err(PyAttributeError::new_err(format!(
@@ -489,6 +598,7 @@ fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SerializedFile>()?;
     m.add_class::<UnityAssetViewer>()?;
     m.add_class::<TypeTreeObject>()?;
+    m.add_class::<ObjectRef>()?;
 
     #[macro_export]
     macro_rules! add_python_unity_class {
