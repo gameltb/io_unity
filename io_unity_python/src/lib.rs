@@ -360,7 +360,7 @@ impl TypeTreeObject {
                     .map_err(cast_error_map)?;
                 return Ok(value.into_py(py));
             }
-            "vector" => {
+            "vector" | "staticvector" => {
                 let field = self
                     .0
                     .get_field_by_path(&("/Base/".to_string() + attr + "/Array"))
