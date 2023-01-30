@@ -118,7 +118,7 @@ impl Field {
         }
     }
 
-    fn get_field(&self, path: &[String]) -> Option<&Self> {
+    pub fn get_field(&self, path: &[String]) -> Option<&Self> {
         if path.len() == 0 {
             return Some(self);
         } else {
@@ -169,6 +169,9 @@ impl TypeTreeObject {
     }
 
     pub fn get_field_by_name(&self, name: &str) -> Option<&Field> {
+        if name.len() == 0 {
+            return Some(&self.data);
+        }
         self.data.get_field(&vec![name.to_string()])
     }
 

@@ -5,7 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use io_unity::type_tree::convert::{TryCast, TryCastRef};
+use io_unity::type_tree::{
+    convert::{FieldCastArgs, TryCast, TryCastRef},
+    Field,
+};
 use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
@@ -269,6 +272,11 @@ impl TypeTreeObject {
         self.0.display_tree();
     }
 
+    fn get_data_buff(&self) -> Option<Vec<u8>> {
+        let field = self.0.get_field_by_name("")?;
+        Some(field.try_cast_as(&self.0.get_field_cast_args()).ok()?.to_owned())
+    }
+
     fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
         let field_cast_args = self.0.get_field_cast_args();
         let field = self
@@ -279,187 +287,195 @@ impl TypeTreeObject {
                 attr,
             )))?;
 
-        let cast_error_map = |_| {
-            PyAttributeError::new_err(format!(
-                "field {} cast failed. Type: {}",
-                attr,
-                field.get_type().as_str()
-            ))
-        };
+        fn cast_field(
+            py: Python<'_>,
+            field: &Field,
+            field_cast_args: &FieldCastArgs,
+            attr: &str,
+        ) -> PyResult<PyObject> {
+            let cast_error_map = |_| {
+                PyAttributeError::new_err(format!(
+                    "field {} cast failed. Type: {}",
+                    attr,
+                    field.get_type().as_str()
+                ))
+            };
 
-        match field.get_type().as_str() {
-            "string" => {
-                let value: String = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "bool" => {
-                let value: bool = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "SInt8" => {
-                let value: i8 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "SInt16" | "short" => {
-                let value: i16 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "SInt32" | "int" => {
-                let value: i32 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "SInt64" | "long long" => {
-                let value: i64 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "UInt8" | "char" => {
-                let value: u8 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "UInt16" | "unsigned short" => {
-                let value: u16 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "UInt32" | "unsigned int" => {
-                let value: u32 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "UInt64" | "unsigned long long" | "FileSize" => {
-                let value: u64 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "float" => {
-                let value: f32 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "double" => {
-                let value: f64 = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                return Ok(value.into_py(py));
-            }
-            "vector" | "staticvector" => {
-                let field = self
-                    .0
-                    .get_field_by_path(&("/Base/".to_string() + attr + "/Array"))
-                    .ok_or(PyAttributeError::new_err(format!(
-                        "Array field {} cast failed. Type: {}",
-                        attr,
-                        field.get_type().as_str()
-                    )))?;
-                if let Some((buff_type, size)) = field.try_get_buff_type_and_type_size() {
-                    match buff_type.as_str() {
-                        "float" => {
-                            let value: Vec<f32> = field
-                                .try_cast_to(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.into_py(py));
-                        }
-                        "double" => {
-                            let value: Vec<f64> = field
-                                .try_cast_to(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.into_py(py));
-                        }
-                        &_ => (),
-                    }
-
-                    match size {
-                        1 => {
-                            let value: &Vec<u8> = field
-                                .try_cast_as(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.to_owned().into_py(py));
-                        }
-                        2 => {
-                            let value: Vec<u16> = field
-                                .try_cast_to(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.into_py(py));
-                        }
-                        4 => {
-                            let value: Vec<u32> = field
-                                .try_cast_to(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.into_py(py));
-                        }
-                        8 => {
-                            let value: Vec<u64> = field
-                                .try_cast_to(&field_cast_args)
-                                .map_err(cast_error_map)?;
-                            return Ok(value.into_py(py));
-                        }
-                        _ => (),
-                    }
-
-                    return Err(PyAttributeError::new_err(format!(
-                        "Array field {} cannot cast. Type: {} Item Type : {}",
-                        attr,
-                        field.get_type().as_str(),
-                        buff_type
-                    )));
+            match field.get_type().as_str() {
+                "string" => {
+                    let value: String = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
                 }
-                let value: Vec<io_unity::type_tree::TypeTreeObject> = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                let value: Vec<TypeTreeObject> =
-                    value.into_iter().map(|obj| TypeTreeObject(obj)).collect();
-                return Ok(value.into_py(py));
-            }
-            "map" => {
-                let field = self
-                    .0
-                    .get_field_by_path(&("/Base/".to_string() + attr + "/Array"))
-                    .ok_or(PyAttributeError::new_err(format!(
-                        "Map field {} cast failed. Type: {}",
-                        attr,
-                        field.get_type().as_str()
-                    )))?;
-                let value: HashMap<String, io_unity::type_tree::TypeTreeObject> = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                let value: HashMap<String, TypeTreeObject> = value
-                    .into_iter()
-                    .map(|(name, obj)| (name, TypeTreeObject(obj)))
-                    .collect();
-                return Ok(value.into_py(py));
-            }
-            &_ => {
-                let value: io_unity::type_tree::TypeTreeObject = field
-                    .try_cast_to(&field_cast_args)
-                    .map_err(cast_error_map)?;
-                let value = TypeTreeObject(value);
-                return Ok(value.into_py(py));
+                "bool" => {
+                    let value: bool = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "SInt8" => {
+                    let value: i8 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "SInt16" | "short" => {
+                    let value: i16 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "SInt32" | "int" => {
+                    let value: i32 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "SInt64" | "long long" => {
+                    let value: i64 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "UInt8" | "char" => {
+                    let value: u8 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "UInt16" | "unsigned short" => {
+                    let value: u16 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "UInt32" | "unsigned int" => {
+                    let value: u32 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "UInt64" | "unsigned long long" | "FileSize" => {
+                    let value: u64 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "float" => {
+                    let value: f32 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "double" => {
+                    let value: f64 = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    return Ok(value.into_py(py));
+                }
+                "vector" | "staticvector" => {
+                    let field = field.get_field(&["Array".to_string()]).ok_or(
+                        PyAttributeError::new_err(format!(
+                            "Array field {} cast failed. Type: {}",
+                            attr,
+                            field.get_type().as_str()
+                        )),
+                    )?;
+                    if let Some((buff_type, size)) = field.try_get_buff_type_and_type_size() {
+                        match buff_type.as_str() {
+                            "float" => {
+                                let value: Vec<f32> = field
+                                    .try_cast_to(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.into_py(py));
+                            }
+                            "double" => {
+                                let value: Vec<f64> = field
+                                    .try_cast_to(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.into_py(py));
+                            }
+                            &_ => (),
+                        }
+
+                        match size {
+                            1 => {
+                                let value: &Vec<u8> = field
+                                    .try_cast_as(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.to_owned().into_py(py));
+                            }
+                            2 => {
+                                let value: Vec<u16> = field
+                                    .try_cast_to(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.into_py(py));
+                            }
+                            4 => {
+                                let value: Vec<u32> = field
+                                    .try_cast_to(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.into_py(py));
+                            }
+                            8 => {
+                                let value: Vec<u64> = field
+                                    .try_cast_to(&field_cast_args)
+                                    .map_err(cast_error_map)?;
+                                return Ok(value.into_py(py));
+                            }
+                            _ => (),
+                        }
+
+                        return Err(PyAttributeError::new_err(format!(
+                            "Array field {} cannot cast. Type: {} Item Type : {}",
+                            attr,
+                            field.get_type().as_str(),
+                            buff_type
+                        )));
+                    }
+                    let value: Vec<io_unity::type_tree::TypeTreeObject> = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    let mut new_vec = Vec::new();
+                    for obj in value {
+                        let value = obj.get_field_by_name("").unwrap();
+                        let value = cast_field(py, value, field_cast_args, attr)?;
+                        new_vec.push(value)
+                    }
+                    return Ok(new_vec.into_py(py));
+                }
+                "map" => {
+                    let field = field.get_field(&["Array".to_string()]).ok_or(
+                        PyAttributeError::new_err(format!(
+                            "Map field {} cast failed. Type: {}",
+                            attr,
+                            field.get_type().as_str()
+                        )),
+                    )?;
+                    let value: HashMap<String, io_unity::type_tree::TypeTreeObject> = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+
+                    let mut new_map = HashMap::new();
+                    for (name, obj) in value {
+                        let value = obj.get_field_by_name("").unwrap();
+                        let value = cast_field(py, value, field_cast_args, attr)?;
+                        new_map.insert(name, value);
+                    }
+                    return Ok(new_map.into_py(py));
+                }
+                &_ => {
+                    let value: io_unity::type_tree::TypeTreeObject = field
+                        .try_cast_to(&field_cast_args)
+                        .map_err(cast_error_map)?;
+                    let value = TypeTreeObject(value);
+                    return Ok(value.into_py(py));
+                }
             }
         }
 
-        Err(PyAttributeError::new_err(format!(
-            "field {} cannot cast. Type: {}",
-            attr,
-            field.get_type().as_str()
-        )))
+        cast_field(py, field, &field_cast_args, attr)
     }
 }
 
