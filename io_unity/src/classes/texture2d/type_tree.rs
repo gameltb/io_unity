@@ -9,7 +9,7 @@ use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
 
-impl Texture2DObject for Texture2D {
+impl Texture2DObject for Texture2D<'_> {
     fn get_width(&self) -> Option<u64> {
         self.get_width().and_then(|i| Some(i as u64))
     }
@@ -40,7 +40,7 @@ impl Texture2DObject for Texture2D {
     }
 }
 
-impl Texture2D {
+impl Texture2D<'_> {
     fn get_width(&self) -> Option<i64> {
         i64::try_cast_from(&self.inner, "/Base/m_Width").ok()
     }

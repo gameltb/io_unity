@@ -7,7 +7,7 @@ use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, ErrorKind, SeekFrom};
 
-impl AudioClipObject for AudioClip {
+impl AudioClipObject for AudioClip<'_> {
     fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>> {
         let resource_source = self
             .get_resource_source()
@@ -32,7 +32,7 @@ impl AudioClipObject for AudioClip {
     }
 }
 
-impl AudioClip {
+impl AudioClip<'_> {
     fn get_resource_source(&self) -> Option<String> {
         String::try_cast_from(&self.inner, "/Base/m_Resource/m_Source").ok()
     }

@@ -7,14 +7,14 @@ use io_unity::type_tree::{
 use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
-    use io_unity::classes::*;
+
     use pyo3::prelude::*;
 
     #[macro_export]
     macro_rules! def_python_unity_class {
         ($x:ident($y:path)) => {
             #[pyclass]
-            pub struct $x(pub $y);
+            pub struct $x(pub io_unity::type_tree::TypeTreeObject);
         };
         ($($xx:ident($yy:path)),+) => {
 

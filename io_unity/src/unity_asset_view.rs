@@ -22,7 +22,7 @@ pub struct UnityAssetViewer {
     unity_fs_map: BTreeMap<i64, UnityFS>,
     unity_fs_count: i64,
     serialized_file_to_unity_fs_map: BTreeMap<i64, i64>,
-    pub container_maps: HashMap<String, Vec<(i64, PPtr)>>,
+    pub container_maps: HashMap<String, Vec<(i64, TypeTreeObject)>>,
     container_name_maps: HashMap<i64, HashMap<i64, String>>,
 }
 
@@ -100,8 +100,7 @@ impl UnityAssetViewer {
                 let mut name_map = HashMap::new();
                 for (name, asset_info) in containers {
                     if let Ok(pptr) = TypeTreeObject::try_cast_from(&asset_info, "/Base/asset") {
-                        let pptr = PPtr::new(pptr);
-                        if let Some(path_id) = pptr.get_path_id() {
+                        if let Some(path_id) = PPtr::new(&pptr).get_path_id() {
                             name_map.insert(path_id, name.clone());
                         }
 
@@ -129,8 +128,7 @@ impl UnityAssetViewer {
                     ) {
                         let mut name_map = HashMap::new();
                         for (name, pptr) in containers {
-                            let pptr = PPtr::new(pptr);
-                            if let Some(path_id) = pptr.get_path_id() {
+                            if let Some(path_id) = PPtr::new(&pptr).get_path_id() {
                                 name_map.insert(path_id, name.clone());
                             }
 
@@ -301,7 +299,7 @@ impl UnityAssetViewer {
         if let Some(serialized_file_id) = self.container_maps.get(container_name) {
             if let Some((serialized_file_id, pptr)) = serialized_file_id.get(0) {
                 if let Some(serialized_file) = self.serialized_file_map.get(serialized_file_id) {
-                    return pptr.get_type_tree_object(serialized_file, Some(self));
+                    return PPtr::new(pptr).get_type_tree_object(serialized_file, Some(self));
                 }
             }
         }

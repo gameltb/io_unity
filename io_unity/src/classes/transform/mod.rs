@@ -1,6 +1,6 @@
 pub mod type_tree;
 
-use crate::{def_unity_class, unity_asset_view::UnityAssetViewer};
+use crate::{def_unity_class, type_tree::TypeTreeObject, unity_asset_view::UnityAssetViewer};
 
 use crc::{Crc, CRC_32_ISO_HDLC};
 use glam::Mat4;
@@ -13,9 +13,9 @@ pub const CRC_ISO_HDLC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 def_unity_class!(Transform);
 
 pub trait TransformObject: fmt::Debug {
-    fn get_father(&self) -> Option<PPtr>;
+    fn get_father(&self) -> Option<TypeTreeObject>;
     fn get_local_mat(&self) -> Option<Mat4>;
-    fn get_children(&self) -> Option<Vec<PPtr>>;
+    fn get_children(&self) -> Option<Vec<TypeTreeObject>>;
 }
 
 pub fn get_transform_path(
@@ -64,8 +64,10 @@ pub fn get_bone_path_hash_map(
     }
     if let Some(chilrens) = transform.get_children() {
         for chilren in &*chilrens {
-            let chilren = chilren.get_type_tree_object_in_view(viewer)?.unwrap();
-            let chilren = Transform::new(chilren);
+            let chilren = PPtr::new(&chilren)
+                .get_type_tree_object_in_view(viewer)?
+                .unwrap();
+            let chilren = Transform::new(&chilren);
             map.extend(get_bone_path_hash_map(viewer, &chilren)?);
         }
     }

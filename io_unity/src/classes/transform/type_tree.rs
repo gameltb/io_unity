@@ -1,11 +1,11 @@
 use super::{Transform, TransformObject};
-use crate::classes::p_ptr::PPtr;
+
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObject;
 use glam::Mat4;
 
-impl TransformObject for Transform {
-    fn get_father(&self) -> Option<PPtr> {
+impl TransformObject for Transform<'_> {
+    fn get_father(&self) -> Option<TypeTreeObject> {
         Some(self.get_father()?)
     }
 
@@ -17,16 +17,14 @@ impl TransformObject for Transform {
         ))
     }
 
-    fn get_children(&self) -> Option<Vec<PPtr>> {
+    fn get_children(&self) -> Option<Vec<TypeTreeObject>> {
         Some(self.get_children()?)
     }
 }
 
-impl Transform {
-    fn get_father(&self) -> Option<PPtr> {
-        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_Father")
-            .ok()
-            .and_then(|po| Some(PPtr::new(po)))
+impl Transform<'_> {
+    fn get_father(&self) -> Option<TypeTreeObject> {
+        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_Father").ok()
     }
 
     fn get_local_rotation(&self) -> Option<glam::Quat> {
@@ -41,9 +39,7 @@ impl Transform {
         glam::Vec3::try_cast_from(&self.inner, "/Base/m_LocalScale").ok()
     }
 
-    fn get_children(&self) -> Option<Vec<PPtr>> {
-        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Children/Array")
-            .ok()
-            .and_then(|ov| Some(ov.into_iter().map(|po| PPtr::new(po)).collect()))
+    fn get_children(&self) -> Option<Vec<TypeTreeObject>> {
+        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Children/Array").ok()
     }
 }

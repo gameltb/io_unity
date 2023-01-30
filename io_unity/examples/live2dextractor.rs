@@ -492,13 +492,13 @@ fn main() -> anyhow::Result<()> {
                     {
                         let pptr =
                             TypeTreeObject::try_cast_from(&component, "/Base/component").unwrap();
-                        let pptr = PPtr::new(pptr);
+                        let pptr = PPtr::new(&pptr);
                         let component_obj = pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)
                             .unwrap()
                             .unwrap();
                         if component_obj.class_id == ClassIDType::Transform as i32 {
-                            let transform = Transform::new(component_obj);
+                            let transform = Transform::new(&component_obj);
                             path_hash_map.extend(
                                 get_bone_path_hash_map(&unity_asset_viewer, &transform).unwrap(),
                             );
@@ -508,7 +508,7 @@ fn main() -> anyhow::Result<()> {
                                 if let Ok(pptr_o) =
                                     TypeTreeObject::try_cast_from(&component_obj, "/Base/m_Script")
                                 {
-                                    let script_pptr = PPtr::new(pptr_o);
+                                    let script_pptr = PPtr::new(&pptr_o);
                                     let script = script_pptr
                                         .get_type_tree_object_in_view(&unity_asset_viewer)?
                                         .unwrap();
@@ -533,7 +533,7 @@ fn main() -> anyhow::Result<()> {
                 println!("Parse : {}", container_path);
                 if obj.class_id == ClassIDType::MonoBehaviour as i32 {
                     if let Ok(pptr_o) = TypeTreeObject::try_cast_from(&obj, "/Base/m_Script") {
-                        let script_pptr = PPtr::new(pptr_o);
+                        let script_pptr = PPtr::new(&pptr_o);
                         let script = script_pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)?
                             .unwrap();
@@ -590,7 +590,7 @@ fn main() -> anyhow::Result<()> {
                     let texture2d = if obj.class_id == ClassIDType::Sprite as i32 {
                         let tex_pptr =
                             TypeTreeObject::try_cast_from(&obj, "/Base/m_RD/texture").unwrap();
-                        let tex_pptr = PPtr::new(tex_pptr);
+                        let tex_pptr = PPtr::new(&tex_pptr);
                         tex_pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)?
                             .unwrap()
@@ -600,7 +600,7 @@ fn main() -> anyhow::Result<()> {
 
                     let container_path = PathBuf::from(container_path);
 
-                    let tex = Texture2D::new(texture2d);
+                    let tex = Texture2D::new(&texture2d);
                     create_dir_all(container_path.parent().unwrap());
                     let tex_path = container_path.parent().unwrap().join(texture_name + ".png");
                     if let Ok(img) = tex.get_image(&unity_asset_viewer) {
@@ -1080,7 +1080,7 @@ fn get_live2d_path(
             return (target.to_owned(), id.to_owned());
         }
     } else if let Ok(pptr) = TypeTreeObject::try_cast_from(&binding, "/Base/script") {
-        let pptr = PPtr::new(pptr);
+        let pptr = PPtr::new(&pptr);
         let script = pptr.get_type_tree_object_in_view(viewer).unwrap().unwrap();
         match String::try_cast_from(&script, "/Base/m_ClassName")
             .unwrap()

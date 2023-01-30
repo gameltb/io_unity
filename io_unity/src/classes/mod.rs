@@ -12,26 +12,36 @@ use num_enum::TryFromPrimitive;
 macro_rules! def_unity_class {
     (  $x:ident  ) => {
         #[derive(Debug)]
-        pub struct $x {
-            inner: crate::type_tree::TypeTreeObject,
+        pub struct $x<'a> {
+            inner: &'a crate::type_tree::TypeTreeObject,
         }
 
-        impl $x {
-            pub fn new(inner: crate::type_tree::TypeTreeObject) -> Self {
+        impl<'a> $x<'a> {
+            pub fn new(inner: &'a crate::type_tree::TypeTreeObject) -> $x<'a> {
                 Self { inner }
             }
 
             pub fn inner(&self) -> &crate::type_tree::TypeTreeObject {
-                &self.inner
+                self.inner
             }
         }
 
-        impl crate::classes::SerializedFileRef for $x {
+        impl crate::classes::SerializedFileRef for $x<'_> {
             fn get_serialized_file_id(&self) -> i64 {
                 self.inner.serialized_file_id
             }
         }
+
+        impl<'a> crate::classes::CastRef<$x<'a>> for &'a crate::type_tree::TypeTreeObject {
+            fn cast_as(&self) -> $x<'a> {
+                $x { inner: self }
+            }
+        }
     };
+}
+
+pub trait CastRef<T>: Sized {
+    fn cast_as(&self) -> T;
 }
 
 pub trait SerializedFileRef {
@@ -39,12 +49,12 @@ pub trait SerializedFileRef {
 }
 
 #[derive(Debug)]
-pub enum Class {
-    AudioClip(audio_clip::AudioClip),
-    Texture2D(texture2d::Texture2D),
-    Mesh(mesh::Mesh),
-    Transform(transform::Transform),
-    AnimationClip(animation_clip::AnimationClip),
+pub enum Class<'a> {
+    AudioClip(audio_clip::AudioClip<'a>),
+    Texture2D(texture2d::Texture2D<'a>),
+    Mesh(mesh::Mesh<'a>),
+    Transform(transform::Transform<'a>),
+    AnimationClip(animation_clip::AnimationClip<'a>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive, Hash)]

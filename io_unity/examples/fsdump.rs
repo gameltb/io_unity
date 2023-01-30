@@ -128,7 +128,7 @@ fn main() -> anyhow::Result<()> {
                             .unwrap();
 
                         if let Ok(pptr_o) = TypeTreeObject::try_cast_from(&obj, "/Base/m_Script") {
-                            let script_pptr = PPtr::new(pptr_o);
+                            let script_pptr = PPtr::new(&pptr_o);
                             if let Some(script) =
                                 script_pptr.get_type_tree_object_in_view(&unity_asset_viewer)?
                             {
@@ -175,7 +175,7 @@ fn main() -> anyhow::Result<()> {
                     if let Ok(name) = String::try_cast_from(&obj, "/Base/m_Name") {
                         println!("name {}", name);
                         if obj_meta.class == ClassIDType::Texture2D as i32 {
-                            let tex = Texture2D::new(obj);
+                            let tex = Texture2D::new(&obj);
 
                             let out_tex_path_base = "/tmp/tex/".to_string() + &name;
                             let mut out_tex_path = out_tex_path_base.clone();
