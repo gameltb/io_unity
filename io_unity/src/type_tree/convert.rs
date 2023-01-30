@@ -275,6 +275,7 @@ impl TryCast<TypeTreeObject> for Field {
             class_id: 0,
             serialized_file_id: field_cast_args.serialized_file_id,
             data: self.clone(),
+            external_data: None,
         })
     }
 }
@@ -321,6 +322,7 @@ impl TryCast<Vec<TypeTreeObject>> for Field {
                             class_id: 0,
                             serialized_file_id: field_cast_args.serialized_file_id,
                             data: f.clone(),
+                            external_data: None,
                         })
                         .collect());
                 }

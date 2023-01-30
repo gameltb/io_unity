@@ -143,6 +143,7 @@ pub struct TypeTreeObject {
     pub class_id: i32,
     pub serialized_file_id: i64,
     data: Field,
+    pub external_data: Option<Vec<u8>>,
 }
 
 impl TypeTreeObject {

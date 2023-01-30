@@ -32,7 +32,6 @@ use binrw::{BinRead, ReadOptions};
 use num_enum::TryFromPrimitive;
 use once_cell::sync::Lazy;
 
-use crate::classes::ClassIDType;
 use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{
     reader::TypeTreeObjectBinReadArgs, reader::TypeTreeObjectBinReadClassArgs, TypeTreeObject,
@@ -322,7 +321,7 @@ pub struct Object {
     pub path_id: i64,
     byte_start: u64,
     byte_size: u32,
-    pub class: ClassIDType,
+    pub class: i32,
     type_id: usize,
 }
 
@@ -416,9 +415,8 @@ impl SerializedFile {
             }
         };
         let mut object_map = BTreeMap::new();
-        for i in 0..file.get_object_count() {
-            file.get_raw_object_by_index(i as u32)
-                .and_then(|obj| object_map.insert(obj.path_id, obj));
+        for obj in file.get_objects_metadata() {
+            object_map.insert(obj.path_id, obj);
         }
         Ok(SerializedFile {
             content: file,
@@ -427,10 +425,6 @@ impl SerializedFile {
             serialized_file_id,
             resource_search_path,
         })
-    }
-
-    pub fn get_object_count(&self) -> i32 {
-        self.content.get_object_count()
     }
 
     pub fn get_object_map(&self) -> &BTreeMap<i64, Object> {
@@ -475,12 +469,11 @@ pub trait Serialized: fmt::Debug {
     fn get_serialized_file_version(&self) -> &SerializedFileFormatVersion;
     fn get_data_offset(&self) -> u64;
     fn get_endianess(&self) -> &Endian;
-    fn get_raw_object_by_index(&self, index: u32) -> Option<Object>;
+    fn get_objects_metadata(&self) -> Vec<Object>;
     fn get_type_object_args_by_type_id(
         &self,
         type_id: usize,
     ) -> Option<TypeTreeObjectBinReadClassArgs>;
-    fn get_object_count(&self) -> i32;
     fn get_unity_version(&self) -> String;
     fn get_target_platform(&self) -> &BuildTarget;
     fn get_enable_type_tree(&self) -> bool;
@@ -522,15 +515,16 @@ pub trait Serialized: fmt::Debug {
             Endian::Big => binrw::Endian::Big,
         });
 
-        let type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
+        let mut type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
         let apos = reader.seek(SeekFrom::Current(0))?;
         if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
-            println!(
-                "{} readed, {} object size. class id {:?}",
-                apos - (self.get_data_offset() + obj.byte_start),
-                obj.byte_size,
-                obj.class
-            );
+            let mut external_data = vec![
+                0u8;
+                (obj.byte_size as u64 - (apos - (self.get_data_offset() + obj.byte_start)))
+                    as usize
+            ];
+            reader.read_exact(&mut external_data)?;
+            type_tree_object.external_data = Some(external_data);
         }
         Ok(type_tree_object)
     }

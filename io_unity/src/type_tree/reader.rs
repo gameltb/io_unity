@@ -189,6 +189,7 @@ impl BinRead for TypeTreeObject {
             class_id: args.class_args.class_id,
             serialized_file_id: args.serialized_file_id,
             data,
+            external_data: None,
         })
     }
 }

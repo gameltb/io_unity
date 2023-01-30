@@ -1,11 +1,10 @@
 use std::borrow::Cow;
-use std::convert::TryFrom;
+
 use std::sync::Arc;
 
 use binrw::io::Cursor;
 use binrw::{binrw, NullString};
 
-use crate::classes::ClassIDType;
 use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 use crate::until::Endian;
 use crate::version13::{Object, ObjectBinReadArgs, ScriptType};
@@ -38,19 +37,18 @@ impl Serialized for SerializedFile {
         &self.endianess
     }
 
-    fn get_raw_object_by_index(&self, index: u32) -> Option<super::Object> {
-        let obj = self.content.objects.get(index as usize)?;
-        Some(super::Object {
-            path_id: obj.path_id,
-            byte_start: obj.byte_start as u64,
-            byte_size: obj.byte_size,
-            class: ClassIDType::try_from(obj.class_id as i32).unwrap_or(ClassIDType::Object),
-            type_id: obj.type_id as usize,
-        })
-    }
-
-    fn get_object_count(&self) -> i32 {
-        self.content.object_count
+    fn get_objects_metadata(&self) -> Vec<super::Object> {
+        self.content
+            .objects
+            .iter()
+            .map(|obj| super::Object {
+                path_id: obj.path_id,
+                byte_start: obj.byte_start as u64,
+                byte_size: obj.byte_size,
+                class: obj.class_id as i32,
+                type_id: obj.type_id as usize,
+            })
+            .collect()
     }
 
     fn get_unity_version(&self) -> String {

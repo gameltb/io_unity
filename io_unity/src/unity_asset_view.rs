@@ -119,7 +119,7 @@ impl UnityAssetViewer {
         }
 
         for (path_id, obj) in serialized_file.get_object_map() {
-            if obj.class == ClassIDType::ResourceManager {
+            if obj.class == ClassIDType::ResourceManager as i32 {
                 if let Ok(Some(resource_manager)) =
                     serialized_file.get_tt_object_by_path_id(*path_id)
                 {

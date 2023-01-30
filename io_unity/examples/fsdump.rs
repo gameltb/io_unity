@@ -102,13 +102,13 @@ fn main() -> anyhow::Result<()> {
             let mut mono_behaviour_calss_types = HashSet::new();
             for (_, sf) in &unity_asset_viewer.serialized_file_map {
                 for (pathid, obj) in sf.get_object_map() {
-                    if obj.class == ClassIDType::MonoScript {
+                    if obj.class == ClassIDType::MonoScript as i32 {
                         // let tt_o = sf.get_tt_object_by_path_id(*pathid).unwrap().unwrap();
                         // println!("name\t{:?}", tt_o.get_value_by_path("/Base/m_Name"));
                         // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_ClassName"));
                         // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_Namespace"));
                         // println!("\t{:?}", tt_o.get_value_by_path("/Base/m_AssemblyName"));
-                    } else if obj.class == ClassIDType::MonoBehaviour {
+                    } else if obj.class == ClassIDType::MonoBehaviour as i32 {
                         let obj = sf
                             .get_tt_object_by_path_id(*pathid)
                             .map_err(|err| {
@@ -174,7 +174,7 @@ fn main() -> anyhow::Result<()> {
 
                     if let Ok(name) = String::try_cast_from(&obj, "/Base/m_Name") {
                         println!("name {}", name);
-                        if obj_meta.class == ClassIDType::Texture2D {
+                        if obj_meta.class == ClassIDType::Texture2D as i32 {
                             let tex = Texture2D::new(obj);
 
                             let out_tex_path_base = "/tmp/tex/".to_string() + &name;
@@ -186,18 +186,18 @@ fn main() -> anyhow::Result<()> {
                             }
                             tex.get_image(&unity_asset_viewer)
                                 .and_then(|dynimg| Ok(dynimg.flipv().save(out_tex_path + ".png")));
-                        } else if obj_meta.class == ClassIDType::TextAsset {
+                        } else if obj_meta.class == ClassIDType::TextAsset as i32 {
                             if let Ok(script) = String::try_cast_from(&obj, "/Base/m_Script") {
                                 let mut file =
                                     File::create("/tmp/tex/".to_string() + &name + ".txt").unwrap();
                                 file.write_all(script.as_bytes());
                             }
-                        } else if obj_meta.class == ClassIDType::AssetBundle
-                            || obj_meta.class == ClassIDType::Material
-                            || obj_meta.class == ClassIDType::GameObject
-                            || obj_meta.class == ClassIDType::MonoBehaviour
-                            || obj_meta.class == ClassIDType::AudioClip
-                            || obj_meta.class == ClassIDType::Mesh
+                        } else if obj_meta.class == ClassIDType::AssetBundle as i32
+                            || obj_meta.class == ClassIDType::Material as i32
+                            || obj_meta.class == ClassIDType::GameObject as i32
+                            || obj_meta.class == ClassIDType::MonoBehaviour as i32
+                            || obj_meta.class == ClassIDType::AudioClip as i32
+                            || obj_meta.class == ClassIDType::Mesh as i32
                         {
                         } else {
                             obj.display_tree();

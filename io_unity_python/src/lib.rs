@@ -67,7 +67,7 @@ impl<T> IntoPyResult<T> for Option<T> {
 pub struct ObjectRef {
     serialized_file_id: i64,
     path_id: i64,
-    class_id_type: io_unity::classes::ClassIDType,
+    class_id: i32,
 }
 
 #[pymethods]
@@ -77,12 +77,12 @@ impl ObjectRef {
         ObjectRef {
             serialized_file_id,
             path_id,
-            class_id_type: io_unity::classes::ClassIDType::Object,
+            class_id: 0,
         }
     }
 
     fn get_class_id(&self) -> i32 {
-        self.class_id_type.clone() as i32
+        self.class_id
     }
 }
 
@@ -171,7 +171,7 @@ impl UnityAssetViewer {
                 obj_vec.push(ObjectRef {
                     serialized_file_id: *serialized_file_id,
                     path_id: *path_id,
-                    class_id_type: obj.class.clone(),
+                    class_id: obj.class,
                 })
             }
         }
