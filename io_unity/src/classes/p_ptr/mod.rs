@@ -1,23 +1,19 @@
 pub mod type_tree;
-pub mod version13;
-pub mod version14;
 
 use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
-use crate::{def_unity_class, SerializedFile, SerializedFileMetadata};
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use crate::{def_unity_class, SerializedFile};
+
+use std::fmt;
 use std::path::PathBuf;
-use std::{
-    fmt,
-    io::{Read, Seek, Write},
-};
 
-def_unity_class!(PPtr, PPtrObject);
+use super::SerializedFileRef;
 
-pub trait PPtrObject: fmt::Debug {
+def_unity_class!(PPtr);
+
+pub trait PPtrObject: fmt::Debug + SerializedFileRef {
     fn get_path_id(&self) -> Option<i64>;
     fn get_file_id(&self) -> Option<i64>;
-    fn get_serialized_file_id(&self) -> i64;
 
     fn get_serialized_file<'a>(
         &self,
@@ -71,37 +67,5 @@ pub trait PPtrObject: fmt::Debug {
             return self.get_type_tree_object(self_serialized_file, Some(viewer));
         }
         Ok(None)
-    }
-}
-
-impl BinRead for PPtr {
-    type Args = SerializedFileMetadata;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        if args.version.clone() as i32 >= 14 {
-            return Ok(PPtr(Box::new(version14::PPtr::read_options(
-                reader, options, args,
-            )?)));
-        }
-        Ok(PPtr(Box::new(version13::PPtr::read_options(
-            reader, options, args,
-        )?)))
-    }
-}
-
-impl BinWrite for PPtr {
-    type Args = SerializedFileMetadata;
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        _writer: &mut W,
-        _options: &WriteOptions,
-        _args: Self::Args,
-    ) -> BinResult<()> {
-        todo!()
     }
 }

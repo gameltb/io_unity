@@ -1,97 +1,50 @@
-pub mod asset_bundle;
+pub mod animation_clip;
 pub mod audio_clip;
-pub mod component;
-pub mod editor_extension;
 pub mod mesh;
+pub mod named_object;
 pub mod p_ptr;
 pub mod texture2d;
 pub mod transform;
-// pub mod object;
-pub mod animation_clip;
-pub mod animator;
-pub mod avatar;
-pub mod behaviour;
-pub mod game_object;
-pub mod material;
-pub mod mesh_filter;
-pub mod mesh_renderer;
-pub mod mono_behaviour;
-pub mod mono_script;
-pub mod named_object;
-pub mod renderer;
-pub mod skinned_mesh_renderer;
 
 use num_enum::TryFromPrimitive;
 
 #[macro_export]
 macro_rules! def_unity_class {
-    (  $x:ident,$y:ident  ) => {
+    (  $x:ident  ) => {
         #[derive(Debug)]
-        pub struct $x(Box<dyn $y + Send>);
-
-        impl std::ops::Deref for $x {
-            type Target = Box<dyn $y + Send>;
-
-            fn deref(&self) -> &Box<dyn $y + Send> {
-                &self.0
-            }
+        pub struct $x {
+            inner: crate::type_tree::TypeTreeObject,
         }
 
         impl $x {
             pub fn new(inner: crate::type_tree::TypeTreeObject) -> Self {
-                Self(Box::new(type_tree::$x::new(inner)))
+                Self { inner }
+            }
+
+            pub fn inner(&self) -> &crate::type_tree::TypeTreeObject {
+                &self.inner
             }
         }
 
-        pub trait DownCast {
-            fn downcast<'a>(&'a self) -> supercow::Supercow<Box<dyn $y + Send + 'a>>;
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! def_type_tree_class {
-    (  $x:ident  ) => {
-        #[derive(Debug)]
-        pub struct $x<'a> {
-            inner: Supercow<'a, TypeTreeObject>,
-        }
-
-        impl<'a> $x<'a> {
-            pub fn new<T: Into<Supercow<'a, TypeTreeObject>>>(inner: T) -> Self {
-                Self {
-                    inner: inner.into(),
-                }
-            }
-
-            pub fn inner(self) -> Supercow<'a, TypeTreeObject> {
-                self.inner
-            }
-
-            pub fn get_serialized_file_id(&self) -> i64 {
+        impl crate::classes::SerializedFileRef for $x {
+            fn get_serialized_file_id(&self) -> i64 {
                 self.inner.serialized_file_id
             }
         }
     };
 }
 
+pub trait SerializedFileRef {
+    fn get_serialized_file_id(&self) -> i64;
+}
+
 #[derive(Debug)]
 pub enum Class {
-    AssetBundle(asset_bundle::AssetBundle),
     AudioClip(audio_clip::AudioClip),
     Texture2D(texture2d::Texture2D),
     Mesh(mesh::Mesh),
     Transform(transform::Transform),
-    GameObject(game_object::GameObject),
     AnimationClip(animation_clip::AnimationClip),
-    SkinnedMeshRenderer(skinned_mesh_renderer::SkinnedMeshRenderer),
-    MeshRenderer(mesh_renderer::MeshRenderer),
-    Material(material::Material),
-    MeshFilter(mesh_filter::MeshFilter),
-    MonoBehaviour(mono_behaviour::MonoBehaviour),
-    MonoScript(mono_script::MonoScript),
-    Animator(animator::Animator),
-    Avatar(avatar::Avatar),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive, Hash)]

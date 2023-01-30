@@ -1,26 +1,15 @@
-use super::{Texture2DObject, TextureFormat};
-use crate::classes::named_object::{self, NamedObjectObject};
-use crate::def_type_tree_class;
+use super::{Texture2D, Texture2DObject, TextureFormat};
+use crate::classes::SerializedFileRef;
+
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::convert::TryCastRefFrom;
-use crate::type_tree::TypeTreeObject;
+
 use crate::unity_asset_view::UnityAssetViewer;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
-use supercow::Supercow;
 
-def_type_tree_class!(Texture2D);
-
-impl named_object::DownCast for Texture2D<'_> {
-    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
-        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
-            &*self.inner,
-        )))
-    }
-}
-
-impl Texture2DObject for Texture2D<'_> {
+impl Texture2DObject for Texture2D {
     fn get_width(&self) -> Option<u64> {
         self.get_width().and_then(|i| Some(i as u64))
     }
@@ -51,7 +40,7 @@ impl Texture2DObject for Texture2D<'_> {
     }
 }
 
-impl Texture2D<'_> {
+impl Texture2D {
     fn get_width(&self) -> Option<i64> {
         i64::try_cast_from(&self.inner, "/Base/m_Width").ok()
     }

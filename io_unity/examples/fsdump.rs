@@ -3,8 +3,8 @@ extern crate io_unity;
 extern crate anyhow;
 
 use clap::{arg, Parser, Subcommand};
-use io_unity::classes::p_ptr::PPtr;
-use io_unity::classes::texture2d::Texture2D;
+use io_unity::classes::p_ptr::{PPtr, PPtrObject};
+use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
 use io_unity::type_tree::TypeTreeObject;
 use std::collections::HashSet;
@@ -54,7 +54,7 @@ pub enum Commands {
         #[arg(value_parser)]
         filter_path: Option<String>,
     },
-    /// Extract one model, Assets under the filter path will be treated as one model.
+    /// Extract Assets.
     Extract {
         /// filter path
         #[arg(value_parser)]
@@ -177,8 +177,7 @@ fn main() -> anyhow::Result<()> {
                         if obj_meta.class == ClassIDType::Texture2D {
                             let tex = Texture2D::new(obj);
 
-                            let out_tex_path_base =
-                                "/tmp/tex/".to_string() + &tex.downcast().get_name().unwrap();
+                            let out_tex_path_base = "/tmp/tex/".to_string() + &name;
                             let mut out_tex_path = out_tex_path_base.clone();
                             let mut i = 0;
                             while PathBuf::from(out_tex_path.clone() + ".png").exists() {

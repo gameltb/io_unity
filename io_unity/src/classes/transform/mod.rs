@@ -1,77 +1,45 @@
-pub mod transform;
 pub mod type_tree;
 
-use super::{component, p_ptr::PPtr};
-use crate::{
-    def_unity_class, type_tree::convert::TryCastFrom, unity_asset_view::UnityAssetViewer,
-    SerializedFileMetadata,
-};
-use binrw::{BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use crate::{def_unity_class, unity_asset_view::UnityAssetViewer};
+
 use crc::{Crc, CRC_32_ISO_HDLC};
 use glam::Mat4;
-use std::{
-    collections::BTreeMap,
-    fmt,
-    io::{Read, Seek, Write},
-};
-use supercow::Supercow;
+use std::{collections::BTreeMap, fmt};
+
+use super::p_ptr::{PPtr, PPtrObject};
 
 pub const CRC_ISO_HDLC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 
-def_unity_class!(Transform, TransformObject);
+def_unity_class!(Transform);
 
-pub trait TransformObject: fmt::Debug + component::DownCast {
-    fn get_father(&self) -> Option<Supercow<PPtr>>;
+pub trait TransformObject: fmt::Debug {
+    fn get_father(&self) -> Option<PPtr>;
     fn get_local_mat(&self) -> Option<Mat4>;
-    fn get_children(&self) -> Option<Supercow<Vec<PPtr>>>;
-}
-
-impl BinRead for Transform {
-    type Args = SerializedFileMetadata;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        return Ok(Transform(Box::new(transform::Transform::read_options(
-            reader, options, args,
-        )?)));
-    }
-}
-
-impl BinWrite for Transform {
-    type Args = SerializedFileMetadata;
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        _writer: &mut W,
-        _options: &WriteOptions,
-        _args: Self::Args,
-    ) -> BinResult<()> {
-        Ok(())
-    }
+    fn get_children(&self) -> Option<Vec<PPtr>>;
 }
 
 pub fn get_transform_path(
-    viewer: &UnityAssetViewer,
-    transform: &Transform,
+    _viewer: &UnityAssetViewer,
+    _transform: &Transform,
 ) -> anyhow::Result<String> {
-    let game_object = transform
-        .downcast()
-        .get_game_object()
-        .unwrap()
-        .get_type_tree_object_in_view(viewer)?
-        .unwrap();
-    if let Some(father) = transform.get_father() {
-        if let Some(father) = father.get_type_tree_object_in_view(viewer)? {
-            return Ok(get_transform_path(viewer, &Transform::new(father))?
-                + "/"
-                + &String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
-        }
-    } else {
-        return Ok(String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
-    }
+    //        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_GameObject")
+    // .ok()
+    // .and_then(|f| Some(PPtr::new(f)))
+    // let game_object = transform
+    //     .downcast()
+    //     .get_game_object()
+    //     .unwrap()
+    //     .get_type_tree_object_in_view(viewer)?
+    //     .unwrap();
+    // if let Some(father) = transform.get_father() {
+    //     if let Some(father) = father.get_type_tree_object_in_view(viewer)? {
+    //         return Ok(get_transform_path(viewer, &Transform::new(father))?
+    //             + "/"
+    //             + &String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
+    //     }
+    // } else {
+    //     return Ok(String::try_cast_from(&game_object, "/Base/m_Name").unwrap());
+    // }
     Ok(String::default())
 }
 

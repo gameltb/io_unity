@@ -1,53 +1,18 @@
 pub mod type_tree;
-pub mod version_2018_3_0;
 
 use crate::type_tree::convert::TryCastFrom;
-use crate::{
-    def_unity_class, type_tree::TypeTreeObject, until::UnityVersion, SerializedFileMetadata,
-};
-use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use crate::{def_unity_class, type_tree::TypeTreeObject};
+use binrw::{binrw, BinRead};
 use std::{
     fmt,
-    io::{Cursor, Read, Seek, SeekFrom, Write},
+    io::{Cursor, Read, Seek, SeekFrom},
 };
 
-use super::{named_object, ClassIDType};
+use super::ClassIDType;
 
-def_unity_class!(AnimationClip, AnimationClipObject);
+def_unity_class!(AnimationClip);
 
-pub trait AnimationClipObject: fmt::Debug + named_object::DownCast {}
-
-impl BinRead for AnimationClip {
-    type Args = SerializedFileMetadata;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        if args.unity_version >= UnityVersion::new(vec![2018, 3], None) {
-            return Ok(AnimationClip(Box::new(
-                version_2018_3_0::AnimationClip::read_options(reader, options, args)?,
-            )));
-        }
-        Err(binrw::Error::NoVariantMatch {
-            pos: reader.seek(SeekFrom::Current(0))?,
-        })
-    }
-}
-
-impl BinWrite for AnimationClip {
-    type Args = SerializedFileMetadata;
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        _writer: &mut W,
-        _options: &WriteOptions,
-        _args: Self::Args,
-    ) -> BinResult<()> {
-        Ok(())
-    }
-}
+pub trait AnimationClipObject: fmt::Debug {}
 
 #[binrw]
 #[derive(Debug, Clone)]

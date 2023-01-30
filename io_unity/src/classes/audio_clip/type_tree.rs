@@ -1,27 +1,13 @@
-use super::AudioClipObject;
-use crate::classes::named_object;
-use crate::classes::named_object::NamedObjectObject;
-use crate::def_type_tree_class;
+use super::{AudioClip, AudioClipObject};
+use crate::classes::SerializedFileRef;
 use crate::type_tree::convert::TryCastFrom;
-use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 use std::borrow::Cow;
 use std::io::{prelude::*, ErrorKind, SeekFrom};
-use supercow::Supercow;
 
-def_type_tree_class!(AudioClip);
-
-impl named_object::DownCast for AudioClip<'_> {
-    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
-        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
-            &*self.inner,
-        )))
-    }
-}
-
-impl AudioClipObject for AudioClip<'_> {
+impl AudioClipObject for AudioClip {
     fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>> {
         let resource_source = self
             .get_resource_source()
@@ -46,7 +32,7 @@ impl AudioClipObject for AudioClip<'_> {
     }
 }
 
-impl AudioClip<'_> {
+impl AudioClip {
     fn get_resource_source(&self) -> Option<String> {
         String::try_cast_from(&self.inner, "/Base/m_Resource/m_Source").ok()
     }

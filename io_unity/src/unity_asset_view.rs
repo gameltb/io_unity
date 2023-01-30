@@ -7,6 +7,7 @@ use std::{
 
 use walkdir::WalkDir;
 
+use crate::classes::{p_ptr::PPtrObject, SerializedFileRef};
 use crate::type_tree::convert::TryCastFrom;
 use crate::{
     classes::{p_ptr::PPtr, ClassIDType},

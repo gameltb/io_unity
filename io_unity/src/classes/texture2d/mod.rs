@@ -1,25 +1,14 @@
 pub mod type_tree;
-pub mod version_2018_2_0;
-pub mod version_2020_2_0;
 
-use crate::{
-    def_unity_class, unity_asset_view::UnityAssetViewer, until::UnityVersion,
-    SerializedFileMetadata,
-};
-use binrw::{binrw, BinRead, BinResult, BinWrite, ReadOptions, WriteOptions};
+use crate::{def_unity_class, unity_asset_view::UnityAssetViewer};
+use binrw::binrw;
 use image::{DynamicImage, GrayAlphaImage, RgbImage, RgbaImage};
 use num_enum::TryFromPrimitive;
-use std::{
-    borrow::Cow,
-    fmt,
-    io::{Read, Seek, SeekFrom, Write},
-};
+use std::{borrow::Cow, fmt};
 
-use super::named_object;
+def_unity_class!(Texture2D);
 
-def_unity_class!(Texture2D, Texture2DObject);
-
-pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
+pub trait Texture2DObject: fmt::Debug {
     fn get_width(&self) -> Option<u64>;
     fn get_height(&self) -> Option<u64>;
     fn get_texture_format(&self) -> Option<TextureFormat>;
@@ -148,42 +137,6 @@ pub trait Texture2DObject: fmt::Debug + named_object::DownCast {
                 self.get_texture_format()
             )),
         }
-    }
-}
-
-impl BinRead for Texture2D {
-    type Args = SerializedFileMetadata;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        if args.unity_version >= UnityVersion::new(vec![2020, 2], None) {
-            return Ok(Texture2D(Box::new(
-                version_2020_2_0::Texture2D::read_options(reader, options, args)?,
-            )));
-        } else if args.unity_version >= UnityVersion::new(vec![2018, 2], None) {
-            return Ok(Texture2D(Box::new(
-                version_2018_2_0::Texture2D::read_options(reader, options, args)?,
-            )));
-        }
-        Err(binrw::Error::NoVariantMatch {
-            pos: reader.seek(SeekFrom::Current(0))?,
-        })
-    }
-}
-
-impl BinWrite for Texture2D {
-    type Args = SerializedFileMetadata;
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        _writer: &mut W,
-        _options: &WriteOptions,
-        _args: Self::Args,
-    ) -> BinResult<()> {
-        Ok(())
     }
 }
 

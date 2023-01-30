@@ -1,28 +1,18 @@
 use std::borrow::Cow;
 use std::io::{Cursor, Seek, SeekFrom};
 
-use super::version_2020_0_0::{get_format_size, ChannelType, VertexFormat};
-use super::{BoneWeights, MeshObject, StreamBuff};
-use crate::classes::named_object::{self, NamedObjectObject};
-use crate::def_type_tree_class;
+use super::{
+    get_format_size, BoneWeights, ChannelType, Mesh, MeshObject, StreamBuff, VertexFormat,
+};
+
+use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::convert::TryCastRefFrom;
 
 use crate::type_tree::TypeTreeObject;
 use binrw::{BinRead, ReadOptions, VecArgs};
-use supercow::Supercow;
 
-def_type_tree_class!(Mesh);
-
-impl named_object::DownCast for Mesh<'_> {
-    fn downcast<'a>(&'a self) -> Supercow<Box<dyn NamedObjectObject + Send + 'a>> {
-        Supercow::owned(Box::new(named_object::type_tree::NamedObject::new(
-            &*self.inner,
-        )))
-    }
-}
-
-impl MeshObject for Mesh<'_> {
+impl MeshObject for Mesh {
     fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>> {
         let binding = self.get_sub_meshes().ok_or(anyhow!("sub_meshs"))?;
         let sub_mesh = binding.get(sub_mesh_id).ok_or(anyhow!("sub_mesh"))?;
@@ -160,12 +150,12 @@ impl MeshObject for Mesh<'_> {
         Some(self.get_sub_meshes()?.len())
     }
 
-    fn get_bind_pose(&self) -> anyhow::Result<Supercow<Vec<crate::until::binrw_parser::Mat4>>> {
+    fn get_bind_pose(&self) -> anyhow::Result<Vec<crate::until::binrw_parser::Mat4>> {
         todo!()
     }
 }
 
-impl Mesh<'_> {
+impl Mesh {
     pub fn get_sub_meshes(&self) -> Option<Vec<SubMesh>> {
         <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_SubMeshes/Array")
             .ok()
@@ -189,9 +179,9 @@ impl Mesh<'_> {
     }
 }
 
-def_type_tree_class!(SubMesh);
+def_unity_class!(SubMesh);
 
-impl SubMesh<'_> {
+impl SubMesh {
     pub fn get_first_byte(&self) -> Option<u64> {
         u64::try_cast_from(&self.inner, "/Base/firstByte").ok()
     }
@@ -206,10 +196,10 @@ impl SubMesh<'_> {
     }
 }
 
-def_type_tree_class!(VertexData);
-def_type_tree_class!(Channel);
+def_unity_class!(VertexData);
+def_unity_class!(Channel);
 
-impl Channel<'_> {
+impl Channel {
     pub fn get_stream(&self) -> Option<u64> {
         u64::try_cast_from(&self.inner, "/Base/stream").ok()
     }
@@ -226,7 +216,7 @@ impl Channel<'_> {
     }
 }
 
-impl VertexData<'_> {
+impl VertexData {
     pub fn get_channels(&self) -> Option<Vec<Channel>> {
         <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Channels/Array")
             .ok()
@@ -244,7 +234,7 @@ impl VertexData<'_> {
     }
 }
 
-impl VertexData<'_> {
+impl VertexData {
     fn get_stream_offset(&self, stream: u8) -> anyhow::Result<usize> {
         let mut offset = 0;
         for s in 0..stream {

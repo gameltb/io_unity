@@ -15,8 +15,8 @@ use io_unity::{
         animation_clip::{
             animation_clip_binding_constant_find_binding, streamed_clip_read_u32_buff,
         },
-        p_ptr::PPtr,
-        texture2d::Texture2D,
+        p_ptr::{PPtr, PPtrObject},
+        texture2d::{Texture2D, Texture2DObject},
         transform::{get_bone_path_hash_map, Transform},
         ClassIDType,
     },

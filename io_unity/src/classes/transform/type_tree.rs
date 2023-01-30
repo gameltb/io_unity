@@ -1,23 +1,12 @@
-use super::TransformObject;
-use crate::classes::component::{self, ComponentObject};
+use super::{Transform, TransformObject};
 use crate::classes::p_ptr::PPtr;
-use crate::def_type_tree_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObject;
 use glam::Mat4;
-use supercow::Supercow;
 
-def_type_tree_class!(Transform);
-
-impl component::DownCast for Transform<'_> {
-    fn downcast<'a>(&'a self) -> Supercow<Box<dyn ComponentObject + Send + 'a>> {
-        Supercow::owned(Box::new(component::type_tree::Component::new(&*self.inner)))
-    }
-}
-
-impl TransformObject for Transform<'_> {
-    fn get_father(&self) -> Option<Supercow<PPtr>> {
-        Some(Supercow::owned(self.get_father()?))
+impl TransformObject for Transform {
+    fn get_father(&self) -> Option<PPtr> {
+        Some(self.get_father()?)
     }
 
     fn get_local_mat(&self) -> Option<Mat4> {
@@ -28,12 +17,12 @@ impl TransformObject for Transform<'_> {
         ))
     }
 
-    fn get_children(&self) -> Option<Supercow<Vec<PPtr>>> {
-        Some(Supercow::owned(self.get_children()?))
+    fn get_children(&self) -> Option<Vec<PPtr>> {
+        Some(self.get_children()?)
     }
 }
 
-impl Transform<'_> {
+impl Transform {
     fn get_father(&self) -> Option<PPtr> {
         TypeTreeObject::try_cast_from(&self.inner, "/Base/m_Father")
             .ok()

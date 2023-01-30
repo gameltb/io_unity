@@ -32,22 +32,7 @@ use binrw::{BinRead, ReadOptions};
 use num_enum::TryFromPrimitive;
 use once_cell::sync::Lazy;
 
-use crate::classes::animation_clip::AnimationClip;
-use crate::classes::animator::Animator;
-use crate::classes::asset_bundle::AssetBundle;
-use crate::classes::audio_clip::AudioClip;
-use crate::classes::avatar::Avatar;
-use crate::classes::game_object::GameObject;
-use crate::classes::material::Material;
-use crate::classes::mesh::Mesh;
-use crate::classes::mesh_filter::MeshFilter;
-use crate::classes::mesh_renderer::MeshRenderer;
-use crate::classes::mono_behaviour::MonoBehaviour;
-use crate::classes::mono_script::MonoScript;
-use crate::classes::skinned_mesh_renderer::SkinnedMeshRenderer;
-use crate::classes::texture2d::Texture2D;
-use crate::classes::transform::Transform;
-use crate::classes::{Class, ClassIDType};
+use crate::classes::ClassIDType;
 use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{
     reader::TypeTreeObjectBinReadArgs, reader::TypeTreeObjectBinReadClassArgs, TypeTreeObject,
@@ -452,19 +437,6 @@ impl SerializedFile {
         &self.object_map
     }
 
-    pub fn get_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<Class>> {
-        self.object_map
-            .get(&path_id)
-            .and_then(|obj| {
-                Some(self.content.get_object(
-                    &mut *self.file_reader.borrow_mut(),
-                    obj,
-                    self.serialized_file_id,
-                ))
-            })
-            .transpose()
-    }
-
     pub fn get_tt_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<TypeTreeObject>> {
         Ok(self
             .object_map
@@ -561,87 +533,5 @@ pub trait Serialized: fmt::Debug {
             );
         }
         Ok(type_tree_object)
-    }
-
-    fn get_object(
-        &self,
-        reader: &mut Box<dyn UnityResource + Send + Sync>,
-        obj: &Object,
-        serialized_file_id: i64,
-    ) -> anyhow::Result<Class> {
-        reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
-
-        let op = ReadOptions::new(match self.get_endianess() {
-            Endian::Little => binrw::Endian::Little,
-            Endian::Big => binrw::Endian::Big,
-        });
-
-        if self.get_enable_type_tree() {
-            #[macro_export]
-            macro_rules! cov_type_tree_class {
-                ($($x:ident($y:path)),+) => {
-                    match obj.class {
-                        $(ClassIDType::$x => {
-                            let type_tree_object = self.get_type_tree_object(reader, obj, serialized_file_id)?;
-                            return Ok(Class::$x($x::new(type_tree_object)));
-                        },)+
-                        _ => (),
-                    }
-                };
-            }
-
-            cov_type_tree_class!(
-                AssetBundle(asset_bundle::AssetBundle),
-                AudioClip(audio_clip::AudioClip),
-                Texture2D(texture_2d::Texture2D),
-                Mesh(mesh::Mesh),
-                Transform(transform::Transform),
-                GameObject(game_object::GameObject),
-                AnimationClip(animation_clip::AnimationClip),
-                SkinnedMeshRenderer(skinned_mesh_renderer::SkinnedMeshRenderer),
-                MeshRenderer(mesh_renderer::MeshRenderer),
-                Material(material::Material),
-                MeshFilter(mesh_filter::MeshFilter),
-                MonoBehaviour(mono_behaviour::MonoBehaviour),
-                MonoScript(mono_script::MonoScript),
-                Animator(animator::Animator),
-                Avatar(avatar::Avatar)
-            )
-        }
-
-        #[macro_export]
-        macro_rules! cov_class {
-            ($($x:ident($y:path)),+) => {
-                match obj.class {
-                    $(ClassIDType::$x => {
-                            let mut metadata = self.get_metadata();
-                            metadata.serialized_file_id = serialized_file_id;
-                            let o = $x::read_options(reader, &op, metadata)?;
-                            Ok(Class::$x(o))
-                        },)+
-                    _ => {
-                        Err(anyhow!("{:?}", &obj.class))
-                    }
-                }
-            };
-        }
-
-        cov_class!(
-            AssetBundle(asset_bundle::AssetBundle),
-            AudioClip(audio_clip::AudioClip),
-            Texture2D(texture_2d::Texture2D),
-            Mesh(mesh::Mesh),
-            Transform(transform::Transform),
-            GameObject(game_object::GameObject),
-            AnimationClip(animation_clip::AnimationClip),
-            SkinnedMeshRenderer(skinned_mesh_renderer::SkinnedMeshRenderer),
-            MeshRenderer(mesh_renderer::MeshRenderer),
-            Material(material::Material),
-            MeshFilter(mesh_filter::MeshFilter),
-            MonoBehaviour(mono_behaviour::MonoBehaviour),
-            MonoScript(mono_script::MonoScript),
-            Animator(animator::Animator),
-            Avatar(avatar::Avatar)
-        )
     }
 }
