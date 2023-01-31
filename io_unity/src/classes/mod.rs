@@ -13,26 +13,26 @@ macro_rules! def_unity_class {
     (  $x:ident  ) => {
         #[derive(Debug)]
         pub struct $x<'a> {
-            inner: &'a crate::type_tree::TypeTreeObject,
+            inner: &'a crate::type_tree::TypeTreeObjectRef,
         }
 
         impl<'a> $x<'a> {
-            pub fn new(inner: &'a crate::type_tree::TypeTreeObject) -> $x<'a> {
+            pub fn new(inner: &'a crate::type_tree::TypeTreeObjectRef) -> $x<'a> {
                 Self { inner }
             }
 
-            pub fn inner(&self) -> &crate::type_tree::TypeTreeObject {
+            pub fn inner(&self) -> &crate::type_tree::TypeTreeObjectRef {
                 self.inner
             }
         }
 
         impl crate::classes::SerializedFileRef for $x<'_> {
             fn get_serialized_file_id(&self) -> i64 {
-                self.inner.serialized_file_id
+                self.inner.get_serialized_file_id()
             }
         }
 
-        impl<'a> crate::classes::CastRef<$x<'a>> for &'a crate::type_tree::TypeTreeObject {
+        impl<'a> crate::classes::CastRef<$x<'a>> for &'a crate::type_tree::TypeTreeObjectRef {
             fn cast_as(&self) -> $x<'a> {
                 $x { inner: self }
             }

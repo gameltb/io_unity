@@ -12,7 +12,7 @@ pub trait Texture2DObject: fmt::Debug {
     fn get_width(&self) -> Option<u64>;
     fn get_height(&self) -> Option<u64>;
     fn get_texture_format(&self) -> Option<TextureFormat>;
-    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Cow<Vec<u8>>>;
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>>;
 
     fn get_image(&self, viewer: &UnityAssetViewer) -> anyhow::Result<DynamicImage> {
         let data = self.get_image_data(viewer).ok_or(anyhow!("data"))?;
@@ -103,7 +103,7 @@ pub trait Texture2DObject: fmt::Debug {
                     _ => unreachable!(),
                 };
                 astc_decode::astc_decode(
-                    &**data,
+                    &*data,
                     width as u32,
                     height as u32,
                     footprint,
@@ -117,7 +117,7 @@ pub trait Texture2DObject: fmt::Debug {
                 Ok(DynamicImage::ImageRgba8(result))
             }
             TextureFormat::Alpha8 => {
-                let buff: Vec<[u8; 2]> = data.as_ref().into_iter().map(|f| [0, *f]).collect();
+                let buff: Vec<[u8; 2]> = data.into_iter().map(|f| [0, f]).collect();
                 let result = GrayAlphaImage::from_raw(width as u32, height as u32, buff.concat())
                     .ok_or(anyhow!("from_raw"))?;
                 Ok(DynamicImage::ImageLumaA8(result))

@@ -2,7 +2,12 @@ pub mod convert;
 pub mod reader;
 pub mod type_tree_json;
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use crate::type_tree::convert::TryCast;
 
@@ -23,7 +28,7 @@ pub trait TypeField: Debug {
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
-    Data(Vec<u8>),
+    DataOffset(u64),
     Fields(HashMap<String, Field>),
     Array(Box<ArrayField>),
     ArrayItems(Vec<Field>),
@@ -32,7 +37,8 @@ pub enum FieldValue {
 #[derive(Debug, Clone)]
 pub struct ArrayField {
     array_size: Field,
-    item_type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
+    item_field: Option<Field>,
+    item_field_size: Option<u64>,
     data: FieldValue,
 }
 
@@ -54,17 +60,24 @@ impl Field {
 
     pub fn try_get_buff_type_and_type_size(&self) -> Option<(&String, i32)> {
         if let FieldValue::Array(ar) = &self.data {
-            if let FieldValue::Data(_) = &ar.data {
-                if ar.item_type_fields.len() == 1 {
-                    let item_type = &ar.item_type_fields.get(0).unwrap();
-                    return Some((item_type.get_type(), item_type.get_byte_size()));
+            if let FieldValue::DataOffset(_) = &ar.data {
+                if let Some(item_field) = ar.item_field.as_ref() {
+                    if let FieldValue::DataOffset(_) = item_field.data {
+                        let item_type = &item_field.field_type;
+                        return Some((item_type.get_type(), item_type.get_byte_size()));
+                    }
                 }
             }
         }
         None
     }
 
-    fn display_field(&self, p: &String, field_cast_args: &FieldCastArgs) {
+    fn display_field(
+        &self,
+        p: &String,
+        object_data_buff: &Vec<u8>,
+        field_cast_args: &mut FieldCastArgs,
+    ) {
         let np = p.clone() + "/" + self.field_type.get_name();
         print!(
             "{}/{} : {}({}) {:?}",
@@ -75,41 +88,44 @@ impl Field {
             &self.time
         );
         match &self.data {
-            FieldValue::Data(v) => {
-                let num: Result<i64, ()> = self.try_cast_to(field_cast_args);
+            FieldValue::DataOffset(v) => {
+                let num: Result<i64, ()> = self.try_cast_to(object_data_buff, field_cast_args);
                 if let Ok(num) = num {
                     println!(" data : {:?}", num);
-                } else if v.len() <= 8 {
-                    println!(" data : {:?}", v);
                 } else {
-                    println!(" data : {:?}...", &v[..8]);
+                    let num: Result<u64, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+                    if let Ok(num) = num {
+                        println!(" data : {:?}", num);
+                    } else {
+                        let num: Result<f32, ()> =
+                            self.try_cast_to(object_data_buff, field_cast_args);
+                        if let Ok(num) = num {
+                            println!(" data : {:?}", num);
+                        } else {
+                            println!("");
+                        }
+                    }
                 }
             }
             FieldValue::Fields(fls) => {
                 println!("");
                 fls.into_iter()
-                    .map(|(_n, f)| f.display_field(&np, field_cast_args))
+                    .map(|(_n, f)| f.display_field(&np, object_data_buff, field_cast_args))
                     .collect()
             }
             FieldValue::Array(ar) => {
                 println!("");
-                ar.array_size.display_field(&np, field_cast_args);
+                ar.array_size
+                    .display_field(&np, object_data_buff, field_cast_args);
                 match &ar.data {
                     FieldValue::ArrayItems(ai) => {
                         if let Some(aii) = ai.get(0) {
-                            aii.display_field(&np, field_cast_args);
+                            aii.display_field(&np, object_data_buff, field_cast_args);
                         }
                     }
                     _ => {
-                        for item in &ar.item_type_fields {
-                            println!(
-                                "{}/?/{} : {}({}) at level [{}]",
-                                np,
-                                item.get_name(),
-                                item.get_type(),
-                                item.get_byte_size(),
-                                item.get_level(),
-                            );
+                        if let Some(item_field) = &ar.item_field {
+                            item_field.display_field(&np, object_data_buff, field_cast_args);
                         }
                     }
                 }
@@ -118,15 +134,58 @@ impl Field {
         }
     }
 
-    pub fn get_field(&self, path: &[String]) -> Option<&Self> {
+    fn get_field(
+        &self,
+        path: &[String],
+        field_offset: i64,
+        type_tree_object: &TypeTreeObject,
+    ) -> Option<(&Self, i64)> {
         if path.len() == 0 {
-            return Some(self);
+            return Some((self, field_offset));
         } else {
             match &self.data {
                 FieldValue::Fields(fields) => {
                     if let Some((name, path)) = path.split_first() {
                         if let Some(field) = fields.get(name) {
-                            return field.get_field(path);
+                            return field.get_field(path, field_offset, type_tree_object);
+                        }
+                    }
+                }
+                FieldValue::Array(fields) => {
+                    if let Some((index, path)) = path.split_first() {
+                        if let Ok(index) = index.parse::<i32>() {
+                            match &fields.data {
+                                FieldValue::DataOffset(offset) => {
+                                    assert_eq!(field_offset, 0);
+                                    let item_size = fields.item_field_size?;
+                                    let field = fields.item_field.as_ref()?;
+                                    let size: i32 = fields
+                                        .array_size
+                                        .try_cast_to(
+                                            &type_tree_object.data_buff,
+                                            &type_tree_object.get_field_cast_args(),
+                                        )
+                                        .ok()?;
+                                    if size <= index {
+                                        return None;
+                                    }
+                                    return field.get_field(
+                                        path,
+                                        (*offset + item_size * index as u64) as i64,
+                                        type_tree_object,
+                                    );
+                                }
+                                FieldValue::ArrayItems(items) => {
+                                    if let Some(field) = items.get(index as usize) {
+                                        return field.get_field(
+                                            path,
+                                            field_offset,
+                                            type_tree_object,
+                                        );
+                                    }
+                                }
+                                _ => (),
+                            }
                         }
                     }
                 }
@@ -142,22 +201,26 @@ pub struct TypeTreeObject {
     endian: binrw::Endian,
     pub class_id: i32,
     pub serialized_file_id: i64,
-    data: Field,
+    data_layout: Field,
+    data_buff: Vec<u8>,
     pub external_data: Option<Vec<u8>>,
 }
 
 impl TypeTreeObject {
     pub fn display_tree(&self) {
         println!("class_id : {}", self.class_id);
-        self.data
-            .display_field(&"".to_string(), &self.get_field_cast_args());
+        self.data_layout.display_field(
+            &"".to_string(),
+            &self.data_buff,
+            &mut self.get_field_cast_args(),
+        );
     }
 
     pub fn get_endian(&self) -> binrw::Endian {
         self.endian.clone()
     }
 
-    pub fn get_field_by_path(&self, path: &str) -> Option<&Field> {
+    pub fn get_field_by_path(&self, path: &str) -> Option<(&Field, i64)> {
         let path: Vec<String> = path
             .split("/")
             .filter(|s| !s.is_empty())
@@ -166,20 +229,54 @@ impl TypeTreeObject {
         if path.len() < 1 {
             return None;
         }
-        self.data.get_field(&path[1..])
+        self.data_layout.get_field(&path[1..], 0, &self)
     }
 
-    pub fn get_field_by_name(&self, name: &str) -> Option<&Field> {
-        if name.len() == 0 {
-            return Some(&self.data);
+    pub fn get_field_by_path_list(&self, path: &Vec<String>) -> Option<(&Field, i64)> {
+        if path.len() == 0 {
+            return Some((&self.data_layout, 0));
         }
-        self.data.get_field(&vec![name.to_string()])
+        self.data_layout.get_field(&path[1..], 0, &self)
     }
 
     pub fn get_field_cast_args(&self) -> FieldCastArgs {
         FieldCastArgs {
             endian: self.endian.clone(),
             serialized_file_id: self.serialized_file_id,
+            field_offset: 0,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeTreeObjectRef {
+    inner: Arc<RwLock<Box<TypeTreeObject>>>,
+    pub path: Vec<String>,
+}
+
+impl Into<TypeTreeObjectRef> for TypeTreeObject {
+    fn into(self) -> TypeTreeObjectRef {
+        TypeTreeObjectRef {
+            inner: Arc::new(RwLock::new(Box::new(self))),
+            path: vec!["Base".to_owned()],
+        }
+    }
+}
+
+impl TypeTreeObjectRef {
+    pub fn display_tree(&self) {
+        self.inner.read().unwrap().display_tree()
+    }
+
+    pub fn get_endian(&self) -> binrw::Endian {
+        self.inner.read().unwrap().endian.clone()
+    }
+
+    pub fn get_serialized_file_id(&self) -> i64 {
+        self.inner.read().unwrap().serialized_file_id
+    }
+
+    pub fn get_field_cast_args(&self) -> FieldCastArgs {
+        self.inner.read().unwrap().get_field_cast_args()
     }
 }

@@ -1,6 +1,7 @@
 pub mod type_tree;
 
 use crate::type_tree::convert::TryCastFrom;
+use crate::type_tree::TypeTreeObjectRef;
 use crate::{def_unity_class, type_tree::TypeTreeObject};
 use binrw::{binrw, BinRead};
 use std::{
@@ -95,11 +96,11 @@ pub fn streamed_clip_read_u32_buff(u32_buff: &Vec<u32>) -> anyhow::Result<Vec<St
 }
 
 pub fn animation_clip_binding_constant_find_binding(
-    animation_clip_binding_constant: &TypeTreeObject,
+    animation_clip_binding_constant: &TypeTreeObjectRef,
     index: usize,
-) -> Option<TypeTreeObject> {
+) -> Option<TypeTreeObjectRef> {
     let mut curves = 0;
-    for b in <Vec<TypeTreeObject>>::try_cast_from(
+    for b in <Vec<TypeTreeObjectRef>>::try_cast_from(
         animation_clip_binding_constant,
         "/Base/genericBindings/Array",
     )

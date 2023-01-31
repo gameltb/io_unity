@@ -21,7 +21,7 @@ impl Texture2DObject for Texture2D<'_> {
         TextureFormat::try_from_primitive(self.get_texture_format()? as u32).ok()
     }
 
-    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Cow<Vec<u8>>> {
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>> {
         if let Some(data) = self.get_image_data() {
             return Some(data);
         } else {
@@ -33,7 +33,7 @@ impl Texture2DObject for Texture2D<'_> {
                     .ok()?;
                 let mut data = vec![0u8; self.get_stream_data_size()? as usize];
                 file.read_exact(&mut data).ok()?;
-                return Some(Cow::Owned(data));
+                return Some(data);
             }
         }
         None
@@ -42,32 +42,30 @@ impl Texture2DObject for Texture2D<'_> {
 
 impl Texture2D<'_> {
     fn get_width(&self) -> Option<i64> {
-        i64::try_cast_from(&self.inner, "/Base/m_Width").ok()
+        i64::try_cast_from(self.inner, "/Base/m_Width").ok()
     }
 
     fn get_height(&self) -> Option<i64> {
-        i64::try_cast_from(&self.inner, "/Base/m_Height").ok()
+        i64::try_cast_from(self.inner, "/Base/m_Height").ok()
     }
 
     fn get_texture_format(&self) -> Option<i64> {
-        i64::try_cast_from(&self.inner, "/Base/m_TextureFormat").ok()
+        i64::try_cast_from(self.inner, "/Base/m_TextureFormat").ok()
     }
 
-    fn get_image_data(&self) -> Option<Cow<Vec<u8>>> {
-        Some(Cow::Borrowed(
-            <Vec<u8>>::try_cast_as_from(&self.inner, "/Base/image data").ok()?,
-        ))
+    fn get_image_data(&self) -> Option<Vec<u8>> {
+        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/image data").ok()?)
     }
 
     fn get_stream_data_path(&self) -> Option<String> {
-        String::try_cast_from(&self.inner, "/Base/m_StreamData/path").ok()
+        String::try_cast_from(self.inner, "/Base/m_StreamData/path").ok()
     }
 
     fn get_stream_data_offset(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/m_StreamData/offset").ok()
+        u64::try_cast_from(self.inner, "/Base/m_StreamData/offset").ok()
     }
 
     fn get_stream_data_size(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/m_StreamData/size").ok()
+        u64::try_cast_from(self.inner, "/Base/m_StreamData/size").ok()
     }
 }

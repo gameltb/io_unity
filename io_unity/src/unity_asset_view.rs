@@ -7,12 +7,15 @@ use std::{
 
 use walkdir::WalkDir;
 
-use crate::classes::{p_ptr::PPtrObject, SerializedFileRef};
 use crate::type_tree::convert::TryCastFrom;
 use crate::{
     classes::{p_ptr::PPtr, ClassIDType},
     type_tree::TypeTreeObject,
     SerializedFile, UnityFS, UnityResource,
+};
+use crate::{
+    classes::{p_ptr::PPtrObject, SerializedFileRef},
+    type_tree::TypeTreeObjectRef,
 };
 
 pub struct UnityAssetViewer {
@@ -22,7 +25,7 @@ pub struct UnityAssetViewer {
     unity_fs_map: BTreeMap<i64, UnityFS>,
     unity_fs_count: i64,
     serialized_file_to_unity_fs_map: BTreeMap<i64, i64>,
-    pub container_maps: HashMap<String, Vec<(i64, TypeTreeObject)>>,
+    pub container_maps: HashMap<String, Vec<(i64, TypeTreeObjectRef)>>,
     container_name_maps: HashMap<i64, HashMap<i64, String>>,
 }
 
@@ -93,13 +96,13 @@ impl UnityAssetViewer {
             resource_search_path,
         )?;
         if let Ok(Some(asset_bundle)) = serialized_file.get_tt_object_by_path_id(1) {
-            if let Ok(containers) = <HashMap<String, TypeTreeObject>>::try_cast_from(
-                &asset_bundle,
+            if let Ok(containers) = <HashMap<String, TypeTreeObjectRef>>::try_cast_from(
+                &asset_bundle.into(),
                 "/Base/m_Container/Array",
             ) {
                 let mut name_map = HashMap::new();
                 for (name, asset_info) in containers {
-                    if let Ok(pptr) = TypeTreeObject::try_cast_from(&asset_info, "/Base/asset") {
+                    if let Ok(pptr) = TypeTreeObjectRef::try_cast_from(&asset_info, "/Base/asset") {
                         if let Some(path_id) = PPtr::new(&pptr).get_path_id() {
                             name_map.insert(path_id, name.clone());
                         }
@@ -122,8 +125,8 @@ impl UnityAssetViewer {
                 if let Ok(Some(resource_manager)) =
                     serialized_file.get_tt_object_by_path_id(*path_id)
                 {
-                    if let Ok(containers) = <HashMap<String, TypeTreeObject>>::try_cast_from(
-                        &resource_manager,
+                    if let Ok(containers) = <HashMap<String, TypeTreeObjectRef>>::try_cast_from(
+                        &resource_manager.into(),
                         "/Base/m_Container/Array",
                     ) {
                         let mut name_map = HashMap::new();

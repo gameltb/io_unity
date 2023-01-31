@@ -6,7 +6,7 @@ use clap::{arg, Parser, Subcommand};
 use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
-use io_unity::type_tree::TypeTreeObject;
+use io_unity::type_tree::{TypeTreeObject, TypeTreeObjectRef};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
@@ -127,7 +127,9 @@ fn main() -> anyhow::Result<()> {
                             .unwrap()
                             .unwrap();
 
-                        if let Ok(pptr_o) = TypeTreeObject::try_cast_from(&obj, "/Base/m_Script") {
+                        if let Ok(pptr_o) =
+                            TypeTreeObjectRef::try_cast_from(&obj.into(), "/Base/m_Script")
+                        {
                             let script_pptr = PPtr::new(&pptr_o);
                             if let Some(script) =
                                 script_pptr.get_type_tree_object_in_view(&unity_asset_viewer)?
@@ -175,6 +177,7 @@ fn main() -> anyhow::Result<()> {
                     if let Ok(name) = String::try_cast_from(&obj, "/Base/m_Name") {
                         println!("name {}", name);
                         if obj_meta.class == ClassIDType::Texture2D as i32 {
+                            let obj = obj.into();
                             let tex = Texture2D::new(&obj);
 
                             let out_tex_path_base = "/tmp/tex/".to_string() + &name;
@@ -200,8 +203,8 @@ fn main() -> anyhow::Result<()> {
                             || obj_meta.class == ClassIDType::Mesh as i32
                         {
                         } else {
-                            obj.display_tree();
-                            panic!()
+                            // obj.display_tree();
+                            // panic!()
                         }
                     }
                 }

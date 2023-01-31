@@ -8,7 +8,10 @@ use std::{
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
 
-use crate::type_tree::{ArrayField, FieldValue, TypeTreeObject};
+use crate::type_tree::{
+    convert::{FieldCastArgs, TryCast, TryRead},
+    ArrayField, FieldValue, TypeTreeObject,
+};
 
 use super::{Field, TypeField};
 
@@ -55,6 +58,7 @@ impl BinRead for TypeTreeObject {
             options: &ReadOptions,
             type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
+            read_offset: &mut u64,
         ) -> BinResult<Field> {
             let time = std::time::Instant::now();
             let field = type_fields
@@ -63,12 +67,20 @@ impl BinRead for TypeTreeObject {
             let field_level = field.get_level();
             let field_value = if field.is_array() {
                 *field_index += 1;
-                let size_field = read(reader, options, type_fields, field_index)?;
-                let mut size_reader = Cursor::new(match &size_field.data {
-                    FieldValue::Data(data) => data,
-                    _ => unreachable!(),
-                });
-                let size = <u32>::read_options(&mut size_reader, options, ())?;
+                let size_start_pos = reader.seek(SeekFrom::Current(0))?;
+                let size_field = read(reader, options, type_fields, field_index, read_offset)?;
+                reader.seek(SeekFrom::Start(size_start_pos))?;
+                let size: i32 = (&size_field)
+                    .try_read_to(
+                        reader,
+                        &FieldCastArgs {
+                            endian: options.endian(),
+                            serialized_file_id: 0,
+                            field_offset: 0,
+                        },
+                    )
+                    .map_err(|_| std::io::Error::from(ErrorKind::NotFound))?;
+
                 *field_index += 1;
                 let item_field_index = *field_index;
                 let item_type_field = type_fields
@@ -101,22 +113,30 @@ impl BinRead for TypeTreeObject {
                 }
 
                 if let (Some(byte_size), true) = (fix_item_size, buf_read_flag) {
-                    let array = <Vec<u8>>::read_options(
+                    let this_offset = *read_offset;
+                    let item_start_pos = reader.seek(SeekFrom::Current(0))?;
+                    let mut item_field_offset = 0;
+                    let item_field = read(
                         reader,
                         options,
-                        VecArgs {
-                            count: byte_size * size as usize,
-                            inner: (),
-                        },
+                        type_fields,
+                        field_index,
+                        &mut item_field_offset,
                     )?;
+
+                    *read_offset += (byte_size * size as usize) as u64;
+                    reader.seek(SeekFrom::Start(
+                        item_start_pos + (byte_size * size as usize) as u64,
+                    ))?;
 
                     Field {
                         field_type: field.clone(),
                         data: FieldValue::Array(
                             ArrayField {
                                 array_size: size_field,
-                                item_type_fields,
-                                data: FieldValue::Data(array),
+                                item_field: Some(item_field),
+                                item_field_size: Some(byte_size as u64),
+                                data: FieldValue::DataOffset(this_offset),
                             }
                             .into(),
                         ),
@@ -126,7 +146,13 @@ impl BinRead for TypeTreeObject {
                     let mut array = Vec::new();
                     for _ in 0..size as usize {
                         *field_index = item_field_index;
-                        array.push(read(reader, options, type_fields, field_index)?);
+                        array.push(read(
+                            reader,
+                            options,
+                            type_fields,
+                            field_index,
+                            read_offset,
+                        )?);
                     }
 
                     Field {
@@ -134,7 +160,8 @@ impl BinRead for TypeTreeObject {
                         data: FieldValue::Array(
                             ArrayField {
                                 array_size: size_field,
-                                item_type_fields,
+                                item_field: None,
+                                item_field_size: None,
                                 data: FieldValue::ArrayItems(array),
                             }
                             .into(),
@@ -148,7 +175,8 @@ impl BinRead for TypeTreeObject {
                     while let Some(next_field) = type_fields.get(*field_index + 1) {
                         if next_field.get_level() == field_level + 1 {
                             *field_index += 1;
-                            let field_data = read(reader, options, type_fields, field_index)?;
+                            let field_data =
+                                read(reader, options, type_fields, field_index, read_offset)?;
                             fields.insert(field_data.get_name().clone(), field_data);
                         } else if next_field.get_level() <= field_level {
                             break;
@@ -163,16 +191,31 @@ impl BinRead for TypeTreeObject {
                         time: time.elapsed(),
                     }
                 } else {
-                    Field::read_options(reader, options, field.clone())?
+                    let this_offset = *read_offset;
+                    *read_offset += field.get_byte_size() as u64;
+                    reader.seek(SeekFrom::Current(field.get_byte_size() as i64))?;
+                    Field {
+                        field_type: field.clone(),
+                        data: FieldValue::DataOffset(this_offset),
+                        time: Duration::from_secs(0),
+                    }
                 }
             } else {
-                Field::read_options(reader, options, field.clone())?
+                let this_offset = *read_offset;
+                *read_offset += field.get_byte_size() as u64;
+                reader.seek(SeekFrom::Current(field.get_byte_size() as i64))?;
+                Field {
+                    field_type: field.clone(),
+                    data: FieldValue::DataOffset(this_offset),
+                    time: Duration::from_secs(0),
+                }
             };
 
             if field.is_align() {
                 let pos = reader.seek(SeekFrom::Current(0))?;
                 if pos % 4 != 0 {
                     reader.seek(SeekFrom::Current((4 - (pos % 4)) as i64))?;
+                    *read_offset += 4 - (pos % 4);
                 }
             }
             // println!("pos {:?}",reader.seek(SeekFrom::Current(0)));
@@ -181,40 +224,32 @@ impl BinRead for TypeTreeObject {
             Ok(field_value)
         }
 
+        let start_pos = reader.seek(SeekFrom::Current(0))?;
         let mut index = 0;
-        let data = read(reader, options, &args.class_args.type_fields, &mut index)?;
+        let mut data_buff_offset = 0;
+        let data = read(
+            reader,
+            options,
+            &args.class_args.type_fields,
+            &mut index,
+            &mut data_buff_offset,
+        )?;
+        reader.seek(SeekFrom::Start(start_pos))?;
 
         Ok(TypeTreeObject {
             endian: options.endian(),
             class_id: args.class_args.class_id,
             serialized_file_id: args.serialized_file_id,
-            data,
+            data_layout: data,
+            data_buff: <Vec<u8>>::read_options(
+                reader,
+                options,
+                VecArgs {
+                    count: data_buff_offset as usize,
+                    inner: (),
+                },
+            )?,
             external_data: None,
-        })
-    }
-}
-
-impl BinRead for Field {
-    type Args = Arc<Box<dyn TypeField + Send + Sync>>;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        let buff = <Vec<u8>>::read_options(
-            reader,
-            options,
-            VecArgs {
-                count: args.get_byte_size() as usize,
-                inner: (),
-            },
-        )?;
-
-        Ok(Field {
-            field_type: args,
-            data: FieldValue::Data(buff),
-            time: Duration::from_secs(0),
         })
     }
 }

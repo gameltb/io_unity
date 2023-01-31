@@ -34,15 +34,15 @@ impl AudioClipObject for AudioClip<'_> {
 
 impl AudioClip<'_> {
     fn get_resource_source(&self) -> Option<String> {
-        String::try_cast_from(&self.inner, "/Base/m_Resource/m_Source").ok()
+        String::try_cast_from(self.inner, "/Base/m_Resource/m_Source").ok()
     }
 
     fn get_resource_offset(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/m_Resource/m_Offset").ok()
+        u64::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()
     }
 
     fn get_resource_size(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/m_Resource/m_Size").ok()
+        u64::try_cast_from(self.inner, "/Base/m_Resource/m_Size").ok()
     }
 }
 

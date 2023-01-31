@@ -8,6 +8,7 @@ use crate::classes::CastRef;
 use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::convert::TryCastRefFrom;
+use crate::type_tree::TypeTreeObjectRef;
 
 use crate::type_tree::TypeTreeObject;
 use binrw::{BinRead, ReadOptions, VecArgs};
@@ -165,20 +166,20 @@ impl MeshObject for Mesh<'_> {
 }
 
 impl Mesh<'_> {
-    pub fn get_sub_meshes(&self) -> Option<Vec<TypeTreeObject>> {
-        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_SubMeshes/Array").ok()
+    pub fn get_sub_meshes(&self) -> Option<Vec<TypeTreeObjectRef>> {
+        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_SubMeshes/Array").ok()
     }
 
     pub fn get_index_format(&self) -> Option<i64> {
-        i64::try_cast_from(&self.inner, "/Base/m_IndexFormat").ok()
+        i64::try_cast_from(self.inner, "/Base/m_IndexFormat").ok()
     }
 
-    pub fn get_index_buffer(&self) -> Option<&Vec<u8>> {
-        Some(<Vec<u8>>::try_cast_as_from(&self.inner, "/Base/m_IndexBuffer/Array").ok()?)
+    pub fn get_index_buffer(&self) -> Option<Vec<u8>> {
+        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/m_IndexBuffer/Array").ok()?)
     }
 
-    pub fn get_vertex_data(&self) -> Option<TypeTreeObject> {
-        TypeTreeObject::try_cast_from(&self.inner, "/Base/m_VertexData").ok()
+    pub fn get_vertex_data(&self) -> Option<TypeTreeObjectRef> {
+        TypeTreeObjectRef::try_cast_from(self.inner, "/Base/m_VertexData").ok()
     }
 }
 
@@ -186,16 +187,16 @@ def_unity_class!(SubMesh);
 
 impl SubMesh<'_> {
     pub fn get_first_byte(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/firstByte").ok()
+        u64::try_cast_from(self.inner, "/Base/firstByte").ok()
     }
     pub fn get_index_count(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/indexCount").ok()
+        u64::try_cast_from(self.inner, "/Base/indexCount").ok()
     }
     pub fn get_first_vertex(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/firstVertex").ok()
+        u64::try_cast_from(self.inner, "/Base/firstVertex").ok()
     }
     pub fn get_vertex_count(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/vertexCount").ok()
+        u64::try_cast_from(self.inner, "/Base/vertexCount").ok()
     }
 }
 
@@ -204,32 +205,32 @@ def_unity_class!(Channel);
 
 impl Channel<'_> {
     pub fn get_stream(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/stream").ok()
+        u64::try_cast_from(self.inner, "/Base/stream").ok()
     }
     pub fn get_offset(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/offset").ok()
+        u64::try_cast_from(self.inner, "/Base/offset").ok()
     }
     pub fn get_format(&self) -> Option<VertexFormat> {
-        u8::try_cast_from(&self.inner, "/Base/format")
+        u8::try_cast_from(self.inner, "/Base/format")
             .ok()
             .and_then(|t| VertexFormat::try_from(t).ok())
     }
     pub fn get_dimension(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/dimension").ok()
+        u64::try_cast_from(self.inner, "/Base/dimension").ok()
     }
 }
 
 impl VertexData<'_> {
-    pub fn get_channels(&self) -> Option<Vec<TypeTreeObject>> {
-        <Vec<TypeTreeObject>>::try_cast_from(&self.inner, "/Base/m_Channels/Array").ok()
+    pub fn get_channels(&self) -> Option<Vec<TypeTreeObjectRef>> {
+        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_Channels/Array").ok()
     }
 
     pub fn get_vertex_count(&self) -> Option<u64> {
-        u64::try_cast_from(&self.inner, "/Base/m_VertexCount").ok()
+        u64::try_cast_from(self.inner, "/Base/m_VertexCount").ok()
     }
 
-    pub fn get_data(&self) -> Option<&Vec<u8>> {
-        Some(<Vec<u8>>::try_cast_as_from(&self.inner, "/Base/m_DataSize").ok()?)
+    pub fn get_data(&self) -> Option<Vec<u8>> {
+        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/m_DataSize").ok()?)
     }
 }
 

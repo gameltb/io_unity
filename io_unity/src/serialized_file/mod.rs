@@ -518,6 +518,12 @@ pub trait Serialized: fmt::Debug {
         let mut type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
         let apos = reader.seek(SeekFrom::Current(0))?;
         if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
+            println!(
+                "{} readed, {} object size. class id {:?}",
+                apos - (self.get_data_offset() + obj.byte_start),
+                obj.byte_size,
+                obj.class
+            );
             let mut external_data = vec![
                 0u8;
                 (obj.byte_size as u64 - (apos - (self.get_data_offset() + obj.byte_start)))
