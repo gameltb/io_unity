@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::BufReader,
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
 use io_unity::type_tree::{
     convert::{FieldCastArgs, TryCast, TryCastRef},
@@ -7,6 +13,8 @@ use io_unity::type_tree::{
 use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
+
+    use std::sync::{Arc, RwLock};
 
     use pyo3::prelude::*;
 
@@ -38,7 +46,10 @@ pub mod python_unity_class {
     #[pyclass]
     pub struct UnityAssetViewer(pub io_unity::unity_asset_view::UnityAssetViewer);
     #[pyclass]
-    pub struct TypeTreeObject(pub io_unity::type_tree::TypeTreeObject);
+    pub struct TypeTreeObject {
+        pub inner: Arc<RwLock<Box<io_unity::type_tree::TypeTreeObject>>>,
+        pub path: String,
+    }
 }
 
 use python_unity_class::*;
@@ -157,7 +168,12 @@ impl UnityAssetViewer {
         {
             return serialized_file
                 .get_tt_object_by_path_id(object_ref.path_id)
-                .map(|otto| otto.map(|tto| TypeTreeObject(tto)))
+                .map(|otto| {
+                    otto.map(|tto| TypeTreeObject {
+                        inner: Arc::new(RwLock::new(Box::new(tto))),
+                        path: "/Base".to_owned(),
+                    })
+                })
                 .into_py_result();
         }
         Ok(None)
@@ -185,43 +201,48 @@ impl UnityAssetViewer {
 #[pymethods]
 impl TypeTreeObject {
     fn get_class_id(&self) -> i32 {
-        self.0.class_id
+        self.inner.read().unwrap().class_id
     }
 
     fn display_tree(&self) {
-        self.0.display_tree();
+        self.inner.read().unwrap().display_tree();
     }
 
     fn get_data_buff(&self) -> Option<Vec<u8>> {
-        let field = self.0.get_field_by_name("")?;
+        let inner = self.inner.read().unwrap();
+        let field = inner.get_field_by_path(&self.path)?;
         Some(
             field
-                .try_cast_as(&self.0.get_field_cast_args())
+                .try_cast_as(&inner.get_field_cast_args())
                 .ok()?
                 .to_owned(),
         )
     }
 
     fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
-        let field_cast_args = self.0.get_field_cast_args();
-        let field = self
-            .0
-            .get_field_by_name(attr)
+        let inner = self.inner.read().unwrap();
+
+        let field_cast_args = inner.get_field_cast_args();
+        let path = self.path.clone() + "/" + attr;
+        let field = inner
+            .get_field_by_path(&path)
             .ok_or(PyAttributeError::new_err(format!(
-                "field {} cannot found",
-                attr,
+                "field {} cannot found, Path : {}",
+                attr, &path,
             )))?;
 
         fn cast_field(
+            type_tree_object: &Arc<RwLock<Box<io_unity::type_tree::TypeTreeObject>>>,
             py: Python<'_>,
             field: &Field,
             field_cast_args: &FieldCastArgs,
-            attr: &str,
+            path: &str,
+            should_clone_field: bool,
         ) -> PyResult<PyObject> {
             let cast_error_map = |_| {
                 PyAttributeError::new_err(format!(
                     "field {} cast failed. Type: {}",
-                    attr,
+                    path,
                     field.get_type().as_str()
                 ))
             };
@@ -303,7 +324,7 @@ impl TypeTreeObject {
                     let field = field.get_field(&["Array".to_string()]).ok_or(
                         PyAttributeError::new_err(format!(
                             "Array field {} cast failed. Type: {}",
-                            attr,
+                            path,
                             field.get_type().as_str()
                         )),
                     )?;
@@ -354,7 +375,7 @@ impl TypeTreeObject {
 
                         return Err(PyAttributeError::new_err(format!(
                             "Array field {} cannot cast. Type: {} Item Type : {}",
-                            attr,
+                            path,
                             field.get_type().as_str(),
                             buff_type
                         )));
@@ -365,7 +386,8 @@ impl TypeTreeObject {
                     let mut new_vec = Vec::new();
                     for obj in value {
                         let value = obj.get_field_by_name("").unwrap();
-                        let value = cast_field(py, value, field_cast_args, attr)?;
+                        let value =
+                            cast_field(type_tree_object, py, value, field_cast_args, path, true)?;
                         new_vec.push(value)
                     }
                     return Ok(new_vec.into_py(py));
@@ -374,7 +396,7 @@ impl TypeTreeObject {
                     let field = field.get_field(&["Array".to_string()]).ok_or(
                         PyAttributeError::new_err(format!(
                             "Map field {} cast failed. Type: {}",
-                            attr,
+                            path,
                             field.get_type().as_str()
                         )),
                     )?;
@@ -385,22 +407,34 @@ impl TypeTreeObject {
                     let mut new_map = HashMap::new();
                     for (name, obj) in value {
                         let value = obj.get_field_by_name("").unwrap();
-                        let value = cast_field(py, value, field_cast_args, attr)?;
+                        let value =
+                            cast_field(type_tree_object, py, value, field_cast_args, path, true)?;
                         new_map.insert(name, value);
                     }
                     return Ok(new_map.into_py(py));
                 }
                 &_ => {
-                    let value: io_unity::type_tree::TypeTreeObject = field
-                        .try_cast_to(&field_cast_args)
-                        .map_err(cast_error_map)?;
-                    let value = TypeTreeObject(value);
+                    let value = if should_clone_field {
+                        let value: io_unity::type_tree::TypeTreeObject = field
+                            .try_cast_to(&field_cast_args)
+                            .map_err(cast_error_map)?;
+                        TypeTreeObject {
+                            inner: Arc::new(RwLock::new(Box::new(value))),
+                            path: "/Base".to_owned(),
+                        }
+                    } else {
+                        TypeTreeObject {
+                            inner: type_tree_object.clone(),
+                            path: path.to_string(),
+                        }
+                    };
+
                     return Ok(value.into_py(py));
                 }
             }
         }
 
-        cast_field(py, field, &field_cast_args, attr)
+        cast_field(&self.inner, py, field, &field_cast_args, &path, false)
     }
 }
 
