@@ -70,7 +70,7 @@ impl UnityAssetViewer {
         let unity_fs_id = self.unity_fs_count;
         self.unity_fs_count = self.unity_fs_count + 1;
         for cab_path in unity_fs.get_cab_path() {
-            let cab_buff = unity_fs.get_file_by_path(&cab_path)?;
+            let cab_buff = unity_fs.get_file_data_by_path(&cab_path)?;
             let cab_buff_reader = Box::new(Cursor::new(cab_buff));
 
             let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
@@ -349,8 +349,7 @@ pub fn get_resource_file_by_path(
     {
         if path.starts_with("archive:/") {
             if let Some(unityfs) = unityfs {
-                if let Ok(file) = unityfs.get_file_by_path(&file_name) {
-                    let file_reader = Cursor::new(file);
+                if let Some(file_reader) = unityfs.get_file_reader_by_path(&file_name) {
                     return Some(Box::new(file_reader));
                 }
             }

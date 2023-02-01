@@ -2,11 +2,8 @@ use super::{Texture2D, Texture2DObject, TextureFormat};
 use crate::classes::SerializedFileRef;
 
 use crate::type_tree::convert::TryCastFrom;
-use crate::type_tree::convert::TryCastRefFrom;
-
 use crate::unity_asset_view::UnityAssetViewer;
 use num_enum::TryFromPrimitive;
-use std::borrow::Cow;
 use std::io::{prelude::*, SeekFrom};
 
 impl Texture2DObject for Texture2D<'_> {

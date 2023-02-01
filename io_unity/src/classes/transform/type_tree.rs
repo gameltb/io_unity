@@ -1,7 +1,7 @@
 use super::{Transform, TransformObject};
 
 use crate::type_tree::convert::TryCastFrom;
-use crate::type_tree::{TypeTreeObject, TypeTreeObjectRef};
+use crate::type_tree::TypeTreeObjectRef;
 use glam::Mat4;
 
 impl TransformObject for Transform<'_> {

@@ -6,7 +6,6 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 
 use crate::type_tree::convert::TryCast;
@@ -28,25 +27,36 @@ pub trait TypeField: Debug {
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
-    DataOffset(u64),
+    DataOffset(DataOffset),
     Fields(HashMap<String, Field>),
     Array(Box<ArrayField>),
-    ArrayItems(Vec<Field>),
 }
 
 #[derive(Debug, Clone)]
 pub struct ArrayField {
     array_size: Field,
+    item_type_fields: Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
     item_field: Option<Field>,
     item_field_size: Option<u64>,
-    data: FieldValue,
+    data: ArrayFieldValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum ArrayFieldValue {
+    DataOffset(DataOffset),
+    ArrayItems(Vec<Field>),
+}
+
+#[derive(Debug, Clone)]
+pub enum DataOffset {
+    AbsDataOffset(u64),
+    ArrayItemOffset(u64),
 }
 
 #[derive(Debug, Clone)]
 pub struct Field {
     field_type: Arc<Box<dyn TypeField + Send + Sync>>,
     data: FieldValue,
-    time: Duration,
 }
 
 impl Field {
@@ -58,9 +68,46 @@ impl Field {
         self.field_type.get_type()
     }
 
+    pub fn try_as_slice<'a>(
+        &self,
+        object_data_buff: &'a Vec<u8>,
+        field_cast_args: &FieldCastArgs,
+    ) -> Result<&'a [u8], ()> {
+        let offset = field_cast_args.field_offset;
+        let (pos, size) = match &self.data {
+            FieldValue::DataOffset(data_offset) => {
+                let pos = match data_offset {
+                    DataOffset::AbsDataOffset(data) => *data,
+                    DataOffset::ArrayItemOffset(data) => *data + offset.ok_or(())? as u64,
+                };
+                let size = self.field_type.get_byte_size() as u64;
+                (pos, size)
+            }
+            FieldValue::Array(array) => match &array.data {
+                ArrayFieldValue::DataOffset(data_offset) => {
+                    let pos = match data_offset {
+                        DataOffset::AbsDataOffset(data) => *data,
+                        DataOffset::ArrayItemOffset(_) => return Err(()),
+                    };
+                    let array_size: i32 = array
+                        .array_size
+                        .try_cast_to(object_data_buff, field_cast_args)?;
+                    if array_size < 0 {
+                        return Err(());
+                    }
+                    let size = array.item_field_size.ok_or(())? * array_size as u64;
+                    (pos, size)
+                }
+                ArrayFieldValue::ArrayItems(_) => return Err(()),
+            },
+            FieldValue::Fields(_) => return Err(()),
+        };
+        Ok(&object_data_buff[pos as usize..(pos + size) as usize])
+    }
+
     pub fn try_get_buff_type_and_type_size(&self) -> Option<(&String, i32)> {
         if let FieldValue::Array(ar) = &self.data {
-            if let FieldValue::DataOffset(_) = &ar.data {
+            if let ArrayFieldValue::DataOffset(_) = &ar.data {
                 if let Some(item_field) = ar.item_field.as_ref() {
                     if let FieldValue::DataOffset(_) = item_field.data {
                         let item_type = &item_field.field_type;
@@ -80,15 +127,14 @@ impl Field {
     ) {
         let np = p.clone() + "/" + self.field_type.get_name();
         print!(
-            "{}/{} : {}({}) {:?}",
+            "{}/{} : {}({})",
             p,
             self.field_type.get_name(),
             self.field_type.get_type(),
             self.field_type.get_byte_size(),
-            &self.time
         );
         match &self.data {
-            FieldValue::DataOffset(v) => {
+            FieldValue::DataOffset(_v) => {
                 let num: Result<i64, ()> = self.try_cast_to(object_data_buff, field_cast_args);
                 if let Ok(num) = num {
                     println!(" data : {:?}", num);
@@ -118,28 +164,38 @@ impl Field {
                 ar.array_size
                     .display_field(&np, object_data_buff, field_cast_args);
                 match &ar.data {
-                    FieldValue::ArrayItems(ai) => {
+                    ArrayFieldValue::ArrayItems(ai) => {
                         if let Some(aii) = ai.get(0) {
                             aii.display_field(&np, object_data_buff, field_cast_args);
+                        } else {
+                            for item in &ar.item_type_fields {
+                                println!(
+                                    "{}/?/{} : {}({}) at level [{}]",
+                                    np,
+                                    item.get_name(),
+                                    item.get_type(),
+                                    item.get_byte_size(),
+                                    item.get_level(),
+                                );
+                            }
                         }
                     }
-                    _ => {
+                    ArrayFieldValue::DataOffset(_) => {
                         if let Some(item_field) = &ar.item_field {
                             item_field.display_field(&np, object_data_buff, field_cast_args);
                         }
                     }
                 }
             }
-            FieldValue::ArrayItems(_) => (),
         }
     }
 
     fn get_field(
         &self,
         path: &[String],
-        field_offset: i64,
+        field_offset: Option<i64>,
         type_tree_object: &TypeTreeObject,
-    ) -> Option<(&Self, i64)> {
+    ) -> Option<(&Self, Option<i64>)> {
         if path.len() == 0 {
             return Some((self, field_offset));
         } else {
@@ -155,10 +211,13 @@ impl Field {
                     if let Some((index, path)) = path.split_first() {
                         if let Ok(index) = index.parse::<i32>() {
                             match &fields.data {
-                                FieldValue::DataOffset(offset) => {
-                                    assert_eq!(field_offset, 0);
+                                ArrayFieldValue::DataOffset(offset) => {
+                                    assert_eq!(field_offset, None);
                                     let item_size = fields.item_field_size?;
                                     let field = fields.item_field.as_ref()?;
+                                    let DataOffset::AbsDataOffset(offset) = offset else {
+                                        return None;
+                                    };
                                     let size: i32 = fields
                                         .array_size
                                         .try_cast_to(
@@ -171,11 +230,11 @@ impl Field {
                                     }
                                     return field.get_field(
                                         path,
-                                        (*offset + item_size * index as u64) as i64,
+                                        Some((*offset + item_size * index as u64) as i64),
                                         type_tree_object,
                                     );
                                 }
-                                FieldValue::ArrayItems(items) => {
+                                ArrayFieldValue::ArrayItems(items) => {
                                     if let Some(field) = items.get(index as usize) {
                                         return field.get_field(
                                             path,
@@ -184,7 +243,6 @@ impl Field {
                                         );
                                     }
                                 }
-                                _ => (),
                             }
                         }
                     }
@@ -196,6 +254,7 @@ impl Field {
     }
 }
 
+// todo: cache get layout
 #[derive(Debug, Clone)]
 pub struct TypeTreeObject {
     endian: binrw::Endian,
@@ -220,7 +279,17 @@ impl TypeTreeObject {
         self.endian.clone()
     }
 
-    pub fn get_field_by_path(&self, path: &str) -> Option<(&Field, i64)> {
+    pub fn try_as_slice(&self, path: &str) -> Result<&[u8], ()> {
+        self.get_field_by_path(path)
+            .and_then(|(feild, offset)| {
+                let mut field_cast_args = self.get_field_cast_args();
+                field_cast_args.field_offset = offset;
+                feild.try_as_slice(&self.data_buff, &field_cast_args).ok()
+            })
+            .ok_or(())
+    }
+
+    pub(super) fn get_field_by_path(&self, path: &str) -> Option<(&Field, Option<i64>)> {
         let path: Vec<String> = path
             .split("/")
             .filter(|s| !s.is_empty())
@@ -229,21 +298,20 @@ impl TypeTreeObject {
         if path.len() < 1 {
             return None;
         }
-        self.data_layout.get_field(&path[1..], 0, &self)
+        self.data_layout.get_field(&path[1..], None, &self)
     }
 
-    pub fn get_field_by_path_list(&self, path: &Vec<String>) -> Option<(&Field, i64)> {
+    pub(super) fn get_field_by_path_list(&self, path: &[String]) -> Option<(&Field, Option<i64>)> {
         if path.len() == 0 {
-            return Some((&self.data_layout, 0));
+            return Some((&self.data_layout, None));
         }
-        self.data_layout.get_field(&path[1..], 0, &self)
+        self.data_layout.get_field(&path, None, &self)
     }
 
-    pub fn get_field_cast_args(&self) -> FieldCastArgs {
+    pub(super) fn get_field_cast_args(&self) -> FieldCastArgs {
         FieldCastArgs {
             endian: self.endian.clone(),
-            serialized_file_id: self.serialized_file_id,
-            field_offset: 0,
+            field_offset: None,
         }
     }
 }
@@ -258,12 +326,50 @@ impl Into<TypeTreeObjectRef> for TypeTreeObject {
     fn into(self) -> TypeTreeObjectRef {
         TypeTreeObjectRef {
             inner: Arc::new(RwLock::new(Box::new(self))),
-            path: vec!["Base".to_owned()],
+            path: vec![],
         }
     }
 }
 
 impl TypeTreeObjectRef {
+    pub fn inner(&self) -> &Arc<RwLock<Box<TypeTreeObject>>> {
+        &self.inner
+    }
+
+    pub fn get_name(&self) -> Option<String> {
+        Some(
+            self.inner
+                .read()
+                .unwrap()
+                .get_field_by_path_list(&self.path)?
+                .0
+                .get_name()
+                .to_owned(),
+        )
+    }
+
+    pub fn get_type(&self) -> Option<String> {
+        Some(
+            self.inner
+                .read()
+                .unwrap()
+                .get_field_by_path_list(&self.path)?
+                .0
+                .get_type()
+                .to_owned(),
+        )
+    }
+
+    pub fn try_get_buff_type_and_type_size(&self) -> Option<(String, i32)> {
+        self.inner
+            .read()
+            .unwrap()
+            .get_field_by_path_list(&self.path)?
+            .0
+            .try_get_buff_type_and_type_size()
+            .and_then(|(n, s)| Some((n.to_owned(), s)))
+    }
+
     pub fn display_tree(&self) {
         self.inner.read().unwrap().display_tree()
     }
@@ -276,7 +382,7 @@ impl TypeTreeObjectRef {
         self.inner.read().unwrap().serialized_file_id
     }
 
-    pub fn get_field_cast_args(&self) -> FieldCastArgs {
-        self.inner.read().unwrap().get_field_cast_args()
+    pub fn get_class_id(&self) -> i32 {
+        self.inner.read().unwrap().class_id
     }
 }

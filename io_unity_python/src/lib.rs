@@ -1,20 +1,10 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::BufReader,
-    path::Path,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
-use io_unity::type_tree::{
-    convert::{FieldCastArgs, TryCast, TryCastRef},
-    Field,
-};
+use io_unity::type_tree::convert::TryCastFrom;
+
 use pyo3::{exceptions::PyAttributeError, prelude::*};
 
 pub mod python_unity_class {
-
-    use std::sync::{Arc, RwLock};
 
     use pyo3::prelude::*;
 
@@ -46,10 +36,7 @@ pub mod python_unity_class {
     #[pyclass]
     pub struct UnityAssetViewer(pub io_unity::unity_asset_view::UnityAssetViewer);
     #[pyclass]
-    pub struct TypeTreeObject {
-        pub inner: Arc<RwLock<Box<io_unity::type_tree::TypeTreeObject>>>,
-        pub path: String,
-    }
+    pub struct TypeTreeObjectRef(pub io_unity::type_tree::TypeTreeObjectRef);
 }
 
 use python_unity_class::*;
@@ -160,7 +147,7 @@ impl UnityAssetViewer {
             .into_py_result()
     }
 
-    pub fn deref_object_ref(&self, object_ref: ObjectRef) -> PyResult<Option<TypeTreeObject>> {
+    pub fn deref_object_ref(&self, object_ref: ObjectRef) -> PyResult<Option<TypeTreeObjectRef>> {
         if let Some(serialized_file) = self
             .0
             .serialized_file_map
@@ -168,12 +155,7 @@ impl UnityAssetViewer {
         {
             return serialized_file
                 .get_tt_object_by_path_id(object_ref.path_id)
-                .map(|otto| {
-                    otto.map(|tto| TypeTreeObject {
-                        inner: Arc::new(RwLock::new(Box::new(tto))),
-                        path: "/Base".to_owned(),
-                    })
-                })
+                .map(|otto| otto.map(|tto| TypeTreeObjectRef(tto.into())))
                 .into_py_result();
         }
         Ok(None)
@@ -199,147 +181,136 @@ impl UnityAssetViewer {
 }
 
 #[pymethods]
-impl TypeTreeObject {
+impl TypeTreeObjectRef {
     fn get_class_id(&self) -> i32 {
-        self.inner.read().unwrap().class_id
+        self.0.get_class_id()
     }
 
     fn display_tree(&self) {
-        self.inner.read().unwrap().display_tree();
+        self.0.display_tree();
     }
 
     fn get_data_buff(&self) -> Option<Vec<u8>> {
-        let inner = self.inner.read().unwrap();
-        let field = inner.get_field_by_path(&self.path)?;
-        Some(
-            field
-                .try_cast_as(&inner.get_field_cast_args())
-                .ok()?
-                .to_owned(),
-        )
+        let path_to_self: Vec<String> = Vec::new();
+        <Vec<u8>>::try_cast_from(&self.0, path_to_self.as_slice()).ok()
     }
 
     fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
-        let inner = self.inner.read().unwrap();
-
-        let field_cast_args = inner.get_field_cast_args();
-        let path = self.path.clone() + "/" + attr;
-        let field = inner
-            .get_field_by_path(&path)
-            .ok_or(PyAttributeError::new_err(format!(
-                "field {} cannot found, Path : {}",
-                attr, &path,
-            )))?;
+        let path = vec![attr.to_owned()];
+        let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(&self.0, path.as_slice())
+            .map_err(|_| {
+                PyAttributeError::new_err(format!(
+                    "field {} cannot found, Path : {:?}",
+                    attr, &path,
+                ))
+            })?;
 
         fn cast_field(
-            type_tree_object: &Arc<RwLock<Box<io_unity::type_tree::TypeTreeObject>>>,
+            field: io_unity::type_tree::TypeTreeObjectRef,
             py: Python<'_>,
-            field: &Field,
-            field_cast_args: &FieldCastArgs,
-            path: &str,
-            should_clone_field: bool,
         ) -> PyResult<PyObject> {
             let cast_error_map = |_| {
                 PyAttributeError::new_err(format!(
-                    "field {} cast failed. Type: {}",
-                    path,
-                    field.get_type().as_str()
+                    "field {:?} cast failed. Type: {:?}",
+                    field.path,
+                    field.get_type()
                 ))
             };
+            let path_to_self: Vec<String> = Vec::new();
 
-            match field.get_type().as_str() {
+            match field
+                .get_type()
+                .ok_or(PyAttributeError::new_err(format!(
+                    "field {:?} cast failed. Type: {:?}",
+                    field.path,
+                    field.get_type()
+                )))?
+                .as_str()
+            {
                 "string" => {
-                    let value: String = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <String>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "bool" => {
-                    let value: bool = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <bool>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "SInt8" => {
-                    let value: i8 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <i8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "SInt16" | "short" => {
-                    let value: i16 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <i16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "SInt32" | "int" => {
-                    let value: i32 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <i32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "SInt64" | "long long" => {
-                    let value: i64 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <i64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "UInt8" | "char" => {
-                    let value: u8 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <u8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "UInt16" | "unsigned short" => {
-                    let value: u16 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <u16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "UInt32" | "unsigned int" => {
-                    let value: u32 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <u32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "UInt64" | "unsigned long long" | "FileSize" => {
-                    let value: u64 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <u64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "float" => {
-                    let value: f32 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <f32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "double" => {
-                    let value: f64 = field
-                        .try_cast_to(&field_cast_args)
+                    let value = <f64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     return Ok(value.into_py(py));
                 }
                 "vector" | "staticvector" => {
-                    let field = field.get_field(&["Array".to_string()]).ok_or(
+                    let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(
+                        &field,
+                        ["Array".to_owned()].as_slice(),
+                    )
+                    .map_err(|_| {
                         PyAttributeError::new_err(format!(
-                            "Array field {} cast failed. Type: {}",
-                            path,
-                            field.get_type().as_str()
-                        )),
-                    )?;
+                            "Array field {:?} cast failed. Type: {:?}",
+                            field.path,
+                            field.get_type()
+                        ))
+                    })?;
                     if let Some((buff_type, size)) = field.try_get_buff_type_and_type_size() {
                         match buff_type.as_str() {
                             "float" => {
-                                let value: Vec<f32> = field
-                                    .try_cast_to(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<f32>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.into_py(py));
                             }
                             "double" => {
-                                let value: Vec<f64> = field
-                                    .try_cast_to(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<f64>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.into_py(py));
                             }
                             &_ => (),
@@ -347,94 +318,85 @@ impl TypeTreeObject {
 
                         match size {
                             1 => {
-                                let value: &Vec<u8> = field
-                                    .try_cast_as(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<u8>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.to_owned().into_py(py));
                             }
                             2 => {
-                                let value: Vec<u16> = field
-                                    .try_cast_to(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<u16>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.into_py(py));
                             }
                             4 => {
-                                let value: Vec<u32> = field
-                                    .try_cast_to(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<u32>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.into_py(py));
                             }
                             8 => {
-                                let value: Vec<u64> = field
-                                    .try_cast_to(&field_cast_args)
-                                    .map_err(cast_error_map)?;
+                                let value =
+                                    <Vec<u64>>::try_cast_from(&field, path_to_self.as_slice())
+                                        .map_err(cast_error_map)?;
                                 return Ok(value.into_py(py));
                             }
                             _ => (),
                         }
 
                         return Err(PyAttributeError::new_err(format!(
-                            "Array field {} cannot cast. Type: {} Item Type : {}",
-                            path,
-                            field.get_type().as_str(),
+                            "Array field {:?} cannot cast. Type: {:?} Item Type : {}",
+                            field.path,
+                            field.get_type(),
                             buff_type
                         )));
                     }
-                    let value: Vec<io_unity::type_tree::TypeTreeObject> = field
-                        .try_cast_to(&field_cast_args)
-                        .map_err(cast_error_map)?;
+                    let value = <Vec<io_unity::type_tree::TypeTreeObjectRef>>::try_cast_from(
+                        &field,
+                        path_to_self.as_slice(),
+                    )
+                    .map_err(cast_error_map)?;
                     let mut new_vec = Vec::new();
                     for obj in value {
-                        let value = obj.get_field_by_name("").unwrap();
-                        let value =
-                            cast_field(type_tree_object, py, value, field_cast_args, path, true)?;
+                        let value = cast_field(obj, py)?;
                         new_vec.push(value)
                     }
                     return Ok(new_vec.into_py(py));
                 }
                 "map" => {
-                    let field = field.get_field(&["Array".to_string()]).ok_or(
+                    let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(
+                        &field,
+                        ["Array".to_owned()].as_slice(),
+                    )
+                    .map_err(|_| {
                         PyAttributeError::new_err(format!(
-                            "Map field {} cast failed. Type: {}",
-                            path,
-                            field.get_type().as_str()
-                        )),
-                    )?;
-                    let value: HashMap<String, io_unity::type_tree::TypeTreeObject> = field
-                        .try_cast_to(&field_cast_args)
+                            "Map field {:?} cast failed. Type: {:?}",
+                            field.path,
+                            field.get_type()
+                        ))
+                    })?;
+                    let value =
+                        <HashMap<String, io_unity::type_tree::TypeTreeObjectRef>>::try_cast_from(
+                            &field,
+                            path_to_self.as_slice(),
+                        )
                         .map_err(cast_error_map)?;
 
                     let mut new_map = HashMap::new();
                     for (name, obj) in value {
-                        let value = obj.get_field_by_name("").unwrap();
-                        let value =
-                            cast_field(type_tree_object, py, value, field_cast_args, path, true)?;
+                        let value = cast_field(obj, py)?;
                         new_map.insert(name, value);
                     }
                     return Ok(new_map.into_py(py));
                 }
                 &_ => {
-                    let value = if should_clone_field {
-                        let value: io_unity::type_tree::TypeTreeObject = field
-                            .try_cast_to(&field_cast_args)
-                            .map_err(cast_error_map)?;
-                        TypeTreeObject {
-                            inner: Arc::new(RwLock::new(Box::new(value))),
-                            path: "/Base".to_owned(),
-                        }
-                    } else {
-                        TypeTreeObject {
-                            inner: type_tree_object.clone(),
-                            path: path.to_string(),
-                        }
-                    };
-
+                    let value = TypeTreeObjectRef(field);
                     return Ok(value.into_py(py));
                 }
             }
         }
 
-        cast_field(&self.inner, py, field, &field_cast_args, &path, false)
+        cast_field(field, py)
     }
 }
 
@@ -449,7 +411,7 @@ fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<UnityFS>()?;
     m.add_class::<SerializedFile>()?;
     m.add_class::<UnityAssetViewer>()?;
-    m.add_class::<TypeTreeObject>()?;
+    m.add_class::<TypeTreeObjectRef>()?;
     m.add_class::<ObjectRef>()?;
     m.add_function(wrap_pyfunction!(set_info_json_tar_reader, m)?)?;
 

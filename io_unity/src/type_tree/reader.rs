@@ -1,16 +1,15 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    io::{Cursor, ErrorKind, Read, Seek, SeekFrom},
+    io::{ErrorKind, Read, Seek, SeekFrom},
     sync::Arc,
-    time::Duration,
 };
 
 use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
 
 use crate::type_tree::{
-    convert::{FieldCastArgs, TryCast, TryRead},
-    ArrayField, FieldValue, TypeTreeObject,
+    convert::{FieldCastArgs, TryRead},
+    ArrayField, ArrayFieldValue, DataOffset, FieldValue, TypeTreeObject,
 };
 
 use super::{Field, TypeField};
@@ -59,24 +58,31 @@ impl BinRead for TypeTreeObject {
             type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
             read_offset: &mut u64,
+            is_fix_size_array_item: bool,
         ) -> BinResult<Field> {
-            let time = std::time::Instant::now();
             let field = type_fields
                 .get(*field_index)
                 .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
             let field_level = field.get_level();
             let field_value = if field.is_array() {
+                assert_eq!(is_fix_size_array_item, false);
                 *field_index += 1;
                 let size_start_pos = reader.seek(SeekFrom::Current(0))?;
-                let size_field = read(reader, options, type_fields, field_index, read_offset)?;
+                let size_field = read(
+                    reader,
+                    options,
+                    type_fields,
+                    field_index,
+                    read_offset,
+                    false,
+                )?;
                 reader.seek(SeekFrom::Start(size_start_pos))?;
                 let size: i32 = (&size_field)
                     .try_read_to(
                         reader,
                         &FieldCastArgs {
                             endian: options.endian(),
-                            serialized_file_id: 0,
-                            field_offset: 0,
+                            field_offset: None,
                         },
                     )
                     .map_err(|_| std::io::Error::from(ErrorKind::NotFound))?;
@@ -119,9 +125,10 @@ impl BinRead for TypeTreeObject {
                     let item_field = read(
                         reader,
                         options,
-                        type_fields,
-                        field_index,
+                        &item_type_fields,
+                        &mut 0,
                         &mut item_field_offset,
+                        true,
                     )?;
 
                     *read_offset += (byte_size * size as usize) as u64;
@@ -134,13 +141,15 @@ impl BinRead for TypeTreeObject {
                         data: FieldValue::Array(
                             ArrayField {
                                 array_size: size_field,
+                                item_type_fields,
                                 item_field: Some(item_field),
                                 item_field_size: Some(byte_size as u64),
-                                data: FieldValue::DataOffset(this_offset),
+                                data: ArrayFieldValue::DataOffset(DataOffset::AbsDataOffset(
+                                    this_offset,
+                                )),
                             }
                             .into(),
                         ),
-                        time: time.elapsed(),
                     }
                 } else {
                     let mut array = Vec::new();
@@ -152,6 +161,7 @@ impl BinRead for TypeTreeObject {
                             type_fields,
                             field_index,
                             read_offset,
+                            false,
                         )?);
                     }
 
@@ -160,13 +170,13 @@ impl BinRead for TypeTreeObject {
                         data: FieldValue::Array(
                             ArrayField {
                                 array_size: size_field,
+                                item_type_fields,
                                 item_field: None,
                                 item_field_size: None,
-                                data: FieldValue::ArrayItems(array),
+                                data: ArrayFieldValue::ArrayItems(array),
                             }
                             .into(),
                         ),
-                        time: time.elapsed(),
                     }
                 }
             } else if let Some(next_field) = type_fields.get(*field_index + 1) {
@@ -175,8 +185,14 @@ impl BinRead for TypeTreeObject {
                     while let Some(next_field) = type_fields.get(*field_index + 1) {
                         if next_field.get_level() == field_level + 1 {
                             *field_index += 1;
-                            let field_data =
-                                read(reader, options, type_fields, field_index, read_offset)?;
+                            let field_data = read(
+                                reader,
+                                options,
+                                type_fields,
+                                field_index,
+                                read_offset,
+                                is_fix_size_array_item,
+                            )?;
                             fields.insert(field_data.get_name().clone(), field_data);
                         } else if next_field.get_level() <= field_level {
                             break;
@@ -188,7 +204,6 @@ impl BinRead for TypeTreeObject {
                     Field {
                         field_type: field.clone(),
                         data: FieldValue::Fields(fields),
-                        time: time.elapsed(),
                     }
                 } else {
                     let this_offset = *read_offset;
@@ -196,8 +211,11 @@ impl BinRead for TypeTreeObject {
                     reader.seek(SeekFrom::Current(field.get_byte_size() as i64))?;
                     Field {
                         field_type: field.clone(),
-                        data: FieldValue::DataOffset(this_offset),
-                        time: Duration::from_secs(0),
+                        data: if !is_fix_size_array_item {
+                            FieldValue::DataOffset(DataOffset::AbsDataOffset(this_offset))
+                        } else {
+                            FieldValue::DataOffset(DataOffset::ArrayItemOffset(this_offset))
+                        },
                     }
                 }
             } else {
@@ -206,8 +224,11 @@ impl BinRead for TypeTreeObject {
                 reader.seek(SeekFrom::Current(field.get_byte_size() as i64))?;
                 Field {
                     field_type: field.clone(),
-                    data: FieldValue::DataOffset(this_offset),
-                    time: Duration::from_secs(0),
+                    data: if !is_fix_size_array_item {
+                        FieldValue::DataOffset(DataOffset::AbsDataOffset(this_offset))
+                    } else {
+                        FieldValue::DataOffset(DataOffset::ArrayItemOffset(this_offset))
+                    },
                 }
             };
 
@@ -233,6 +254,7 @@ impl BinRead for TypeTreeObject {
             &args.class_args.type_fields,
             &mut index,
             &mut data_buff_offset,
+            false,
         )?;
         reader.seek(SeekFrom::Start(start_pos))?;
 

@@ -1,8 +1,8 @@
 pub mod type_tree;
 
+use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObjectRef;
-use crate::{def_unity_class, type_tree::TypeTreeObject};
 use binrw::{binrw, BinRead};
 use std::{
     fmt,

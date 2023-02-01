@@ -7,10 +7,8 @@ use super::{
 use crate::classes::CastRef;
 use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
-use crate::type_tree::convert::TryCastRefFrom;
 use crate::type_tree::TypeTreeObjectRef;
 
-use crate::type_tree::TypeTreeObject;
 use binrw::{BinRead, ReadOptions, VecArgs};
 
 impl MeshObject for Mesh<'_> {

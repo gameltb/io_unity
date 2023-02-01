@@ -6,7 +6,7 @@ use clap::{arg, Parser, Subcommand};
 use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
-use io_unity::type_tree::{TypeTreeObject, TypeTreeObjectRef};
+use io_unity::type_tree::TypeTreeObjectRef;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
@@ -217,7 +217,7 @@ fn main() -> anyhow::Result<()> {
 
 fn dump_unity_fs(unity_fs: &UnityFS) {
     for file in unity_fs.get_file_paths() {
-        if let Ok(file_buff) = unity_fs.get_file_by_path(&file) {
+        if let Ok(file_buff) = unity_fs.get_file_data_by_path(&file) {
             let file_name = PathBuf::from(file)
                 .file_stem()
                 .unwrap()

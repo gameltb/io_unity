@@ -2,7 +2,7 @@ pub mod type_tree;
 
 use crate::{
     def_unity_class,
-    type_tree::{convert::TryCastFrom, TypeTreeObject, TypeTreeObjectRef},
+    type_tree::{convert::TryCastFrom, TypeTreeObjectRef},
     unity_asset_view::UnityAssetViewer,
 };
 

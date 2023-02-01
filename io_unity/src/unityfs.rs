@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
 
@@ -16,6 +17,7 @@ pub trait UnityResource: std::io::Read + std::io::Seek {}
 
 impl UnityResource for std::io::Cursor<Vec<u8>> {}
 impl UnityResource for BufReader<File> {}
+impl UnityResource for UnityFSNode {}
 
 #[bitfield]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,13 +86,29 @@ pub struct UnityFSFile {
 }
 
 impl UnityFS {
-    pub fn get_file_by_path(&self, path: &String) -> std::io::Result<Vec<u8>> {
-        for node in self.get_files() {
+    pub fn get_file_data_by_path(&self, path: &String) -> std::io::Result<Vec<u8>> {
+        for node in &self.content.blocks_info.directory_info {
             if path == &node.path() {
                 return self.get_file_by_node(node);
             }
         }
         Err(std::io::Error::from(ErrorKind::NotFound))
+    }
+
+    pub fn get_file_reader_by_path(&self, path: &String) -> Option<UnityFSNode> {
+        for node in &self.content.blocks_info.directory_info {
+            if path == &node.path() {
+                return Some(UnityFSNode {
+                    file_reader: self.file_reader.clone(),
+                    storage_blocks: self.content.blocks_info.storage_blocks.clone(),
+                    storage_block_position: self.content.position,
+                    storage_blocks_cache: BTreeMap::new(),
+                    node_info: node.clone(),
+                    current_position: 0,
+                });
+            }
+        }
+        None
     }
 
     fn get_file_by_node(&self, node: &Node) -> std::io::Result<Vec<u8>> {
@@ -121,7 +139,8 @@ impl UnityFS {
                 }
                 file_block.extend(blocks_info_uncompressedd_stream);
                 if file_block.len() >= node.size as usize {
-                    return Ok(file_block.split_at(node.size as usize).0.to_vec());
+                    file_block.truncate(node.size as usize);
+                    return Ok(file_block);
                 }
             }
             compressed_data_offset += sb.compressed_size as u64;
@@ -130,13 +149,9 @@ impl UnityFS {
         Err(std::io::Error::from(ErrorKind::NotFound))
     }
 
-    pub fn get_files(&self) -> &Vec<Node> {
-        return &self.content.blocks_info.directory_info;
-    }
-
     pub fn get_cab_path(&self) -> Vec<String> {
         let mut paths = vec![];
-        for file in self.get_files() {
+        for file in &self.content.blocks_info.directory_info {
             let path = file.path();
             if path.starts_with("CAB-") && (path.len() == 36) {
                 paths.push(path);
@@ -147,7 +162,7 @@ impl UnityFS {
 
     pub fn get_file_paths(&self) -> Vec<String> {
         let mut paths = vec![];
-        for file in self.get_files() {
+        for file in &self.content.blocks_info.directory_info {
             paths.push(file.path());
         }
         paths
@@ -263,4 +278,107 @@ fn blocks_info_parser<R: Read + Seek>(
 
     let mut blocks_info_reader = Cursor::new(blocks_info_uncompressedd_stream);
     BlocksInfo::read(&mut blocks_info_reader)
+}
+
+#[derive(Clone)]
+pub struct UnityFSNode {
+    file_reader: Arc<Mutex<Box<dyn UnityResource + Send>>>,
+    storage_blocks: Vec<StorageBlock>,
+    storage_block_position: u64,
+    node_info: Node,
+    current_position: u64,
+    storage_blocks_cache: BTreeMap<u64, Vec<u8>>,
+}
+
+impl Read for UnityFSNode {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut compressed_data_offset = 0u64;
+        let mut uncompressed_data_offset = 0u64;
+        let mut file_block = Vec::new();
+        for sb in &self.storage_blocks {
+            if (uncompressed_data_offset + (sb.uncompressed_size as u64))
+                >= ((self.node_info.offset as u64) + self.current_position)
+            {
+                let blocks_info_uncompressedd_stream = if let Some(cache_block) =
+                    self.storage_blocks_cache.get(&uncompressed_data_offset)
+                {
+                    cache_block
+                } else {
+                    println!("{:?}", &sb);
+                    let mut blocks_infocompressedd_stream = vec![0u8; sb.compressed_size as usize];
+                    if let Ok(mut file_reader) = self.file_reader.lock() {
+                        file_reader.seek(SeekFrom::Start(
+                            compressed_data_offset + self.storage_block_position,
+                        ))?;
+                        file_reader.read_exact(&mut blocks_infocompressedd_stream)?;
+                    } else {
+                        return Err(std::io::Error::from(ErrorKind::BrokenPipe));
+                    }
+
+                    let blocks_info_uncompressedd_stream = block_uncompressed(
+                        sb.uncompressed_size as u64,
+                        sb.flags.compression_type(),
+                        blocks_infocompressedd_stream,
+                    )?;
+                    self.storage_blocks_cache
+                        .insert(uncompressed_data_offset, blocks_info_uncompressedd_stream);
+                    self.storage_blocks_cache
+                        .get(&uncompressed_data_offset)
+                        .unwrap()
+                };
+
+                if uncompressed_data_offset
+                    < ((self.node_info.offset as u64) + self.current_position) as u64
+                {
+                    file_block.extend_from_slice(
+                        &blocks_info_uncompressedd_stream[(((self.node_info.offset as u64)
+                            + self.current_position)
+                            - uncompressed_data_offset)
+                            as usize..],
+                    );
+                } else {
+                    file_block.extend(blocks_info_uncompressedd_stream);
+                }
+                if file_block.len() >= buf.len() {
+                    let buf_len = buf.len();
+                    buf[0..buf_len].copy_from_slice(&file_block[0..buf_len]);
+                    self.current_position += buf_len as u64;
+                    return Ok(buf_len);
+                }
+            }
+            compressed_data_offset += sb.compressed_size as u64;
+            uncompressed_data_offset += sb.uncompressed_size as u64;
+        }
+        if file_block.len() > 0 && file_block.len() <= buf.len() {
+            buf[0..file_block.len()].copy_from_slice(&file_block[0..file_block.len()]);
+            self.current_position += file_block.len() as u64;
+            return Ok(file_block.len());
+        }
+        Err(std::io::Error::from(ErrorKind::NotFound))
+    }
+}
+
+impl Seek for UnityFSNode {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        match pos {
+            SeekFrom::Start(pos) => self.current_position = pos,
+            SeekFrom::End(offset) => {
+                let new_pos = self.node_info.size + offset;
+                if new_pos >= 0 {
+                    self.current_position = new_pos as u64;
+                } else {
+                    self.current_position = 0;
+                }
+            }
+            SeekFrom::Current(offset) => {
+                let new_pos = self.current_position as i64 + offset;
+                if new_pos >= 0 {
+                    self.current_position = new_pos as u64;
+                } else {
+                    self.current_position = 0;
+                }
+            }
+        }
+        Ok(self.current_position)
+    }
 }

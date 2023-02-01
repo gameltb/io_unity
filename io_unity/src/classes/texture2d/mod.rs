@@ -4,7 +4,7 @@ use crate::{def_unity_class, unity_asset_view::UnityAssetViewer};
 use binrw::binrw;
 use image::{DynamicImage, GrayAlphaImage, RgbImage, RgbaImage};
 use num_enum::TryFromPrimitive;
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 def_unity_class!(Texture2D);
 
