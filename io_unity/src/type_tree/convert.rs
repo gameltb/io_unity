@@ -388,6 +388,27 @@ impl TryCast<u64> for Field {
     }
 }
 
+impl TryCast<usize> for Field {
+    type Error = ();
+
+    fn try_cast_to(
+        &self,
+        object_data_buff: &Vec<u8>,
+        field_cast_args: &FieldCastArgs,
+    ) -> Result<usize, Self::Error> {
+        if ["FileSize"].contains(&self.field_type.get_type().as_str()) {
+            if let FieldValue::DataOffset(data) = &self.data {
+                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
+                return <u64>::read_options(&mut reader, &op, ())
+                    .map_err(|_| ())
+                    .and_then(|size| Ok(size as usize));
+            }
+        }
+        Err(())
+    }
+}
+
 impl TryCast<f32> for Field {
     type Error = ();
 

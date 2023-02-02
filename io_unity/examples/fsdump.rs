@@ -3,6 +3,7 @@ extern crate io_unity;
 extern crate anyhow;
 
 use clap::{arg, Parser, Subcommand};
+use io_unity::classes::audio_clip::{AudioClip, AudioClipObject};
 use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
@@ -144,7 +145,8 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    object_types.insert(obj.class.clone());
+                    object_types
+                        .insert(ClassIDType::try_from(obj.class).unwrap_or(ClassIDType::Object));
                 }
             }
             println!("object_types : {:?}", object_types);
@@ -199,9 +201,12 @@ fn main() -> anyhow::Result<()> {
                             || obj_meta.class == ClassIDType::Material as i32
                             || obj_meta.class == ClassIDType::GameObject as i32
                             || obj_meta.class == ClassIDType::MonoBehaviour as i32
-                            || obj_meta.class == ClassIDType::AudioClip as i32
                             || obj_meta.class == ClassIDType::Mesh as i32
                         {
+                        } else if obj_meta.class == ClassIDType::AudioClip as i32 {
+                            let obj = obj.into();
+                            let audio = AudioClip::new(&obj);
+                            audio.get_audio_data(&unity_asset_viewer);
                         } else {
                             // obj.display_tree();
                             // panic!()

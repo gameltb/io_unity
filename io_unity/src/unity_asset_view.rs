@@ -285,6 +285,17 @@ impl UnityAssetViewer {
         None
     }
 
+    pub fn get_container_name_by_serialized_file_id_and_path_id(
+        &self,
+        serialized_file_id: i64,
+        path_id: i64,
+    ) -> Option<&String> {
+        if let Some(name_map) = self.container_name_maps.get(&serialized_file_id) {
+            return name_map.get(&path_id);
+        }
+        None
+    }
+
     pub fn get_container_name_by_pptr(&self, pptr: &PPtr) -> Option<&String> {
         let serialized_file_id = pptr.get_serialized_file_id();
         if let Some(name_map) = self.container_name_maps.get(&serialized_file_id) {

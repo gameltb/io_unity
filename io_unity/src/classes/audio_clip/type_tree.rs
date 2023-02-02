@@ -4,11 +4,10 @@ use crate::type_tree::convert::TryCastFrom;
 use crate::unity_asset_view::UnityAssetViewer;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
-use std::borrow::Cow;
 use std::io::{prelude::*, ErrorKind, SeekFrom};
 
 impl AudioClipObject for AudioClip<'_> {
-    fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Cow<Vec<u8>>> {
+    fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Vec<u8>> {
         let resource_source = self
             .get_resource_source()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
@@ -23,10 +22,10 @@ impl AudioClipObject for AudioClip<'_> {
             self.get_serialized_file_id(),
             &resource_source,
         ) {
-            file.seek(SeekFrom::Start(resource_offset))?;
+            file.seek(SeekFrom::Start(resource_offset as u64))?;
             let mut data = vec![0u8; resource_size as usize];
             file.read_exact(&mut data)?;
-            return Ok(Cow::Owned(data));
+            return Ok(data);
         }
         Err(std::io::Error::from(ErrorKind::NotFound).into())
     }
@@ -37,8 +36,8 @@ impl AudioClip<'_> {
         String::try_cast_from(self.inner, "/Base/m_Resource/m_Source").ok()
     }
 
-    fn get_resource_offset(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()
+    fn get_resource_offset(&self) -> Option<usize> {
+        usize::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()
     }
 
     fn get_resource_size(&self) -> Option<u64> {

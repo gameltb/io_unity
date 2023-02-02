@@ -442,6 +442,7 @@ impl SerializedFile {
                             &mut *self.file_reader.borrow_mut(),
                             obj,
                             self.serialized_file_id,
+                            path_id,
                         )
                         .map_err(|err| {
                             anyhow!(format!(
@@ -495,6 +496,7 @@ pub trait Serialized: fmt::Debug {
         reader: &mut Box<dyn UnityResource + Send + Sync>,
         obj: &Object,
         serialized_file_id: i64,
+        path_id: i64,
     ) -> BinResult<TypeTreeObject> {
         let class_args = if self.get_enable_type_tree() {
             self.get_type_object_args_by_type_id(obj.type_id)
@@ -506,7 +508,7 @@ pub trait Serialized: fmt::Debug {
         }
         .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
 
-        let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, class_args);
+        let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, path_id, class_args);
 
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 

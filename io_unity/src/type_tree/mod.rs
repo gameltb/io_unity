@@ -260,6 +260,7 @@ pub struct TypeTreeObject {
     endian: binrw::Endian,
     pub class_id: i32,
     pub serialized_file_id: i64,
+    pub path_id: i64,
     data_layout: Field,
     data_buff: Vec<u8>,
     pub external_data: Option<Vec<u8>>,
@@ -380,6 +381,10 @@ impl TypeTreeObjectRef {
 
     pub fn get_serialized_file_id(&self) -> i64 {
         self.inner.read().unwrap().serialized_file_id
+    }
+
+    pub fn get_path_id(&self) -> i64 {
+        self.inner.read().unwrap().path_id
     }
 
     pub fn get_class_id(&self) -> i32 {

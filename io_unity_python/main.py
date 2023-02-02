@@ -1,6 +1,7 @@
 try:
     import os
     import io_unity_python
+    import fsb5
 except ModuleNotFoundError as e:
     import sys
     sys.path.append("target/release")
@@ -10,7 +11,6 @@ except ModuleNotFoundError as e:
 
 
 def fsb5_extractor(input, output):
-
 
     fsb = fsb5.FSB5(input)
 
@@ -28,31 +28,37 @@ def fsb5_extractor(input, output):
         Samples: {sample.samples}'''.format(sample=sample, extension=ext))
 
         # rebuild the sample and save
-        with open('{0}_{1}.{2}'.format(output, sample.name, ext), 'wb') as f:
+        output_ext = ""
+        if len(fsb.samples) > 1:
+            output_ext += "_" + sample.name
+        if not output.endswith("." + ext):
+            output_ext += "." + ext
+        with open(output + output_ext, 'wb') as f:
             rebuilt_sample = fsb.rebuild_sample(sample)
             f.write(rebuilt_sample)
 
 
-def get_a(obj,fs):
-    banks = obj.get_audio_data(fs)
-    name = obj.get_name()
+out_path = ""
+bundle_path = ""
 
-    fsb5_extractor(banks, "/tmp/audio/"+name)
+uav = io_unity_python.UnityAssetViewer()
 
-def handle(file_path):
-
-    fs = io_unity_python.UnityFS.readfs(file_path)
-    cab = fs.get_cab()
-
-    for i in range(cab.get_object_count()):
-        try:
-            get_a(cab.get_raw_object_by_index(i),fs)
-        except Exception as e:
-            print(i)
-            pass
-
-for root, dirs, files in os.walk("/tmp/split_UnityDataAssetPack/assets/aa/Android/"):
+for root, dirs, files in os.walk(bundle_path):
     for name in files:
         if not name.lower().endswith('.bundle'):
-            continue 
-        handle(os.path.join(root, name))
+            continue
+        uav.add_bundle_file(os.path.join(root, name))
+
+for objref in uav:
+    if objref.get_class_id() == 83:
+        obj = uav.deref_object_ref(objref)
+        audio_name = uav.get_container_name_by_object_ref(objref)
+        if audio_name == None and hasattr(obj, "m_Name"):
+            audio_name = obj.m_Name
+        if audio_name == None or len(audio_name) == 0:
+            audio_name = "audio"
+        print(audio_name)
+        audio = io_unity_python.AudioClip(obj)
+        path = os.path.join(out_path, audio_name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fsb5_extractor(audio.get_audio_data(uav), path)

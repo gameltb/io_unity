@@ -1,8 +1,11 @@
 use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
-use io_unity::type_tree::convert::TryCastFrom;
+use io_unity::{
+    classes::{audio_clip::AudioClipObject, p_ptr::PPtrObject},
+    type_tree::convert::TryCastFrom,
+};
 
-use pyo3::{exceptions::PyAttributeError, prelude::*};
+use pyo3::{exceptions::PyAttributeError, prelude::*, types::PyBytes};
 
 pub mod python_unity_class {
 
@@ -12,7 +15,7 @@ pub mod python_unity_class {
     macro_rules! def_python_unity_class {
         ($x:ident($y:path)) => {
             #[pyclass]
-            pub struct $x(pub io_unity::type_tree::TypeTreeObject);
+            pub struct $x(pub io_unity::type_tree::TypeTreeObjectRef);
         };
         ($($xx:ident($yy:path)),+) => {
 
@@ -25,6 +28,7 @@ pub mod python_unity_class {
         AudioClip(audio_clip::AudioClip),
         Texture2D(texture2d::Texture2D),
         Mesh(mesh::Mesh),
+        PPtr(p_ptr::PPtr),
         Transform(transform::Transform),
         AnimationClip(animation_clip::AnimationClip)
     );
@@ -147,7 +151,7 @@ impl UnityAssetViewer {
             .into_py_result()
     }
 
-    pub fn deref_object_ref(&self, object_ref: ObjectRef) -> PyResult<Option<TypeTreeObjectRef>> {
+    pub fn deref_object_ref(&self, object_ref: &ObjectRef) -> PyResult<Option<TypeTreeObjectRef>> {
         if let Some(serialized_file) = self
             .0
             .serialized_file_map
@@ -178,6 +182,15 @@ impl UnityAssetViewer {
         };
         Py::new(slf.py(), iter)
     }
+
+    fn get_container_name_by_object_ref(&self, object_ref: &ObjectRef) -> Option<String> {
+        self.0
+            .get_container_name_by_serialized_file_id_and_path_id(
+                object_ref.serialized_file_id,
+                object_ref.path_id,
+            )
+            .and_then(|s| Some(s.to_owned()))
+    }
 }
 
 #[pymethods]
@@ -193,6 +206,16 @@ impl TypeTreeObjectRef {
     fn get_data_buff(&self) -> Option<Vec<u8>> {
         let path_to_self: Vec<String> = Vec::new();
         <Vec<u8>>::try_cast_from(&self.0, path_to_self.as_slice()).ok()
+    }
+
+    fn get_container_name(&self, viewer: &UnityAssetViewer) -> Option<String> {
+        viewer
+            .0
+            .get_container_name_by_serialized_file_id_and_path_id(
+                self.0.get_serialized_file_id(),
+                self.0.get_path_id(),
+            )
+            .and_then(|s| Some(s.to_owned()))
     }
 
     fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
@@ -401,10 +424,47 @@ impl TypeTreeObjectRef {
 }
 
 #[pymethods]
-impl Mesh {}
+impl PPtr {
+    #[new]
+    fn new(obj: &TypeTreeObjectRef) -> Self {
+        PPtr(obj.0.clone())
+    }
+
+    fn get_type_tree_object_in_view(
+        &self,
+        viewer: &UnityAssetViewer,
+    ) -> PyResult<Option<TypeTreeObjectRef>> {
+        let pptr = io_unity::classes::p_ptr::PPtr::new(&self.0);
+        Ok(pptr
+            .get_type_tree_object_in_view(&viewer.0)
+            .into_py_result()?
+            .and_then(|obj| Some(TypeTreeObjectRef(obj.into()))))
+    }
+}
 
 #[pymethods]
-impl AudioClip {}
+impl Mesh {
+    #[new]
+    fn new(obj: &TypeTreeObjectRef) -> Self {
+        Mesh(obj.0.clone())
+    }
+}
+
+#[pymethods]
+impl AudioClip {
+    #[new]
+    fn new(obj: &TypeTreeObjectRef) -> Self {
+        AudioClip(obj.0.clone())
+    }
+
+    fn get_audio_data(&self, py: Python<'_>, viewer: &UnityAssetViewer) -> PyResult<PyObject> {
+        let audio_clip = io_unity::classes::audio_clip::AudioClip::new(&self.0);
+        audio_clip
+            .get_audio_data(&viewer.0)
+            .and_then(|data| Ok(PyBytes::new(py, &data).into()))
+            .into_py_result()
+    }
+}
 
 #[pymodule]
 fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -429,6 +489,7 @@ fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
         AudioClip(audio_clip::AudioClip),
         Texture2D(texture2d::Texture2D),
         Mesh(mesh::Mesh),
+        PPtr(p_ptr::PPtr),
         Transform(transform::Transform),
         AnimationClip(animation_clip::AnimationClip)
     );

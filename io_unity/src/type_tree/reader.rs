@@ -17,13 +17,19 @@ use super::{Field, TypeField};
 #[derive(Debug, Clone)]
 pub struct TypeTreeObjectBinReadArgs {
     serialized_file_id: i64,
+    path_id: i64,
     class_args: TypeTreeObjectBinReadClassArgs,
 }
 
 impl TypeTreeObjectBinReadArgs {
-    pub fn new(serialized_file_id: i64, class_args: TypeTreeObjectBinReadClassArgs) -> Self {
+    pub fn new(
+        serialized_file_id: i64,
+        path_id: i64,
+        class_args: TypeTreeObjectBinReadClassArgs,
+    ) -> Self {
         Self {
             serialized_file_id,
+            path_id,
             class_args,
         }
     }
@@ -262,6 +268,7 @@ impl BinRead for TypeTreeObject {
             endian: options.endian(),
             class_id: args.class_args.class_id,
             serialized_file_id: args.serialized_file_id,
+            path_id: args.path_id,
             data_layout: data,
             data_buff: <Vec<u8>>::read_options(
                 reader,
