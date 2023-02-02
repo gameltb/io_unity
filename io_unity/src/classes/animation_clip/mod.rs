@@ -4,16 +4,13 @@ use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObjectRef;
 use binrw::{binrw, BinRead};
-use std::{
-    fmt,
-    io::{Cursor, Read, Seek, SeekFrom},
-};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 use super::ClassIDType;
 
 def_unity_class!(AnimationClip);
 
-pub trait AnimationClipObject: fmt::Debug {}
+pub trait AnimationClipObject {}
 
 #[binrw]
 #[derive(Debug, Clone)]

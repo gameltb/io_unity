@@ -4,14 +4,13 @@ use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
 use crate::{def_unity_class, SerializedFile};
 
-use std::fmt;
 use std::path::PathBuf;
 
 use super::SerializedFileRef;
 
 def_unity_class!(PPtr);
 
-pub trait PPtrObject: fmt::Debug + SerializedFileRef {
+pub trait PPtrObject: SerializedFileRef {
     fn get_path_id(&self) -> Option<i64>;
     fn get_file_id(&self) -> Option<i64>;
 

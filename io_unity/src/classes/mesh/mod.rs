@@ -3,11 +3,10 @@ pub mod type_tree;
 use crate::{def_unity_class, until::binrw_parser::Mat4};
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
-use std::fmt;
 
 def_unity_class!(Mesh);
 
-pub trait MeshObject: fmt::Debug {
+pub trait MeshObject {
     fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>>;
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
     fn get_normal_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;

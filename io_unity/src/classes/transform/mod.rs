@@ -8,7 +8,7 @@ use crate::{
 
 use crc::{Crc, CRC_32_ISO_HDLC};
 use glam::Mat4;
-use std::{collections::BTreeMap, fmt};
+use std::collections::BTreeMap;
 
 use super::p_ptr::{PPtr, PPtrObject};
 
@@ -16,7 +16,7 @@ pub const CRC_ISO_HDLC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 
 def_unity_class!(Transform);
 
-pub trait TransformObject: fmt::Debug {
+pub trait TransformObject {
     fn get_father(&self) -> Option<TypeTreeObjectRef>;
     fn get_local_mat(&self) -> Option<Mat4>;
     fn get_children(&self) -> Option<Vec<TypeTreeObjectRef>>;

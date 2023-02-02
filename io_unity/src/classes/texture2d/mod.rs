@@ -4,11 +4,10 @@ use crate::{def_unity_class, unity_asset_view::UnityAssetViewer};
 use binrw::binrw;
 use image::{DynamicImage, GrayAlphaImage, RgbImage, RgbaImage};
 use num_enum::TryFromPrimitive;
-use std::fmt;
 
 def_unity_class!(Texture2D);
 
-pub trait Texture2DObject: fmt::Debug {
+pub trait Texture2DObject {
     fn get_width(&self) -> Option<u64>;
     fn get_height(&self) -> Option<u64>;
     fn get_texture_format(&self) -> Option<TextureFormat>;

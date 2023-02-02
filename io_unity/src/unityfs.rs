@@ -64,6 +64,7 @@ pub struct UnityFS {
     content: UnityFSFile,
     file_reader: Arc<Mutex<Box<dyn UnityResource + Send>>>,
     pub resource_search_path: Option<String>,
+    storage_blocks_start_positions: Vec<(u64, u64)>,
 }
 
 #[binrw]
@@ -101,6 +102,7 @@ impl UnityFS {
                 return Some(UnityFSNode {
                     file_reader: self.file_reader.clone(),
                     storage_blocks: self.content.blocks_info.storage_blocks.clone(),
+                    storage_blocks_start_positions: self.storage_blocks_start_positions.clone(),
                     storage_block_position: self.content.position,
                     storage_blocks_cache: BTreeMap::new(),
                     node_info: node.clone(),
@@ -172,10 +174,23 @@ impl UnityFS {
         mut file: Box<dyn UnityResource + Send>,
         resource_search_path: Option<String>,
     ) -> BinResult<UnityFS> {
+        let content = UnityFSFile::read(&mut file)?;
+        let storage_blocks_start_positions = {
+            let mut compressed_data_offset = 0;
+            let mut uncompressed_data_offset = 0;
+            let mut storage_blocks_positions = Vec::new();
+            for storage_block in &content.blocks_info.storage_blocks {
+                storage_blocks_positions.push((compressed_data_offset, uncompressed_data_offset));
+                compressed_data_offset += storage_block.compressed_size as u64;
+                uncompressed_data_offset += storage_block.uncompressed_size as u64;
+            }
+            storage_blocks_positions
+        };
         Ok(UnityFS {
-            content: UnityFSFile::read(&mut file)?,
+            content,
             file_reader: Arc::new(Mutex::new(file)),
             resource_search_path,
+            storage_blocks_start_positions,
         })
     }
 }
@@ -284,6 +299,7 @@ fn blocks_info_parser<R: Read + Seek>(
 pub struct UnityFSNode {
     file_reader: Arc<Mutex<Box<dyn UnityResource + Send>>>,
     storage_blocks: Vec<StorageBlock>,
+    storage_blocks_start_positions: Vec<(u64, u64)>,
     storage_block_position: u64,
     node_info: Node,
     current_position: u64,
@@ -292,10 +308,18 @@ pub struct UnityFSNode {
 
 impl Read for UnityFSNode {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut compressed_data_offset = 0u64;
-        let mut uncompressed_data_offset = 0u64;
+        let uncompressed_data_read_start_offset =
+            (self.node_info.offset as u64) + self.current_position;
+        let storage_blocks_index = match self.storage_blocks_start_positions.binary_search_by_key(
+            &uncompressed_data_read_start_offset,
+            |&(_compressed_data_offset, uncompressed_data_offset)| uncompressed_data_offset,
+        ) {
+            Ok(index) => index,
+            Err(rindex) => rindex - 1,
+        };
+        let (mut compressed_data_offset,mut uncompressed_data_offset) = self.storage_blocks_start_positions[storage_blocks_index];
         let mut file_block = Vec::new();
-        for sb in &self.storage_blocks {
+        for sb in &self.storage_blocks[storage_blocks_index..] {
             if (uncompressed_data_offset + (sb.uncompressed_size as u64))
                 >= ((self.node_info.offset as u64) + self.current_position)
             {
