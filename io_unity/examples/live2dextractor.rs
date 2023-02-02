@@ -1,6 +1,5 @@
 extern crate io_unity;
 
-use crate::io_unity::type_tree::convert::TryCastRefFrom;
 use std::{
     collections::{BTreeMap, HashMap},
     fs::{create_dir_all, File},
@@ -20,7 +19,7 @@ use io_unity::{
         transform::{get_bone_path_hash_map, Transform},
         ClassIDType,
     },
-    type_tree::{type_tree_json::set_info_json_tar_reader, TypeTreeObject},
+    type_tree::{type_tree_json::set_info_json_tar_reader, TypeTreeObjectRef},
     unity_asset_view::UnityAssetViewer,
 };
 
@@ -463,7 +462,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Extract { filter_path } => {
-            let mut container_paths = Vec::new();
+            let mut container_paths: Vec<(&String, TypeTreeObjectRef)> = Vec::new();
             let mut path_hash_map = BTreeMap::new();
 
             let mut cubism_model3_json = CubismModel3Json::CubismModel3Json::new();
@@ -478,26 +477,27 @@ fn main() -> anyhow::Result<()> {
                     let obj = unity_asset_viewer
                         .get_type_tree_object_by_container_name(container_path)?
                         .unwrap();
-                    container_paths.push((container_path, obj));
+                    container_paths.push((container_path, obj.into()));
                 }
             }
 
             for (container_path, obj) in &container_paths {
-                if obj.class_id == ClassIDType::GameObject as i32 {
+                if obj.get_class_id() == ClassIDType::GameObject as i32 {
                     println!("Parse GameObject : {}", container_path);
-                    println!("{:?}", String::try_cast_from(&obj, "/Base/m_Name"));
+                    println!("{:?}", String::try_cast_from(obj, "/Base/m_Name"));
                     for component in
-                        <Vec<TypeTreeObject>>::try_cast_from(&obj, "/Base/m_Component/Array")
+                        <Vec<TypeTreeObjectRef>>::try_cast_from(obj, "/Base/m_Component/Array")
                             .unwrap()
                     {
-                        let pptr =
-                            TypeTreeObject::try_cast_from(&component, "/Base/component").unwrap();
+                        let pptr = TypeTreeObjectRef::try_cast_from(&component, "/Base/component")
+                            .unwrap();
                         let pptr = PPtr::new(&pptr);
                         let component_obj = pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)
                             .unwrap()
                             .unwrap();
                         if component_obj.class_id == ClassIDType::Transform as i32 {
+                            let component_obj: TypeTreeObjectRef = component_obj.into();
                             let transform = Transform::new(&component_obj);
                             path_hash_map.extend(
                                 get_bone_path_hash_map(&unity_asset_viewer, &transform).unwrap(),
@@ -505,9 +505,11 @@ fn main() -> anyhow::Result<()> {
                             // println!("{:?}", &path_hash_map);
                         } else {
                             if component_obj.class_id == ClassIDType::MonoBehaviour as i32 {
-                                if let Ok(pptr_o) =
-                                    TypeTreeObject::try_cast_from(&component_obj, "/Base/m_Script")
-                                {
+                                let component_obj: TypeTreeObjectRef = component_obj.into();
+                                if let Ok(pptr_o) = TypeTreeObjectRef::try_cast_from(
+                                    &component_obj,
+                                    "/Base/m_Script",
+                                ) {
                                     let script_pptr = PPtr::new(&pptr_o);
                                     let script = script_pptr
                                         .get_type_tree_object_in_view(&unity_asset_viewer)?
@@ -531,8 +533,9 @@ fn main() -> anyhow::Result<()> {
 
             for (container_path, obj) in container_paths {
                 println!("Parse : {}", container_path);
-                if obj.class_id == ClassIDType::MonoBehaviour as i32 {
-                    if let Ok(pptr_o) = TypeTreeObject::try_cast_from(&obj, "/Base/m_Script") {
+                let class_id = obj.get_class_id();
+                if class_id == ClassIDType::MonoBehaviour as i32 {
+                    if let Ok(pptr_o) = TypeTreeObjectRef::try_cast_from(&obj, "/Base/m_Script") {
                         let script_pptr = PPtr::new(&pptr_o);
                         let script = script_pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)?
@@ -557,8 +560,7 @@ fn main() -> anyhow::Result<()> {
                                 let mut moc3_file = File::create(&moc3_path)?;
 
                                 moc3_file.write_all(
-                                    &<Vec<u8>>::try_cast_as_from(&obj, "/Base/_bytes/Array")
-                                        .unwrap(),
+                                    &<Vec<u8>>::try_cast_from(&obj, "/Base/_bytes/Array").unwrap(),
                                 );
 
                                 cubism_model3_json.FileReferences.Moc = moc3_name.clone() + ".moc3";
@@ -574,8 +576,8 @@ fn main() -> anyhow::Result<()> {
                             }
                         }
                     }
-                } else if obj.class_id == ClassIDType::Texture2D as i32
-                    || obj.class_id == ClassIDType::Sprite as i32
+                } else if class_id == ClassIDType::Texture2D as i32
+                    || class_id == ClassIDType::Sprite as i32
                 {
                     // texture
                     println!("Parse texture : {}", container_path);
@@ -587,13 +589,14 @@ fn main() -> anyhow::Result<()> {
                         .to_string_lossy()
                         .to_string();
 
-                    let texture2d = if obj.class_id == ClassIDType::Sprite as i32 {
+                    let texture2d = if class_id == ClassIDType::Sprite as i32 {
                         let tex_pptr =
-                            TypeTreeObject::try_cast_from(&obj, "/Base/m_RD/texture").unwrap();
+                            TypeTreeObjectRef::try_cast_from(&obj, "/Base/m_RD/texture").unwrap();
                         let tex_pptr = PPtr::new(&tex_pptr);
                         tex_pptr
                             .get_type_tree_object_in_view(&unity_asset_viewer)?
                             .unwrap()
+                            .into()
                     } else {
                         obj
                     };
@@ -611,28 +614,31 @@ fn main() -> anyhow::Result<()> {
                         .FileReferences
                         .Textures
                         .push(tex_path.to_string_lossy().to_string())
-                } else if obj.class_id == ClassIDType::AnimationClip as i32 {
+                } else if class_id == ClassIDType::AnimationClip as i32 {
                     let name = String::try_cast_from(&obj, "/Base/m_Name").unwrap();
                     let name = PathBuf::from(name);
                     let name = name.file_stem().unwrap().to_string_lossy().to_string();
                     println!("AnimationClip : {}", &name);
 
                     let m_Clip =
-                        TypeTreeObject::try_cast_from(&obj, "/Base/m_MuscleClip/m_Clip").unwrap();
+                        TypeTreeObjectRef::try_cast_from(&obj, "/Base/m_MuscleClip/m_Clip")
+                            .unwrap();
                     let m_ClipBindingConstant =
-                        TypeTreeObject::try_cast_from(&obj, "/Base/m_ClipBindingConstant").unwrap();
+                        TypeTreeObjectRef::try_cast_from(&obj, "/Base/m_ClipBindingConstant")
+                            .unwrap();
                     let stream_count =
                         u64::try_cast_from(&m_Clip, "/Base/data/m_StreamedClip/curveCount")
                             .unwrap();
                     let m_DenseClip =
-                        TypeTreeObject::try_cast_from(&m_Clip, "/Base/data/m_DenseClip").unwrap();
+                        TypeTreeObjectRef::try_cast_from(&m_Clip, "/Base/data/m_DenseClip")
+                            .unwrap();
                     let m_DenseClip_m_CurveCount =
                         u64::try_cast_from(&m_DenseClip, "/Base/m_CurveCount").unwrap();
 
                     if stream_count == 0 && m_DenseClip_m_CurveCount == 0 {
                         let mut cubism_exp3_json = CubismExp3Json::CubismExp3Json::new();
                         let m_ConstantClip =
-                            TypeTreeObject::try_cast_from(&m_Clip, "/Base/data/m_ConstantClip")
+                            TypeTreeObjectRef::try_cast_from(&m_Clip, "/Base/data/m_ConstantClip")
                                 .unwrap();
                         let m_ConstantClip_data =
                             <Vec<f32>>::try_cast_from(&m_ConstantClip, "/Base/data/Array")
@@ -673,7 +679,7 @@ fn main() -> anyhow::Result<()> {
                     cubism_motion3_json.Meta.FadeOutTime = 1.0;
 
                     let streamed_frames =
-                        TypeTreeObject::try_cast_from(&m_Clip, "/Base/data/m_StreamedClip")
+                        TypeTreeObjectRef::try_cast_from(&m_Clip, "/Base/data/m_StreamedClip")
                             .unwrap();
                     let streamed_clip_buff =
                         <Vec<u32>>::try_cast_from(&streamed_frames, "/Base/data/Array")
@@ -746,7 +752,7 @@ fn main() -> anyhow::Result<()> {
                     }
 
                     let m_ConstantClip =
-                        TypeTreeObject::try_cast_from(&m_Clip, "/Base/data/m_ConstantClip")
+                        TypeTreeObjectRef::try_cast_from(&m_Clip, "/Base/data/m_ConstantClip")
                             .unwrap();
                     let denseCount = m_DenseClip_m_CurveCount;
                     let time_end =
@@ -851,7 +857,8 @@ fn main() -> anyhow::Result<()> {
 
                     let mut total_user_data_size = 0;
                     for m_Event in
-                        <Vec<TypeTreeObject>>::try_cast_from(&obj, "/Base/m_Events/Array").unwrap()
+                        <Vec<TypeTreeObjectRef>>::try_cast_from(&obj, "/Base/m_Events/Array")
+                            .unwrap()
                     {
                         let mut event = CubismMotion3Json::SerializableUserData::default();
                         event.Time = f32::try_cast_from(&m_Event, "/Base/time").unwrap();
@@ -935,16 +942,16 @@ fn main() -> anyhow::Result<()> {
 
 fn parse_cubism_class(
     class_name: String,
-    obj: &TypeTreeObject,
+    obj: &TypeTreeObjectRef,
     cubism_physics3_json: &mut Option<CubismPhysics3Json::CubismPhysics3Json>,
     cubism_model3_json: &mut CubismModel3Json::CubismModel3Json,
 ) {
     // parse_cubism_class
     if class_name == "CubismPhysicsController" {
         let mut cubism_physics3_json_m = CubismPhysics3Json::CubismPhysics3Json::new();
-        let cubism_physics_rig = TypeTreeObject::try_cast_from(&obj, "/Base/_rig").unwrap();
+        let cubism_physics_rig = TypeTreeObjectRef::try_cast_from(obj, "/Base/_rig").unwrap();
         for (i, sub_rig) in
-            <Vec<TypeTreeObject>>::try_cast_from(&cubism_physics_rig, "/Base/SubRigs/Array")
+            <Vec<TypeTreeObjectRef>>::try_cast_from(&cubism_physics_rig, "/Base/SubRigs/Array")
                 .unwrap()
                 .iter()
                 .enumerate()
@@ -952,20 +959,20 @@ fn parse_cubism_class(
             let mut physics_setting = CubismPhysics3Json::SerializablePhysicsSettings::default();
             physics_setting.Id = format!("PhysicsSetting{}", i + 1);
             physics_setting.Normalization.Position.Default =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Position/Default").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Position/Default").unwrap();
             physics_setting.Normalization.Position.Minimum =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Position/Minimum").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Position/Minimum").unwrap();
             physics_setting.Normalization.Position.Maximum =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Position/Maximum").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Position/Maximum").unwrap();
             physics_setting.Normalization.Angle.Default =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Angle/Default").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Angle/Default").unwrap();
             physics_setting.Normalization.Angle.Minimum =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Angle/Minimum").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Angle/Minimum").unwrap();
             physics_setting.Normalization.Angle.Maximum =
-                f32::try_cast_from(&sub_rig, "/Base/Normalization/Angle/Maximum").unwrap();
+                f32::try_cast_from(sub_rig, "/Base/Normalization/Angle/Maximum").unwrap();
 
             for input in
-                <Vec<TypeTreeObject>>::try_cast_from(&sub_rig, "/Base/Input/Array").unwrap()
+                <Vec<TypeTreeObjectRef>>::try_cast_from(sub_rig, "/Base/Input/Array").unwrap()
             {
                 let mut serializable_input = CubismPhysics3Json::SerializableInput::default();
                 serializable_input.Source.Target = "Parameter".to_owned();
@@ -984,7 +991,7 @@ fn parse_cubism_class(
                 physics_setting.Input.push(serializable_input);
             }
             for output in
-                <Vec<TypeTreeObject>>::try_cast_from(&sub_rig, "/Base/Output/Array").unwrap()
+                <Vec<TypeTreeObjectRef>>::try_cast_from(sub_rig, "/Base/Output/Array").unwrap()
             {
                 let mut serializable_output = CubismPhysics3Json::SerializableOutput::default();
                 serializable_output.Destination.Target = "Parameter".to_owned();
@@ -1007,11 +1014,11 @@ fn parse_cubism_class(
                 physics_setting.Output.push(serializable_output);
             }
             for particl in
-                <Vec<TypeTreeObject>>::try_cast_from(&sub_rig, "/Base/Particles/Array").unwrap()
+                <Vec<TypeTreeObjectRef>>::try_cast_from(sub_rig, "/Base/Particles/Array").unwrap()
             {
                 let mut serializable_vertex = CubismPhysics3Json::SerializableVertex::default();
                 let initial_position =
-                    TypeTreeObject::try_cast_from(&particl, "/Base/InitialPosition").unwrap();
+                    TypeTreeObjectRef::try_cast_from(&particl, "/Base/InitialPosition").unwrap();
                 serializable_vertex.Position.X =
                     f32::try_cast_from(&initial_position, "/Base/x").unwrap();
                 serializable_vertex.Position.Y =
@@ -1066,9 +1073,9 @@ fn parse_cubism_class(
 fn get_live2d_path(
     viewer: &UnityAssetViewer,
     path_hash_map: &BTreeMap<u32, String>,
-    binding: &TypeTreeObject,
+    binding: &TypeTreeObjectRef,
 ) -> (String, String) {
-    let path = u64::try_cast_from(&binding, "/Base/path").unwrap() as u32;
+    let path = u64::try_cast_from(binding, "/Base/path").unwrap() as u32;
     let string_path = path_hash_map.get(&path);
     if path != 0 && string_path.is_some() {
         if let Some((target, id)) = string_path.unwrap().rsplit_once("/") {
@@ -1079,7 +1086,7 @@ fn get_live2d_path(
             }
             return (target.to_owned(), id.to_owned());
         }
-    } else if let Ok(pptr) = TypeTreeObject::try_cast_from(&binding, "/Base/script") {
+    } else if let Ok(pptr) = TypeTreeObjectRef::try_cast_from(binding, "/Base/script") {
         let pptr = PPtr::new(&pptr);
         let script = pptr.get_type_tree_object_in_view(viewer).unwrap().unwrap();
         match String::try_cast_from(&script, "/Base/m_ClassName")

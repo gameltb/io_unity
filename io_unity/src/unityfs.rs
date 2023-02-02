@@ -304,7 +304,6 @@ impl Read for UnityFSNode {
                 {
                     cache_block
                 } else {
-                    println!("{:?}", &sb);
                     let mut blocks_infocompressedd_stream = vec![0u8; sb.compressed_size as usize];
                     if let Ok(mut file_reader) = self.file_reader.lock() {
                         file_reader.seek(SeekFrom::Start(

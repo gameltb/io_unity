@@ -20,19 +20,22 @@ impl Texture2DObject for Texture2D<'_> {
 
     fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>> {
         if let Some(data) = self.get_image_data() {
-            return Some(data);
-        } else {
-            if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
-                self.get_serialized_file_id(),
-                &self.get_stream_data_path()?,
-            ) {
-                file.seek(SeekFrom::Start(self.get_stream_data_offset()?))
-                    .ok()?;
-                let mut data = vec![0u8; self.get_stream_data_size()? as usize];
-                file.read_exact(&mut data).ok()?;
+            if data.len() > 0 {
                 return Some(data);
             }
         }
+
+        if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
+            self.get_serialized_file_id(),
+            &self.get_stream_data_path()?,
+        ) {
+            file.seek(SeekFrom::Start(self.get_stream_data_offset()?))
+                .ok()?;
+            let mut data = vec![0u8; self.get_stream_data_size()? as usize];
+            file.read_exact(&mut data).ok()?;
+            return Some(data);
+        }
+
         None
     }
 }
