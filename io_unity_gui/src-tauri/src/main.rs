@@ -65,11 +65,7 @@ fn open_fs(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<String,
 fn list_fs_path(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec<String>, ()> {
     if let Ok(op) = state.fs.try_lock() {
         if let Some(fs) = op.get(fs_path) {
-            let mut paths = vec![];
-            for p in fs.get_files() {
-                paths.push(p.path());
-            }
-            return Ok(paths);
+            return Ok(fs.get_file_paths());
         }
     }
     Err(())
