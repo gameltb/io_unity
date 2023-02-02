@@ -22,7 +22,7 @@ impl AudioClipObject for AudioClip<'_> {
             self.get_serialized_file_id(),
             &resource_source,
         ) {
-            file.seek(SeekFrom::Start(resource_offset as u64))?;
+            file.seek(SeekFrom::Start(resource_offset))?;
             let mut data = vec![0u8; resource_size as usize];
             file.read_exact(&mut data)?;
             return Ok(data);
@@ -36,8 +36,12 @@ impl AudioClip<'_> {
         String::try_cast_from(self.inner, "/Base/m_Resource/m_Source").ok()
     }
 
-    fn get_resource_offset(&self) -> Option<usize> {
-        usize::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()
+    fn get_resource_offset(&self) -> Option<u64> {
+        let offset = u64::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok();
+        if offset.is_some() {
+            return offset;
+        }
+        Some(usize::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()? as u64)
     }
 
     fn get_resource_size(&self) -> Option<u64> {
