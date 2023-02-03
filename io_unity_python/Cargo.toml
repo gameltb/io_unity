@@ -1,6 +1,6 @@
 [package]
 name = "io_unity_python"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["gameltb <gamegccltb@gmail.com>"]
 description = "io_unity_python is a simple python bind for io_unity"
