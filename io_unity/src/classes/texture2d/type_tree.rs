@@ -8,10 +8,10 @@ use std::io::{prelude::*, SeekFrom};
 
 impl Texture2DObject for Texture2D<'_> {
     fn get_width(&self) -> Option<u64> {
-        self.get_width().and_then(|i| Some(i as u64))
+        self.get_width().map(|i| i as u64)
     }
     fn get_height(&self) -> Option<u64> {
-        self.get_height().and_then(|i| Some(i as u64))
+        self.get_height().map(|i| i as u64)
     }
 
     fn get_texture_format(&self) -> Option<TextureFormat> {
@@ -20,7 +20,7 @@ impl Texture2DObject for Texture2D<'_> {
 
     fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>> {
         if let Some(data) = self.get_image_data() {
-            if data.len() > 0 {
+            if !data.is_empty() {
                 return Some(data);
             }
         }
@@ -54,7 +54,7 @@ impl Texture2D<'_> {
     }
 
     fn get_image_data(&self) -> Option<Vec<u8>> {
-        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/image data").ok()?)
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/image data").ok()
     }
 
     fn get_stream_data_path(&self) -> Option<String> {

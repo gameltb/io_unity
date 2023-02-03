@@ -33,7 +33,7 @@ impl TryRead<i32> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<i32, Self::Error> {
         if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             return <i32>::read_options(object_data_reader, &op, ()).map_err(|_| ());
         }
         Err(())
@@ -45,7 +45,7 @@ pub trait TryCast<T>: Sized {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<T, Self::Error>;
 }
@@ -64,7 +64,7 @@ where
 
     fn try_cast_from(value: E, path: &str) -> Result<Self, Self::Error> {
         let path: Vec<String> = path
-            .split("/")
+            .split('/')
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
             .collect();
@@ -118,7 +118,7 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for TypeTreeObjectRef {
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
-        self_path.extend_from_slice(&path);
+        self_path.extend_from_slice(path);
         let type_tree_obj = value.inner.read().map_err(|_| ())?;
         if type_tree_obj.get_field_by_path_list(&self_path).is_some() {
             return Ok(TypeTreeObjectRef {
@@ -180,10 +180,10 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for HashMap<String, TypeTreeObje
 
 #[inline]
 fn gen_reader<'a>(
-    object_data_buff: &'a Vec<u8>,
+    object_data_buff: &'a [u8],
     data_offset: &DataOffset,
     field_cast_args: &FieldCastArgs,
-) -> Result<Cursor<&'a Vec<u8>>, ()> {
+) -> Result<Cursor<&'a [u8]>, ()> {
     let mut reader = Cursor::new(object_data_buff);
     match data_offset {
         DataOffset::AbsDataOffset(data) => reader.set_position(*data),
@@ -199,7 +199,7 @@ impl TryCast<bool> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<bool, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
@@ -217,7 +217,7 @@ impl TryCast<i8> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<i8, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
@@ -235,12 +235,12 @@ impl TryCast<i16> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<i16, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["SInt16", "short"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <i16>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -254,12 +254,12 @@ impl TryCast<i32> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<i32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <i32>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -273,13 +273,13 @@ impl TryCast<i64> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<i64, Self::Error> {
         if ["SInt64", "long long"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 return <i64>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
         } else {
@@ -305,7 +305,7 @@ impl TryCast<u8> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<u8, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
@@ -323,12 +323,12 @@ impl TryCast<u16> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<u16, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["UInt16", "unsigned short"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <u16>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -342,12 +342,12 @@ impl TryCast<u32> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<u32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["UInt32", "unsigned int"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <u32>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -361,12 +361,12 @@ impl TryCast<u64> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<u64, Self::Error> {
         if ["UInt64", "unsigned long long"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <u64>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -393,16 +393,16 @@ impl TryCast<usize> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<usize, Self::Error> {
         if ["FileSize"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <u64>::read_options(&mut reader, &op, ())
                     .map_err(|_| ())
-                    .and_then(|size| Ok(size as usize));
+                    .map(|size| size as usize);
             }
         }
         Err(())
@@ -414,12 +414,12 @@ impl TryCast<f32> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<f32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["float"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <f32>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -433,12 +433,12 @@ impl TryCast<f64> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<f64, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["double"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian.clone());
+                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 return <f64>::read_options(&mut reader, &op, ()).map_err(|_| ());
             }
@@ -452,11 +452,11 @@ impl TryCast<Vec<f32>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<f32>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -486,11 +486,11 @@ impl TryCast<Vec<f64>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<f64>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -520,11 +520,11 @@ impl TryCast<Vec<u8>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u8>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -556,11 +556,11 @@ impl TryCast<Vec<u16>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u16>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -592,11 +592,11 @@ impl TryCast<Vec<u32>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u32>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -628,11 +628,11 @@ impl TryCast<Vec<u64>> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u64>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian.clone());
+            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -664,7 +664,7 @@ impl TryCast<String> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<String, Self::Error> {
         if let FieldValue::Fields(fields) = &self.data {
@@ -684,7 +684,7 @@ impl TryCast<glam::Quat> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<glam::Quat, Self::Error> {
         if let FieldValue::Fields(fields) = &self.data {
@@ -715,7 +715,7 @@ impl TryCast<glam::Vec3> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<glam::Vec3, Self::Error> {
         if let FieldValue::Fields(fields) = &self.data {
@@ -742,7 +742,7 @@ impl TryCast<glam::Vec2> for Field {
 
     fn try_cast_to(
         &self,
-        object_data_buff: &Vec<u8>,
+        object_data_buff: &[u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<glam::Vec2, Self::Error> {
         if let FieldValue::Fields(fields) = &self.data {

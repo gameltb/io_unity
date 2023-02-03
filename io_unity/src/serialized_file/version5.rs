@@ -106,7 +106,7 @@ impl Serialized for SerializedFile {
             .iter()
             .map(|o| crate::version17::FileIdentifier {
                 temp_empty: NullString::default(),
-                guid: o.guid.clone(),
+                guid: o.guid,
                 r#type: o.r#type,
                 path: o.path.clone(),
             })

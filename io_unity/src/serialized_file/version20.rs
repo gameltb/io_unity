@@ -49,7 +49,7 @@ impl Serialized for SerializedFile {
                     .content
                     .types
                     .get(obj.type_id as usize)
-                    .and_then(|t| Some(t.class_id))
+                    .map(|t| t.class_id)
                     .unwrap_or(0),
                 type_id: obj.type_id as usize,
             })

@@ -6,7 +6,7 @@ use glam::Mat4;
 
 impl TransformObject for Transform<'_> {
     fn get_father(&self) -> Option<TypeTreeObjectRef> {
-        Some(self.get_father()?)
+        self.get_father()
     }
 
     fn get_local_mat(&self) -> Option<Mat4> {
@@ -18,7 +18,7 @@ impl TransformObject for Transform<'_> {
     }
 
     fn get_children(&self) -> Option<Vec<TypeTreeObjectRef>> {
-        Some(self.get_children()?)
+        self.get_children()
     }
 }
 

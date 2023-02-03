@@ -141,7 +141,7 @@ fn read_info_json_by_version(version: &String) -> anyhow::Result<InfoJson::InfoJ
             let tar_reader = zstd::stream::read::Decoder::new(&mut *info_json_tar_reader)?;
             let mut tar = Archive::new(tar_reader);
 
-            let json_path = format!("InfoJson/{}.json", version);
+            let json_path = format!("InfoJson/{version}.json");
 
             for file in tar.entries()? {
                 let file = file?;

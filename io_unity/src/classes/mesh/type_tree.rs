@@ -173,7 +173,7 @@ impl Mesh<'_> {
     }
 
     pub fn get_index_buffer(&self) -> Option<Vec<u8>> {
-        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/m_IndexBuffer/Array").ok()?)
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_IndexBuffer/Array").ok()
     }
 
     pub fn get_vertex_data(&self) -> Option<TypeTreeObjectRef> {
@@ -228,7 +228,7 @@ impl VertexData<'_> {
     }
 
     pub fn get_data(&self) -> Option<Vec<u8>> {
-        Some(<Vec<u8>>::try_cast_from(self.inner, "/Base/m_DataSize").ok()?)
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_DataSize").ok()
     }
 }
 
@@ -289,7 +289,7 @@ impl VertexData<'_> {
                 {
                     reader.seek(SeekFrom::Start(
                         offset as u64
-                            + i as u64 * stride as u64
+                            + i * stride as u64
                             + channel.get_offset().ok_or(anyhow!("get_offset"))?,
                     ))?;
                     let sbuff = <Vec<f32>>::read_options(
@@ -319,8 +319,8 @@ impl VertexData<'_> {
                 {
                     reader.seek(SeekFrom::Start(
                         offset as u64
-                            + i as u64 * stride as u64
-                            + channel.get_offset().ok_or(anyhow!("get_offset"))? as u64,
+                            + i * stride as u64
+                            + channel.get_offset().ok_or(anyhow!("get_offset"))?,
                     ))?;
                     let sbuff = <Vec<u16>>::read_options(
                         &mut reader,
@@ -362,8 +362,8 @@ impl VertexData<'_> {
                 {
                     reader.seek(SeekFrom::Start(
                         offset as u64
-                            + i as u64 * stride as u64
-                            + channel.get_offset().ok_or(anyhow!("get_offset"))? as u64,
+                            + i * stride as u64
+                            + channel.get_offset().ok_or(anyhow!("get_offset"))?,
                     ))?;
                     let sbuff = <Vec<u32>>::read_options(
                         &mut reader,

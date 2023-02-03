@@ -52,7 +52,7 @@ impl StreamedCurveKey {
         let length = 1.0 / (dx * dx);
         let d1 = self.get_out_slope() * dx;
         let d2 = dy + dy + dy - d1 - d1 - self.coeff[1] / length;
-        return d2 / dx;
+        d2 / dx
     }
 }
 
@@ -62,7 +62,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
     let mut streamed_frames = Vec::new();
     let end_pos = reader.seek(SeekFrom::End(0))?;
     reader.seek(SeekFrom::Start(0))?;
-    while end_pos > reader.seek(SeekFrom::Current(0))? {
+    while end_pos > reader.stream_position()? {
         streamed_frames.push(StreamedFrame::read_ne(reader)?)
     }
     let streamed_frames_copy = streamed_frames.clone();
@@ -76,7 +76,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
                 if let Some(pre_framekey) = pre_frame.key_list.iter().find(|o| o.index == key.index)
                 {
                     key.in_slope = pre_framekey
-                        .calculate_next_in_slope(streamed_frame.time - pre_frame.time, &key);
+                        .calculate_next_in_slope(streamed_frame.time - pre_frame.time, key);
                     break;
                 }
             }
@@ -85,7 +85,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
     Ok(streamed_frames)
 }
 
-pub fn streamed_clip_read_u32_buff(u32_buff: &Vec<u32>) -> anyhow::Result<Vec<StreamedFrame>> {
+pub fn streamed_clip_read_u32_buff(u32_buff: &[u32]) -> anyhow::Result<Vec<StreamedFrame>> {
     let byte_buff_list: Vec<[u8; 4]> = u32_buff.iter().map(|u| u.to_ne_bytes()).collect();
     let streamed_clip_buff = byte_buff_list.concat();
     let mut streamed_clip_buff_reader = Cursor::new(streamed_clip_buff);

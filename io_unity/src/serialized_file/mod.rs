@@ -433,29 +433,26 @@ impl SerializedFile {
     }
 
     pub fn get_tt_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<TypeTreeObject>> {
-        Ok(self
-            .object_map
+        self.object_map
             .get(&path_id)
-            .and_then(|obj| {
-                Some(
-                    self.content
-                        .get_type_tree_object(
-                            &mut *self.file_reader.borrow_mut(),
+            .map(|obj| {
+                self.content
+                    .get_type_tree_object(
+                        &mut self.file_reader.borrow_mut(),
+                        obj,
+                        self.serialized_file_id,
+                        path_id,
+                    )
+                    .map_err(|err| {
+                        anyhow!(format!(
+                            "error while read object.data_offset: {} object : {:?} error : {}",
+                            self.content.get_data_offset(),
                             obj,
-                            self.serialized_file_id,
-                            path_id,
-                        )
-                        .map_err(|err| {
-                            anyhow!(format!(
-                                "error while read object.data_offset: {} object : {:?} error : {}",
-                                self.content.get_data_offset(),
-                                obj,
-                                err
-                            ))
-                        }),
-                )
+                            err
+                        ))
+                    })
             })
-            .transpose()?)
+            .transpose()
     }
 
     pub fn get_externals(&self) -> Cow<Vec<FileIdentifier>> {
@@ -508,9 +505,9 @@ pub trait Serialized: fmt::Debug {
         #[cfg(feature = "type-tree-json")]
         let class_args = class_args.or(get_type_object_args_by_version_class_id(
             &self.get_unity_version(),
-            obj.class.clone() as i32,
+            obj.class,
         ));
-        
+
         let class_args = class_args.ok_or(std::io::Error::from(ErrorKind::NotFound))?;
 
         let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, path_id, class_args);
@@ -523,7 +520,7 @@ pub trait Serialized: fmt::Debug {
         });
 
         let mut type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
-        let apos = reader.seek(SeekFrom::Current(0))?;
+        let apos = reader.stream_position()?;
         if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
             println!(
                 "{} readed, {} object size. class id {:?}",

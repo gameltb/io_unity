@@ -89,12 +89,12 @@ impl ObjectRef {
 }
 
 #[pyclass]
-pub struct Iter {
+pub struct ObjectRefIter {
     inner: std::vec::IntoIter<ObjectRef>,
 }
 
 #[pymethods]
-impl Iter {
+impl ObjectRefIter {
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
@@ -165,7 +165,7 @@ impl UnityAssetViewer {
         Ok(None)
     }
 
-    pub fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<Iter>> {
+    pub fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<ObjectRefIter>> {
         let mut obj_vec = Vec::new();
 
         for (serialized_file_id, sf) in &slf.0.serialized_file_map {
@@ -177,7 +177,7 @@ impl UnityAssetViewer {
                 })
             }
         }
-        let iter = Iter {
+        let iter = ObjectRefIter {
             inner: obj_vec.into_iter(),
         };
         Py::new(slf.py(), iter)
@@ -189,7 +189,7 @@ impl UnityAssetViewer {
                 object_ref.serialized_file_id,
                 object_ref.path_id,
             )
-            .and_then(|s| Some(s.to_owned()))
+            .map(|s| s.to_owned())
     }
 }
 
@@ -215,7 +215,7 @@ impl TypeTreeObjectRef {
                 self.0.get_serialized_file_id(),
                 self.0.get_path_id(),
             )
-            .and_then(|s| Some(s.to_owned()))
+            .map(|s| s.to_owned())
     }
 
     fn __getattr__(&self, py: Python<'_>, attr: &str) -> PyResult<PyObject> {
@@ -253,62 +253,62 @@ impl TypeTreeObjectRef {
                 "string" => {
                     let value = <String>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "bool" => {
                     let value = <bool>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "SInt8" => {
                     let value = <i8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "SInt16" | "short" => {
                     let value = <i16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "SInt32" | "int" => {
                     let value = <i32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "SInt64" | "long long" => {
                     let value = <i64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "UInt8" | "char" => {
                     let value = <u8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "UInt16" | "unsigned short" => {
                     let value = <u16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "UInt32" | "unsigned int" => {
                     let value = <u32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "UInt64" | "unsigned long long" | "FileSize" => {
                     let value = <u64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "float" => {
                     let value = <f32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "double" => {
                     let value = <f64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                    return Ok(value.into_py(py));
+                     Ok(value.into_py(py))
                 }
                 "vector" | "staticvector" => {
                     let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(
@@ -344,7 +344,7 @@ impl TypeTreeObjectRef {
                                 let value =
                                     <Vec<u8>>::try_cast_from(&field, path_to_self.as_slice())
                                         .map_err(cast_error_map)?;
-                                return Ok(value.to_owned().into_py(py));
+                                return Ok(value.into_py(py));
                             }
                             2 => {
                                 let value =
@@ -384,7 +384,7 @@ impl TypeTreeObjectRef {
                         let value = cast_field(obj, py)?;
                         new_vec.push(value)
                     }
-                    return Ok(new_vec.into_py(py));
+                    Ok(new_vec.into_py(py))
                 }
                 "map" => {
                     let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(
@@ -410,11 +410,11 @@ impl TypeTreeObjectRef {
                         let value = cast_field(obj, py)?;
                         new_map.insert(name, value);
                     }
-                    return Ok(new_map.into_py(py));
+                    Ok(new_map.into_py(py))
                 }
                 &_ => {
                     let value = TypeTreeObjectRef(field);
-                    return Ok(value.into_py(py));
+                    Ok(value.into_py(py))
                 }
             }
         }
@@ -438,7 +438,7 @@ impl PPtr {
         Ok(pptr
             .get_type_tree_object_in_view(&viewer.0)
             .into_py_result()?
-            .and_then(|obj| Some(TypeTreeObjectRef(obj.into()))))
+            .map(|obj| TypeTreeObjectRef(obj.into())))
     }
 }
 
@@ -461,7 +461,7 @@ impl AudioClip {
         let audio_clip = io_unity::classes::audio_clip::AudioClip::new(&self.0);
         audio_clip
             .get_audio_data(&viewer.0)
-            .and_then(|data| Ok(PyBytes::new(py, &data).into()))
+            .map(|data| PyBytes::new(py, &data).into())
             .into_py_result()
     }
 }

@@ -18,6 +18,7 @@ use crate::{
     type_tree::TypeTreeObjectRef,
 };
 
+#[derive(Default)]
 pub struct UnityAssetViewer {
     pub cab_maps: HashMap<String, i64>,
     pub serialized_file_map: BTreeMap<i64, SerializedFile>,
@@ -31,31 +32,20 @@ pub struct UnityAssetViewer {
 
 impl UnityAssetViewer {
     pub fn new() -> Self {
-        Self {
-            cab_maps: HashMap::new(),
-            serialized_file_map: BTreeMap::new(),
-            serialized_file_count: 0,
-            unity_fs_map: BTreeMap::new(),
-            unity_fs_count: 0,
-            serialized_file_to_unity_fs_map: BTreeMap::new(),
-            container_maps: HashMap::new(),
-            container_name_maps: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn read_bundle_dir<P: AsRef<Path>>(&mut self, dir_path: P) -> anyhow::Result<()> {
-        for entry in WalkDir::new(dir_path) {
-            if let Ok(entry) = entry {
-                if entry.file_type().is_file() {
-                    let file = OpenOptions::new().read(true).open(entry.path())?;
-                    let file = Box::new(BufReader::new(file));
-                    let _unity_fs_id = self
-                        .add_bundle_file(
-                            file,
-                            Some(entry.path().parent().unwrap().to_string_lossy().to_string()),
-                        )
-                        .unwrap_or_default();
-                }
+        for entry in WalkDir::new(dir_path).into_iter().flatten() {
+            if entry.file_type().is_file() {
+                let file = OpenOptions::new().read(true).open(entry.path())?;
+                let file = Box::new(BufReader::new(file));
+                let _unity_fs_id = self
+                    .add_bundle_file(
+                        file,
+                        Some(entry.path().parent().unwrap().to_string_lossy().to_string()),
+                    )
+                    .unwrap_or_default();
             }
         }
         Ok(())
@@ -68,7 +58,7 @@ impl UnityAssetViewer {
     ) -> anyhow::Result<i64> {
         let unity_fs = UnityFS::read(bundle_file_reader, resource_search_path)?;
         let unity_fs_id = self.unity_fs_count;
-        self.unity_fs_count = self.unity_fs_count + 1;
+        self.unity_fs_count += 1;
         for cab_path in unity_fs.get_cab_path() {
             let cab_buff = unity_fs.get_file_data_by_path(&cab_path)?;
             let cab_buff_reader = Box::new(Cursor::new(cab_buff));
@@ -88,7 +78,7 @@ impl UnityAssetViewer {
         resource_search_path: Option<String>,
     ) -> anyhow::Result<i64> {
         let serialized_file_id = self.serialized_file_count;
-        self.serialized_file_count = self.serialized_file_count + 1;
+        self.serialized_file_count += 1;
 
         let serialized_file = SerializedFile::read(
             serialized_file_reader,
@@ -156,7 +146,7 @@ impl UnityAssetViewer {
 
     pub fn read_data_dir<P: AsRef<Path>>(&mut self, data_dir_path: P) -> anyhow::Result<()> {
         for i in 0..u8::MAX {
-            let file_name = format!("level{}", i);
+            let file_name = format!("level{i}");
             if let Ok(file) = OpenOptions::new()
                 .read(true)
                 .open(data_dir_path.as_ref().join(&file_name))
@@ -171,7 +161,7 @@ impl UnityAssetViewer {
             }
         }
         for i in 0..u8::MAX {
-            let file_name = format!("sharedassets{}.assets", i);
+            let file_name = format!("sharedassets{i}.assets");
             if let Ok(file) = OpenOptions::new()
                 .read(true)
                 .open(data_dir_path.as_ref().join(&file_name))

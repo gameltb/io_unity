@@ -71,9 +71,9 @@ impl BinRead for TypeTreeObject {
                 .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
             let field_level = field.get_level();
             let field_value = if field.is_array() {
-                assert_eq!(is_fix_size_array_item, false);
+                assert!(!is_fix_size_array_item);
                 *field_index += 1;
-                let size_start_pos = reader.seek(SeekFrom::Current(0))?;
+                let size_start_pos = reader.stream_position()?;
                 let size_field = read(
                     reader,
                     options,
@@ -83,7 +83,7 @@ impl BinRead for TypeTreeObject {
                     false,
                 )?;
                 reader.seek(SeekFrom::Start(size_start_pos))?;
-                let size: i32 = (&size_field)
+                let size: i32 = size_field
                     .try_read_to(
                         reader,
                         &FieldCastArgs {
@@ -110,15 +110,14 @@ impl BinRead for TypeTreeObject {
                     *field_index += 1;
                 }
 
-                let pos = reader.seek(SeekFrom::Current(0))?;
+                let pos = reader.stream_position()?;
                 let is_pos_aligned = (pos % 4) == 0;
                 let fix_item_size = calc_no_array_field_size(&item_type_fields, &mut 0, &mut 0);
                 let mut buf_read_flag = false;
                 if let Some(byte_size) = fix_item_size {
-                    if is_pos_aligned && ((byte_size % 4) == 0) {
-                        buf_read_flag = true;
-                    } else if item_type_fields.len() == 1
-                        && (item_type_fields.get(0).unwrap().is_align() == false)
+                    if (is_pos_aligned && ((byte_size % 4) == 0))
+                        || (item_type_fields.len() == 1
+                            && !item_type_fields.get(0).unwrap().is_align())
                     {
                         buf_read_flag = true;
                     }
@@ -126,7 +125,7 @@ impl BinRead for TypeTreeObject {
 
                 if let (Some(byte_size), true) = (fix_item_size, buf_read_flag) {
                     let this_offset = *read_offset;
-                    let item_start_pos = reader.seek(SeekFrom::Current(0))?;
+                    let item_start_pos = reader.stream_position()?;
                     let mut item_field_offset = 0;
                     let item_field = read(
                         reader,
@@ -239,19 +238,19 @@ impl BinRead for TypeTreeObject {
             };
 
             if field.is_align() {
-                let pos = reader.seek(SeekFrom::Current(0))?;
+                let pos = reader.stream_position()?;
                 if pos % 4 != 0 {
                     reader.seek(SeekFrom::Current((4 - (pos % 4)) as i64))?;
                     *read_offset += 4 - (pos % 4);
                 }
             }
-            // println!("pos {:?}",reader.seek(SeekFrom::Current(0)));
-            // println!("{:?}",&field_value.data);
+            // dbg!(reader.stream_position());
+            // dbg!(&field_value.data);
             // field_value.display_field(&"".to_owned());
             Ok(field_value)
         }
 
-        let start_pos = reader.seek(SeekFrom::Current(0))?;
+        let start_pos = reader.stream_position()?;
         let mut index = 0;
         let mut data_buff_offset = 0;
         let data = read(
@@ -311,10 +310,8 @@ fn calc_no_array_field_size(
         *read_size += field.get_byte_size() as usize;
     };
 
-    if field.is_align() {
-        if *read_size % 4 != 0 {
-            *read_size = *read_size + 4 - (*read_size % 4)
-        }
+    if field.is_align() && *read_size % 4 != 0 {
+        *read_size = *read_size + 4 - (*read_size % 4)
     }
     Some(*read_size)
 }

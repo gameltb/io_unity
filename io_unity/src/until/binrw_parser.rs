@@ -1,6 +1,6 @@
 use std::fmt;
 
-use std::io::{prelude::*, SeekFrom};
+use std::io::prelude::*;
 use std::ops::Deref;
 
 use binrw::{binrw, BinResult, ReadOptions, WriteOptions};
@@ -9,15 +9,7 @@ use binrw::{BinRead, BinWrite};
 // reading/writing utilities
 
 pub fn position_parser<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<u64> {
-    Ok(reader.seek(SeekFrom::Current(0))?)
-}
-
-pub fn endian_parser<R: Read + Seek>(
-    _reader: &mut R,
-    ro: &ReadOptions,
-    _: (),
-) -> BinResult<binrw::Endian> {
-    Ok(ro.endian())
+    Ok(reader.stream_position()?)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -280,7 +272,7 @@ impl fmt::Display for AlignedString {
 
 impl fmt::Debug for AlignedString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{self}")
     }
 }
 

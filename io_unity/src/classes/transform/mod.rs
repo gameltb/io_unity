@@ -58,13 +58,13 @@ pub fn get_bone_path_hash_map(
 
     map.insert(clc_crc(&path), path.clone());
 
-    while let Some((_, rpath)) = path.split_once("/") {
+    while let Some((_, rpath)) = path.split_once('/') {
         path = rpath.to_string();
         map.insert(clc_crc(&path), path.clone());
     }
     if let Some(chilrens) = transform.get_children() {
         for chilren in &*chilrens {
-            let chilren = PPtr::new(&chilren)
+            let chilren = PPtr::new(chilren)
                 .get_type_tree_object_in_view(viewer)?
                 .unwrap();
             let chilren = chilren.into();

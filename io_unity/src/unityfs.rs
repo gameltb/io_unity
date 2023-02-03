@@ -200,18 +200,15 @@ fn block_uncompressed(
     flag: CompressionType,
     blocks_infocompressedd_stream: Vec<u8>,
 ) -> std::io::Result<Vec<u8>> {
-    let blocks_info_uncompressedd_stream;
-    match flag {
-        CompressionType::None => blocks_info_uncompressedd_stream = blocks_infocompressedd_stream,
+    let blocks_info_uncompressedd_stream = match flag {
+        CompressionType::None => blocks_infocompressedd_stream,
         CompressionType::Lzma => todo!(),
-        CompressionType::Lz4 | CompressionType::Lz4HC => {
-            blocks_info_uncompressedd_stream = decompress(
-                &blocks_infocompressedd_stream,
-                Some(uncompressed_size as i32),
-            )?;
-        }
+        CompressionType::Lz4 | CompressionType::Lz4HC => decompress(
+            &blocks_infocompressedd_stream,
+            Some(uncompressed_size as i32),
+        )?,
         CompressionType::Lzham => todo!(),
-    }
+    };
     Ok(blocks_info_uncompressedd_stream)
 }
 
@@ -261,7 +258,7 @@ fn blocks_info_parser<R: Read + Seek>(
     let (version, compressed_blocks_info_size, uncompressed_blocks_info_size, flags) = flags;
 
     if version >= 7 {
-        let pos = reader.seek(SeekFrom::Current(0))?;
+        let pos = reader.stream_position()?;
         if pos % 16 != 0 {
             reader.seek(SeekFrom::Current((16 - (pos % 16)) as i64))?;
         }
@@ -270,7 +267,7 @@ fn blocks_info_parser<R: Read + Seek>(
     let mut blocks_infocompressedd_stream = vec![0u8; compressed_blocks_info_size as usize];
 
     if flags.blocks_info_at_the_end() {
-        let pos = reader.seek(SeekFrom::Current(0))?;
+        let pos = reader.stream_position()?;
         reader.seek(SeekFrom::End(-(compressed_blocks_info_size as i64)))?;
         reader.read_exact(&mut blocks_infocompressedd_stream)?;
         reader.seek(SeekFrom::Start(pos))?;
@@ -279,7 +276,7 @@ fn blocks_info_parser<R: Read + Seek>(
     }
 
     if flags.block_info_need_padding_at_start() {
-        let pos = reader.seek(SeekFrom::Current(0))?;
+        let pos = reader.stream_position()?;
         if pos % 16 != 0 {
             reader.seek(SeekFrom::Current((16 - (pos % 16)) as i64))?;
         }
@@ -352,7 +349,7 @@ impl Read for UnityFSNode {
                 };
 
                 if uncompressed_data_offset
-                    < ((self.node_info.offset as u64) + self.current_position) as u64
+                    < ((self.node_info.offset as u64) + self.current_position)
                 {
                     file_block.extend_from_slice(
                         &blocks_info_uncompressedd_stream[(((self.node_info.offset as u64)
@@ -373,7 +370,7 @@ impl Read for UnityFSNode {
             compressed_data_offset += sb.compressed_size as u64;
             uncompressed_data_offset += sb.uncompressed_size as u64;
         }
-        if file_block.len() > 0 && file_block.len() <= buf.len() {
+        if !file_block.is_empty() && file_block.len() <= buf.len() {
             buf[0..file_block.len()].copy_from_slice(&file_block[0..file_block.len()]);
             self.current_position += file_block.len() as u64;
             return Ok(file_block.len());

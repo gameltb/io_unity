@@ -33,7 +33,7 @@ impl UnityVersion {
             build_type: BUILD_TYPE_REGEX
                 .captures(version)
                 .and_then(|c| c.get(0))
-                .and_then(|m| Some(m.as_str().to_owned())),
+                .map(|m| m.as_str().to_owned()),
         })
     }
 

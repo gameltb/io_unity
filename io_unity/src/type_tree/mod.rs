@@ -71,7 +71,7 @@ impl Field {
 
     pub fn try_as_slice<'a>(
         &self,
-        object_data_buff: &'a Vec<u8>,
+        object_data_buff: &'a [u8],
         field_cast_args: &FieldCastArgs,
     ) -> Result<&'a [u8], ()> {
         let offset = field_cast_args.field_offset;
@@ -138,30 +138,30 @@ impl Field {
             FieldValue::DataOffset(_v) => {
                 let num: Result<i64, ()> = self.try_cast_to(object_data_buff, field_cast_args);
                 if let Ok(num) = num {
-                    println!(" data : {:?}", num);
+                    println!(" data : {num:?}");
                 } else {
                     let num: Result<u64, ()> = self.try_cast_to(object_data_buff, field_cast_args);
                     if let Ok(num) = num {
-                        println!(" data : {:?}", num);
+                        println!(" data : {num:?}",);
                     } else {
                         let num: Result<f32, ()> =
                             self.try_cast_to(object_data_buff, field_cast_args);
                         if let Ok(num) = num {
-                            println!(" data : {:?}", num);
+                            println!(" data : {num:?}",);
                         } else {
-                            println!("");
+                            println!();
                         }
                     }
                 }
             }
             FieldValue::Fields(fls) => {
-                println!("");
-                fls.into_iter()
+                println!();
+                fls.iter()
                     .map(|(_n, f)| f.display_field(&np, object_data_buff, field_cast_args))
                     .collect()
             }
             FieldValue::Array(ar) => {
-                println!("");
+                println!();
                 ar.array_size
                     .display_field(&np, object_data_buff, field_cast_args);
                 match &ar.data {
@@ -197,7 +197,7 @@ impl Field {
         field_offset: Option<i64>,
         type_tree_object: &TypeTreeObject,
     ) -> Option<(&Self, Option<i64>)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Some((self, field_offset));
         } else {
             match &self.data {
@@ -278,7 +278,7 @@ impl TypeTreeObject {
     }
 
     pub fn get_endian(&self) -> binrw::Endian {
-        self.endian.clone()
+        self.endian
     }
 
     pub fn try_as_slice(&self, path: &str) -> Result<&[u8], ()> {
@@ -293,26 +293,26 @@ impl TypeTreeObject {
 
     pub(super) fn get_field_by_path(&self, path: &str) -> Option<(&Field, Option<i64>)> {
         let path: Vec<String> = path
-            .split("/")
+            .split('/')
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
             .collect();
-        if path.len() < 1 {
+        if path.len() <= 1 {
             return None;
         }
-        self.data_layout.get_field(&path[1..], None, &self)
+        self.data_layout.get_field(&path[1..], None, self)
     }
 
     pub(super) fn get_field_by_path_list(&self, path: &[String]) -> Option<(&Field, Option<i64>)> {
-        if path.len() == 0 {
+        if path.is_empty() {
             return Some((&self.data_layout, None));
         }
-        self.data_layout.get_field(&path, None, &self)
+        self.data_layout.get_field(path, None, self)
     }
 
     pub(super) fn get_field_cast_args(&self) -> FieldCastArgs {
         FieldCastArgs {
-            endian: self.endian.clone(),
+            endian: self.endian,
             field_offset: None,
         }
     }
@@ -324,10 +324,10 @@ pub struct TypeTreeObjectRef {
     pub path: Vec<String>,
 }
 
-impl Into<TypeTreeObjectRef> for TypeTreeObject {
-    fn into(self) -> TypeTreeObjectRef {
+impl From<TypeTreeObject> for TypeTreeObjectRef {
+    fn from(value: TypeTreeObject) -> Self {
         TypeTreeObjectRef {
-            inner: Arc::new(RwLock::new(Box::new(self))),
+            inner: Arc::new(RwLock::new(Box::new(value))),
             path: vec![],
         }
     }
@@ -369,7 +369,7 @@ impl TypeTreeObjectRef {
             .get_field_by_path_list(&self.path)?
             .0
             .try_get_buff_type_and_type_size()
-            .and_then(|(n, s)| Some((n.to_owned(), s)))
+            .map(|(n, s)| (n.to_owned(), s))
     }
 
     pub fn display_tree(&self) {
@@ -377,7 +377,7 @@ impl TypeTreeObjectRef {
     }
 
     pub fn get_endian(&self) -> binrw::Endian {
-        self.inner.read().unwrap().endian.clone()
+        self.inner.read().unwrap().endian
     }
 
     pub fn get_serialized_file_id(&self) -> i64 {
