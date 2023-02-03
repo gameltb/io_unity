@@ -1,9 +1,15 @@
+#[cfg(feature = "external-class-handle")]
 pub mod animation_clip;
+#[cfg(feature = "external-class-handle")]
 pub mod audio_clip;
+#[cfg(feature = "external-class-handle")]
 pub mod mesh;
+#[cfg(feature = "external-class-handle")]
 pub mod named_object;
 pub mod p_ptr;
+#[cfg(feature = "external-class-handle-texture2d")]
 pub mod texture2d;
+#[cfg(feature = "external-class-handle")]
 pub mod transform;
 
 use num_enum::TryFromPrimitive;
@@ -46,15 +52,6 @@ pub trait CastRef<T>: Sized {
 
 pub trait SerializedFileRef {
     fn get_serialized_file_id(&self) -> i64;
-}
-
-#[derive(Debug)]
-pub enum Class<'a> {
-    AudioClip(audio_clip::AudioClip<'a>),
-    Texture2D(texture2d::Texture2D<'a>),
-    Mesh(mesh::Mesh<'a>),
-    Transform(transform::Transform<'a>),
-    AnimationClip(animation_clip::AnimationClip<'a>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, TryFromPrimitive, Hash)]

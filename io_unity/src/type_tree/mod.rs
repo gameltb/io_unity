@@ -1,5 +1,6 @@
 pub mod convert;
 pub mod reader;
+#[cfg(feature = "type-tree-json")]
 pub mod type_tree_json;
 
 use std::{

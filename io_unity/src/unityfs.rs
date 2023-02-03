@@ -317,7 +317,8 @@ impl Read for UnityFSNode {
             Ok(index) => index,
             Err(rindex) => rindex - 1,
         };
-        let (mut compressed_data_offset,mut uncompressed_data_offset) = self.storage_blocks_start_positions[storage_blocks_index];
+        let (mut compressed_data_offset, mut uncompressed_data_offset) =
+            self.storage_blocks_start_positions[storage_blocks_index];
         let mut file_block = Vec::new();
         for sb in &self.storage_blocks[storage_blocks_index..] {
             if (uncompressed_data_offset + (sb.uncompressed_size as u64))

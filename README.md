@@ -30,9 +30,9 @@ contain file path like /InfoJson/x.x.x.json.
 
 ```sh
 # build
-cargo build --example live2dextractor --release
+cargo build --example live2dextractor --release --features="all"
 # run
-cargo run --example live2dextractor --release -- help
+cargo run --example live2dextractor --release --features="all" -- help
 ```
 
 # simple python bind

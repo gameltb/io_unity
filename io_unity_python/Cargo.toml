@@ -13,5 +13,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.18", features = ["extension-module"] }
-io_unity = { path = "../io_unity" }  
+io_unity = { path = "../io_unity", features = ["all"] }  
 anyhow = "1.0"

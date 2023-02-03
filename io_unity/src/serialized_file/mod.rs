@@ -32,6 +32,7 @@ use binrw::{BinRead, ReadOptions};
 use num_enum::TryFromPrimitive;
 use once_cell::sync::Lazy;
 
+#[cfg(feature = "type-tree-json")]
 use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{
     reader::TypeTreeObjectBinReadArgs, reader::TypeTreeObjectBinReadClassArgs, TypeTreeObject,
@@ -501,12 +502,16 @@ pub trait Serialized: fmt::Debug {
         let class_args = if self.get_enable_type_tree() {
             self.get_type_object_args_by_type_id(obj.type_id)
         } else {
-            get_type_object_args_by_version_class_id(
-                &self.get_unity_version(),
-                obj.class.clone() as i32,
-            )
-        }
-        .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+            None
+        };
+
+        #[cfg(feature = "type-tree-json")]
+        let class_args = class_args.or(get_type_object_args_by_version_class_id(
+            &self.get_unity_version(),
+            obj.class.clone() as i32,
+        ));
+        
+        let class_args = class_args.ok_or(std::io::Error::from(ErrorKind::NotFound))?;
 
         let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, path_id, class_args);
 

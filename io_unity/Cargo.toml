@@ -16,20 +16,35 @@ modular-bitfield = "0.11"
 walkdir = "2"
 binrw = "0.10"
 lz4 = "1"
-
-tar = "0.4"
-zstd = "0.12"
-serde_json = "1"
-serde = { version = "1.0", features = ["derive"] }
-
-image = "0.24"
-texpresso = "2"
-astc-decode = "0.3"
-
 glam = "0.22"
-half = "2.1"
-ordered-float = "3.4"
-crc = "3.0"
+
+tar = { version ="0.4", optional = true }
+zstd = { version ="0.12", optional = true }
+serde_json = { version ="1", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true  }
+
+image = { version ="0.24", optional = true }
+texpresso = { version ="2", optional = true }
+astc-decode = { version ="0.3", optional = true }
+
+half =  { version ="2.1", optional = true }
+ordered-float = { version ="3.4", optional = true }
+crc = { version ="3.0", optional = true }
+
+[features]
+default = []
+type-tree-json = ["tar","zstd","serde_json","serde"]
+external-class-handle = ["half","ordered-float","crc"]
+external-class-handle-texture2d = ["image","texpresso","astc-decode"]
+all = ["type-tree-json","external-class-handle","external-class-handle-texture2d"]
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+
+[[example]]
+name = "fsdump"
+required-features = ["all"]
+
+[[example]]
+name = "live2dextractor"
+required-features = ["all"]
