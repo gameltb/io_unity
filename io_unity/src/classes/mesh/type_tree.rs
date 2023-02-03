@@ -13,31 +13,25 @@ use binrw::{BinRead, ReadOptions, VecArgs};
 
 impl MeshObject for Mesh<'_> {
     fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>> {
-        let binding = self.get_sub_meshes().ok_or(anyhow!("sub_meshs"))?;
+        let binding = self.get_sub_meshes()?;
         let sub_mesh: SubMesh = binding
             .get(sub_mesh_id)
-            .ok_or(anyhow!("sub_mesh"))?
+            .ok_or(anyhow!(format!("cannot get sub mesh at {sub_mesh_id}")))?
             .cast_as();
 
-        let buff = self.get_index_buffer().ok_or(anyhow!("get_index_buffer"))?;
+        let buff = self.get_index_buffer()?;
         let mut reader = Cursor::new(buff);
-        reader.seek(SeekFrom::Start(
-            sub_mesh.get_first_byte().ok_or(anyhow!("get_first_byte"))?,
-        ))?;
+        reader.seek(SeekFrom::Start(sub_mesh.get_first_byte()?))?;
 
         let op = ReadOptions::new(self.inner.get_endian());
-        let first_vertex = sub_mesh
-            .get_first_vertex()
-            .ok_or(anyhow!("get_first_vertex"))?;
+        let first_vertex = sub_mesh.get_first_vertex()?;
 
-        if self.get_index_format().ok_or(anyhow!("get_index_format"))? == 0 {
+        if self.get_index_format()? == 0 {
             let buff = <Vec<u16>>::read_options(
                 &mut reader,
                 &op,
                 VecArgs {
-                    count: sub_mesh
-                        .get_index_count()
-                        .ok_or(anyhow!("get_index_count"))? as usize,
+                    count: sub_mesh.get_index_count()? as usize,
                     inner: (),
                 },
             )?;
@@ -50,9 +44,7 @@ impl MeshObject for Mesh<'_> {
                 &mut reader,
                 &op,
                 VecArgs {
-                    count: sub_mesh
-                        .get_index_count()
-                        .ok_or(anyhow!("get_index_count"))? as usize,
+                    count: sub_mesh.get_index_count()? as usize,
                     inner: (),
                 },
             )?;
@@ -61,12 +53,12 @@ impl MeshObject for Mesh<'_> {
     }
 
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>> {
-        let binding = self.get_sub_meshes().ok_or(anyhow!("sub_meshs"))?;
+        let binding = self.get_sub_meshes()?;
         let sub_mesh: SubMesh = binding
             .get(sub_mesh_id)
-            .ok_or(anyhow!("sub_mesh"))?
+            .ok_or(anyhow!(format!("cannot get sub mesh at {sub_mesh_id}")))?
             .cast_as();
-        let vertex_data_obj = self.get_vertex_data().ok_or(anyhow!("get_vertex_data"))?;
+        let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
         Ok(match vertex_data.get_channel(
@@ -81,12 +73,12 @@ impl MeshObject for Mesh<'_> {
     }
 
     fn get_normal_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>> {
-        let binding = self.get_sub_meshes().ok_or(anyhow!("sub_meshs"))?;
+        let binding = self.get_sub_meshes()?;
         let sub_mesh: SubMesh = binding
             .get(sub_mesh_id)
-            .ok_or(anyhow!("sub_mesh"))?
+            .ok_or(anyhow!(format!("cannot get sub mesh at {sub_mesh_id}")))?
             .cast_as();
-        let vertex_data_obj = self.get_vertex_data().ok_or(anyhow!("get_vertex_data"))?;
+        let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
         Ok(match vertex_data.get_channel(
@@ -101,13 +93,13 @@ impl MeshObject for Mesh<'_> {
     }
 
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>> {
-        let binding = self.get_sub_meshes().ok_or(anyhow!("sub_meshs"))?;
+        let binding = self.get_sub_meshes()?;
         let sub_mesh: SubMesh = binding
             .get(sub_mesh_id)
-            .ok_or(anyhow!("sub_mesh"))?
+            .ok_or(anyhow!(format!("cannot get sub mesh at {sub_mesh_id}")))?
             .cast_as();
 
-        let vertex_data_obj = self.get_vertex_data().ok_or(anyhow!("get_vertex_data"))?;
+        let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
         Ok(match vertex_data.get_channel(
@@ -122,12 +114,12 @@ impl MeshObject for Mesh<'_> {
     }
 
     fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<BoneWeights>> {
-        let binding = self.get_sub_meshes().ok_or(anyhow!("get_sub_meshes"))?;
+        let binding = self.get_sub_meshes()?;
         let sub_mesh: SubMesh = binding
             .get(sub_mesh_id)
-            .ok_or(anyhow!("sub_mesh"))?
+            .ok_or(anyhow!(format!("cannot get sub mesh at {sub_mesh_id}")))?
             .cast_as();
-        let vertex_data_obj = self.get_vertex_data().ok_or(anyhow!("get_vertex_data"))?;
+        let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
         let weight_buff = match vertex_data.get_channel(
@@ -154,8 +146,8 @@ impl MeshObject for Mesh<'_> {
         Ok(buff)
     }
 
-    fn get_sub_mesh_count(&self) -> Option<usize> {
-        Some(self.get_sub_meshes()?.len())
+    fn get_sub_mesh_count(&self) -> anyhow::Result<usize> {
+        Ok(self.get_sub_meshes()?.len())
     }
 
     fn get_bind_pose(&self) -> anyhow::Result<Vec<crate::until::binrw_parser::Mat4>> {
@@ -164,37 +156,37 @@ impl MeshObject for Mesh<'_> {
 }
 
 impl Mesh<'_> {
-    pub fn get_sub_meshes(&self) -> Option<Vec<TypeTreeObjectRef>> {
-        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_SubMeshes/Array").ok()
+    pub fn get_sub_meshes(&self) -> anyhow::Result<Vec<TypeTreeObjectRef>> {
+        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_SubMeshes/Array")
     }
 
-    pub fn get_index_format(&self) -> Option<i64> {
-        i64::try_cast_from(self.inner, "/Base/m_IndexFormat").ok()
+    pub fn get_index_format(&self) -> anyhow::Result<i64> {
+        i64::try_cast_from(self.inner, "/Base/m_IndexFormat")
     }
 
-    pub fn get_index_buffer(&self) -> Option<Vec<u8>> {
-        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_IndexBuffer/Array").ok()
+    pub fn get_index_buffer(&self) -> anyhow::Result<Vec<u8>> {
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_IndexBuffer/Array")
     }
 
-    pub fn get_vertex_data(&self) -> Option<TypeTreeObjectRef> {
-        TypeTreeObjectRef::try_cast_from(self.inner, "/Base/m_VertexData").ok()
+    pub fn get_vertex_data(&self) -> anyhow::Result<TypeTreeObjectRef> {
+        TypeTreeObjectRef::try_cast_from(self.inner, "/Base/m_VertexData")
     }
 }
 
 def_unity_class!(SubMesh);
 
 impl SubMesh<'_> {
-    pub fn get_first_byte(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/firstByte").ok()
+    pub fn get_first_byte(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/firstByte")
     }
-    pub fn get_index_count(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/indexCount").ok()
+    pub fn get_index_count(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/indexCount")
     }
-    pub fn get_first_vertex(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/firstVertex").ok()
+    pub fn get_first_vertex(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/firstVertex")
     }
-    pub fn get_vertex_count(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/vertexCount").ok()
+    pub fn get_vertex_count(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/vertexCount")
     }
 }
 
@@ -202,33 +194,31 @@ def_unity_class!(VertexData);
 def_unity_class!(Channel);
 
 impl Channel<'_> {
-    pub fn get_stream(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/stream").ok()
+    pub fn get_stream(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/stream")
     }
-    pub fn get_offset(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/offset").ok()
+    pub fn get_offset(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/offset")
     }
-    pub fn get_format(&self) -> Option<VertexFormat> {
-        u8::try_cast_from(self.inner, "/Base/format")
-            .ok()
-            .and_then(|t| VertexFormat::try_from(t).ok())
+    pub fn get_format(&self) -> anyhow::Result<VertexFormat> {
+        Ok(u8::try_cast_from(self.inner, "/Base/format").map(VertexFormat::try_from)??)
     }
-    pub fn get_dimension(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/dimension").ok()
+    pub fn get_dimension(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/dimension")
     }
 }
 
 impl VertexData<'_> {
-    pub fn get_channels(&self) -> Option<Vec<TypeTreeObjectRef>> {
-        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_Channels/Array").ok()
+    pub fn get_channels(&self) -> anyhow::Result<Vec<TypeTreeObjectRef>> {
+        <Vec<TypeTreeObjectRef>>::try_cast_from(self.inner, "/Base/m_Channels/Array")
     }
 
-    pub fn get_vertex_count(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/m_VertexCount").ok()
+    pub fn get_vertex_count(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/m_VertexCount")
     }
 
-    pub fn get_data(&self) -> Option<Vec<u8>> {
-        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_DataSize").ok()
+    pub fn get_data(&self) -> anyhow::Result<Vec<u8>> {
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/m_DataSize")
     }
 }
 
@@ -236,8 +226,7 @@ impl VertexData<'_> {
     fn get_stream_offset(&self, stream: u8) -> anyhow::Result<usize> {
         let mut offset = 0;
         for s in 0..stream {
-            offset += self.get_stream_stride(s)?
-                * (self.get_vertex_count().ok_or(anyhow!("get_vertex_count"))? as usize);
+            offset += self.get_stream_stride(s)? * (self.get_vertex_count()? as usize);
             if offset % 16 != 0 {
                 offset += 16 - (offset % 16);
             }
@@ -247,11 +236,10 @@ impl VertexData<'_> {
 
     fn get_stream_stride(&self, stream: u8) -> anyhow::Result<usize> {
         let mut stride = 0u64;
-        for channel in &self.get_channels().ok_or(anyhow!("get_channels"))? {
+        for channel in &self.get_channels()? {
             let channel: Channel = channel.cast_as();
-            if channel.get_stream().ok_or(anyhow!("get_stream"))? == stream as u64 {
-                stride += get_format_size(channel.get_format().ok_or(anyhow!("get_format"))?) as u64
-                    * channel.get_dimension().ok_or(anyhow!("get_dimension"))?
+            if channel.get_stream()? == stream as u64 {
+                stride += get_format_size(channel.get_format()?) as u64 * channel.get_dimension()?
             }
         }
         Ok(stride as usize)
@@ -263,41 +251,28 @@ impl VertexData<'_> {
         sub_mesh: &SubMesh,
         endian: binrw::Endian,
     ) -> anyhow::Result<StreamBuff> {
-        let channel =
-            &self.get_channels().ok_or(anyhow!("get_channels"))?[channel.clone() as u8 as usize];
+        let channel = &self.get_channels()?[channel.clone() as u8 as usize];
         let channel: Channel = channel.cast_as();
 
-        let offset =
-            self.get_stream_offset(channel.get_stream().ok_or(anyhow!("get_stream"))? as u8)?;
-        let stride =
-            self.get_stream_stride(channel.get_stream().ok_or(anyhow!("get_stream"))? as u8)?;
-        let buff = self.get_data().ok_or(anyhow!("get_data"))?;
+        let offset = self.get_stream_offset(channel.get_stream()? as u8)?;
+        let stride = self.get_stream_stride(channel.get_stream()? as u8)?;
+        let buff = self.get_data()?;
         let mut reader = Cursor::new(buff);
         let op = ReadOptions::new(endian);
-        match &channel.get_format().ok_or(anyhow!("get_format"))? {
+        match &channel.get_format()? {
             VertexFormat::Float => {
                 let mut buff = vec![];
-                for i in sub_mesh
-                    .get_first_vertex()
-                    .ok_or(anyhow!("get_first_vertex"))?
-                    ..sub_mesh
-                        .get_vertex_count()
-                        .ok_or(anyhow!("get_vertex_count"))?
-                        + sub_mesh
-                            .get_first_vertex()
-                            .ok_or(anyhow!("get_first_vertex"))?
+                for i in sub_mesh.get_first_vertex()?
+                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
                 {
                     reader.seek(SeekFrom::Start(
-                        offset as u64
-                            + i * stride as u64
-                            + channel.get_offset().ok_or(anyhow!("get_offset"))?,
+                        offset as u64 + i * stride as u64 + channel.get_offset()?,
                     ))?;
                     let sbuff = <Vec<f32>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().ok_or(anyhow!("get_dimension"))?
-                                as usize,
+                            count: channel.get_dimension()? as usize,
                             inner: (),
                         },
                     )?;
@@ -307,27 +282,17 @@ impl VertexData<'_> {
             }
             VertexFormat::Float16 => {
                 let mut buff = vec![];
-                for i in sub_mesh
-                    .get_first_vertex()
-                    .ok_or(anyhow!("get_first_vertex"))?
-                    ..sub_mesh
-                        .get_vertex_count()
-                        .ok_or(anyhow!("get_vertex_count"))?
-                        + sub_mesh
-                            .get_first_vertex()
-                            .ok_or(anyhow!("get_first_vertex"))?
+                for i in sub_mesh.get_first_vertex()?
+                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
                 {
                     reader.seek(SeekFrom::Start(
-                        offset as u64
-                            + i * stride as u64
-                            + channel.get_offset().ok_or(anyhow!("get_offset"))?,
+                        offset as u64 + i * stride as u64 + channel.get_offset()?,
                     ))?;
                     let sbuff = <Vec<u16>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().ok_or(anyhow!("get_dimension"))?
-                                as usize,
+                            count: channel.get_dimension()? as usize,
                             inner: (),
                         },
                     )?;
@@ -350,27 +315,17 @@ impl VertexData<'_> {
             VertexFormat::SInt16 => todo!(),
             VertexFormat::UInt32 => {
                 let mut buff = vec![];
-                for i in sub_mesh
-                    .get_first_vertex()
-                    .ok_or(anyhow!("get_first_vertex"))?
-                    ..sub_mesh
-                        .get_vertex_count()
-                        .ok_or(anyhow!("get_vertex_count"))?
-                        + sub_mesh
-                            .get_first_vertex()
-                            .ok_or(anyhow!("get_first_vertex"))?
+                for i in sub_mesh.get_first_vertex()?
+                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
                 {
                     reader.seek(SeekFrom::Start(
-                        offset as u64
-                            + i * stride as u64
-                            + channel.get_offset().ok_or(anyhow!("get_offset"))?,
+                        offset as u64 + i * stride as u64 + channel.get_offset()?,
                     ))?;
                     let sbuff = <Vec<u32>>::read_options(
                         &mut reader,
                         &op,
                         VecArgs {
-                            count: channel.get_dimension().ok_or(anyhow!("get_dimension"))?
-                                as usize,
+                            count: channel.get_dimension()? as usize,
                             inner: (),
                         },
                     )?;

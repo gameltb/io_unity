@@ -25,7 +25,7 @@ pub trait TryRead<T>: Sized {
 }
 
 impl TryRead<i32> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_read_to<R: Read + Seek>(
         &self,
@@ -34,9 +34,9 @@ impl TryRead<i32> for Field {
     ) -> Result<i32, Self::Error> {
         if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
             let op = ReadOptions::new(field_cast_args.endian);
-            return <i32>::read_options(object_data_reader, &op, ()).map_err(|_| ());
+            return Ok(<i32>::read_options(object_data_reader, &op, ())?);
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
@@ -58,9 +58,9 @@ pub trait TryCastFrom<T, P>: Sized {
 
 impl<T, E> TryCastFrom<E, &str> for T
 where
-    for<'a> T: TryCastFrom<E, &'a [String], Error = ()>,
+    for<'a> T: TryCastFrom<E, &'a [String], Error = anyhow::Error>,
 {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: E, path: &str) -> Result<Self, Self::Error> {
         let path: Vec<String> = path
@@ -74,69 +74,67 @@ where
 
 impl<T> TryCastFrom<&TypeTreeObject, &[String]> for T
 where
-    Field: TryCast<T>,
+    Field: TryCast<T, Error = anyhow::Error>,
 {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: &TypeTreeObject, path: &[String]) -> Result<Self, Self::Error> {
         value
             .get_field_by_path_list(path)
-            .and_then(|(feild, offset)| {
+            .map(|(feild, offset)| {
                 let mut field_cast_args = value.get_field_cast_args();
                 field_cast_args.field_offset = offset;
-                feild.try_cast_to(&value.data_buff, &field_cast_args).ok()
+                feild.try_cast_to(&value.data_buff, &field_cast_args)
             })
-            .ok_or(())
+            .ok_or(anyhow!(format!("cannot get field {path:?}")))?
     }
 }
 
 impl<'a, T> TryCastFrom<&TypeTreeObjectRef, &'a [String]> for T
 where
-    Field: TryCast<T>,
+    Field: TryCast<T, Error = anyhow::Error>,
 {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &'a [String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|_| ())?;
+        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
         type_tree_obj
             .get_field_by_path_list(&self_path)
-            .and_then(|(feild, offset)| {
+            .map(|(feild, offset)| {
                 let mut field_cast_args = type_tree_obj.get_field_cast_args();
                 field_cast_args.field_offset = offset;
-                feild
-                    .try_cast_to(&type_tree_obj.data_buff, &field_cast_args)
-                    .ok()
+                feild.try_cast_to(&type_tree_obj.data_buff, &field_cast_args)
             })
-            .ok_or(())
+            .ok_or(anyhow!(format!("cannot get field {path:?}")))?
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for TypeTreeObjectRef {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|_| ())?;
+        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
         if type_tree_obj.get_field_by_path_list(&self_path).is_some() {
             return Ok(TypeTreeObjectRef {
                 inner: value.inner.clone(),
                 path: self_path,
             });
         }
-        Err(())
+        Err(anyhow!("cannot get field {path:?}"))
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|_| ())?;
+        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
         if let Some((array_field, _offset)) = type_tree_obj.get_field_by_path_list(&self_path) {
             if let FieldValue::Array(array) = &array_field.data {
                 let size: i32 = array.array_size.try_cast_to(
@@ -155,12 +153,12 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
                 return Ok(vec);
             }
         }
-        Err(())
+        Err(anyhow!("cannot get field {path:?}"))
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for HashMap<String, TypeTreeObjectRef> {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let entites = <Vec<TypeTreeObjectRef>>::try_cast_from(value, path)?;
@@ -183,19 +181,23 @@ fn gen_reader<'a>(
     object_data_buff: &'a [u8],
     data_offset: &DataOffset,
     field_cast_args: &FieldCastArgs,
-) -> Result<Cursor<&'a [u8]>, ()> {
+) -> anyhow::Result<Cursor<&'a [u8]>> {
     let mut reader = Cursor::new(object_data_buff);
     match data_offset {
         DataOffset::AbsDataOffset(data) => reader.set_position(*data),
-        DataOffset::ArrayItemOffset(data) => {
-            reader.set_position(*data + field_cast_args.field_offset.ok_or(())? as u64)
-        }
+        DataOffset::ArrayItemOffset(data) => reader.set_position(
+            *data
+                + field_cast_args
+                    .field_offset
+                    .ok_or(anyhow!("ArrayItemOffset use without field offset."))?
+                    as u64,
+        ),
     }
     Ok(reader)
 }
 
 impl TryCast<bool> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -205,15 +207,15 @@ impl TryCast<bool> for Field {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["bool"].contains(&self.field_type.get_type().as_str()) {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<u8>::read(&mut reader).map_err(|_| ())? != 0);
+                return Ok(<u8>::read(&mut reader)? != 0);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<i8> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -223,15 +225,15 @@ impl TryCast<i8> for Field {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["SInt8"].contains(&self.field_type.get_type().as_str()) {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <i8>::read(&mut reader).map_err(|_| ());
+                return Ok(<i8>::read(&mut reader)?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<i16> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -242,15 +244,15 @@ impl TryCast<i16> for Field {
             if ["SInt16", "short"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <i16>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<i16>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<i32> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -261,15 +263,15 @@ impl TryCast<i32> for Field {
             if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <i32>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<i32>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<i64> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -280,28 +282,28 @@ impl TryCast<i64> for Field {
             if let FieldValue::DataOffset(data) = &self.data {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
                 let op = ReadOptions::new(field_cast_args.endian);
-                return <i64>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<i64>::read_options(&mut reader, &op, ())?);
             }
         } else {
-            let value: Result<i32, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<i32, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as i64);
             }
-            let value: Result<i16, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<i16, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as i64);
             }
-            let value: Result<i8, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<i8, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as i64);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<u8> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -311,15 +313,15 @@ impl TryCast<u8> for Field {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["UInt8", "char"].contains(&self.field_type.get_type().as_str()) {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <u8>::read(&mut reader).map_err(|_| ());
+                return Ok(<u8>::read(&mut reader)?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<u16> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -330,15 +332,15 @@ impl TryCast<u16> for Field {
             if ["UInt16", "unsigned short"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <u16>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<u16>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<u32> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -349,15 +351,15 @@ impl TryCast<u32> for Field {
             if ["UInt32", "unsigned int"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <u32>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<u32>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<u64> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -368,28 +370,28 @@ impl TryCast<u64> for Field {
             if let FieldValue::DataOffset(data) = &self.data {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <u64>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<u64>::read_options(&mut reader, &op, ())?);
             }
         } else {
-            let value: Result<u32, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<u32, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as u64);
             }
-            let value: Result<u16, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<u16, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as u64);
             }
-            let value: Result<u8, ()> = self.try_cast_to(object_data_buff, field_cast_args);
+            let value: Result<u8, _> = self.try_cast_to(object_data_buff, field_cast_args);
             if let Ok(value) = value {
                 return Ok(value as u64);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<usize> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -400,17 +402,15 @@ impl TryCast<usize> for Field {
             if let FieldValue::DataOffset(data) = &self.data {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <u64>::read_options(&mut reader, &op, ())
-                    .map_err(|_| ())
-                    .map(|size| size as usize);
+                return Ok(<u64>::read_options(&mut reader, &op, ())? as usize);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<f32> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -421,15 +421,15 @@ impl TryCast<f32> for Field {
             if ["float"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <f32>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<f32>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<f64> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -440,15 +440,15 @@ impl TryCast<f64> for Field {
             if ["double"].contains(&self.field_type.get_type().as_str()) {
                 let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return <f64>::read_options(&mut reader, &op, ()).map_err(|_| ());
+                return Ok(<f64>::read_options(&mut reader, &op, ())?);
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<f32>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -464,25 +464,24 @@ impl TryCast<Vec<f32>> for Field {
                 if let Some(item_field) = &array_field.item_field {
                     if item_field.field_type.get_type().as_str() == "float" {
                         let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                        return <Vec<f32>>::read_options(
+                        return Ok(<Vec<f32>>::read_options(
                             &mut reader,
                             &op,
                             VecArgs {
                                 count: size as usize,
                                 inner: (),
                             },
-                        )
-                        .map_err(|_| ());
+                        )?);
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<f64>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -498,25 +497,24 @@ impl TryCast<Vec<f64>> for Field {
                 if let Some(item_field) = &array_field.item_field {
                     if item_field.field_type.get_type().as_str() == "double" {
                         let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                        return <Vec<f64>>::read_options(
+                        return Ok(<Vec<f64>>::read_options(
                             &mut reader,
                             &op,
                             VecArgs {
                                 count: size as usize,
                                 inner: (),
                             },
-                        )
-                        .map_err(|_| ());
+                        )?);
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<u8>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -533,26 +531,25 @@ impl TryCast<Vec<u8>> for Field {
                     if let FieldValue::DataOffset(_) = item_field.data {
                         if item_field.field_type.get_byte_size() == 1 {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                            return <Vec<u8>>::read_options(
+                            return Ok(<Vec<u8>>::read_options(
                                 &mut reader,
                                 &op,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
                                 },
-                            )
-                            .map_err(|_| ());
+                            )?);
                         }
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<u16>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -569,26 +566,25 @@ impl TryCast<Vec<u16>> for Field {
                     if let FieldValue::DataOffset(_) = item_field.data {
                         if item_field.field_type.get_byte_size() == 2 {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                            return <Vec<u16>>::read_options(
+                            return Ok(<Vec<u16>>::read_options(
                                 &mut reader,
                                 &op,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
                                 },
-                            )
-                            .map_err(|_| ());
+                            )?);
                         }
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<u32>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -605,26 +601,25 @@ impl TryCast<Vec<u32>> for Field {
                     if let FieldValue::DataOffset(_) = item_field.data {
                         if item_field.field_type.get_byte_size() == 4 {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                            return <Vec<u32>>::read_options(
+                            return Ok(<Vec<u32>>::read_options(
                                 &mut reader,
                                 &op,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
                                 },
-                            )
-                            .map_err(|_| ());
+                            )?);
                         }
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<Vec<u64>> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -641,26 +636,25 @@ impl TryCast<Vec<u64>> for Field {
                     if let FieldValue::DataOffset(_) = item_field.data {
                         if item_field.field_type.get_byte_size() == 8 {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
-                            return <Vec<u64>>::read_options(
+                            return Ok(<Vec<u64>>::read_options(
                                 &mut reader,
                                 &op,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
                                 },
-                            )
-                            .map_err(|_| ());
+                            )?);
                         }
                     }
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<String> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -675,12 +669,12 @@ impl TryCast<String> for Field {
                 }
             }
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<glam::Quat> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -690,28 +684,28 @@ impl TryCast<glam::Quat> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get x."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get y."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let z: f32 = fields
                 .get("z")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get z."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let w: f32 = fields
                 .get("w")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get w."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Quat::from_xyzw(x, y, z, w));
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<glam::Vec3> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -721,24 +715,24 @@ impl TryCast<glam::Vec3> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get x."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get y."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let z: f32 = fields
                 .get("z")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get z."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Vec3::new(x, y, z));
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }
 
 impl TryCast<glam::Vec2> for Field {
-    type Error = ();
+    type Error = anyhow::Error;
 
     fn try_cast_to(
         &self,
@@ -748,14 +742,14 @@ impl TryCast<glam::Vec2> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get x."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(())?
+                .ok_or(anyhow!("Cannot get y."))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Vec2::new(x, y));
         }
-        Err(())
+        Err(anyhow!("Type not match."))
     }
 }

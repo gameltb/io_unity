@@ -4,19 +4,13 @@ use crate::type_tree::convert::TryCastFrom;
 use crate::unity_asset_view::UnityAssetViewer;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
-use std::io::{prelude::*, ErrorKind, SeekFrom};
+use std::io::{prelude::*, SeekFrom};
 
 impl AudioClipObject for AudioClip<'_> {
     fn get_audio_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Vec<u8>> {
-        let resource_source = self
-            .get_resource_source()
-            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
-        let resource_offset = self
-            .get_resource_offset()
-            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
-        let resource_size = self
-            .get_resource_size()
-            .ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let resource_source = self.get_resource_source()?;
+        let resource_offset = self.get_resource_offset()?;
+        let resource_size = self.get_resource_size()?;
 
         if let Some(mut file) = viewer.get_resource_file_by_serialized_file_id_and_path(
             self.get_serialized_file_id(),
@@ -27,25 +21,25 @@ impl AudioClipObject for AudioClip<'_> {
             file.read_exact(&mut data)?;
             return Ok(data);
         }
-        Err(std::io::Error::from(ErrorKind::NotFound).into())
+        Err(anyhow!("Get audio data fail"))
     }
 }
 
 impl AudioClip<'_> {
-    fn get_resource_source(&self) -> Option<String> {
-        String::try_cast_from(self.inner, "/Base/m_Resource/m_Source").ok()
+    fn get_resource_source(&self) -> anyhow::Result<String> {
+        String::try_cast_from(self.inner, "/Base/m_Resource/m_Source")
     }
 
-    fn get_resource_offset(&self) -> Option<u64> {
-        let offset = u64::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok();
-        if offset.is_some() {
+    fn get_resource_offset(&self) -> anyhow::Result<u64> {
+        let offset = u64::try_cast_from(self.inner, "/Base/m_Resource/m_Offset");
+        if offset.is_ok() {
             return offset;
         }
-        Some(usize::try_cast_from(self.inner, "/Base/m_Resource/m_Offset").ok()? as u64)
+        Ok(usize::try_cast_from(self.inner, "/Base/m_Resource/m_Offset")? as u64)
     }
 
-    fn get_resource_size(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/m_Resource/m_Size").ok()
+    fn get_resource_size(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/m_Resource/m_Size")
     }
 }
 

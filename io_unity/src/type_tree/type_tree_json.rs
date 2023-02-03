@@ -147,7 +147,7 @@ fn read_info_json_by_version(version: &String) -> anyhow::Result<InfoJson::InfoJ
                 let file = file?;
 
                 if let Some(path) = file.header().path()?.to_str() {
-                    if path == &json_path {
+                    if path == json_path {
                         // files implement the Read trait
                         let info_json: InfoJson::InfoJson = serde_json::from_reader(file)?;
                         return Ok(info_json);

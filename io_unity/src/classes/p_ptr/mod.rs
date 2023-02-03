@@ -11,35 +11,39 @@ use super::SerializedFileRef;
 def_unity_class!(PPtr);
 
 pub trait PPtrObject: SerializedFileRef {
-    fn get_path_id(&self) -> Option<i64>;
-    fn get_file_id(&self) -> Option<i64>;
+    fn get_path_id(&self) -> anyhow::Result<i64>;
+    fn get_file_id(&self) -> anyhow::Result<i64>;
 
     fn get_serialized_file<'a>(
         &self,
         self_serialized_file: &'a SerializedFile,
         viewer: Option<&'a UnityAssetViewer>,
-    ) -> Option<&'a SerializedFile> {
-        if let Some(file_id) = self.get_file_id() {
-            if file_id == 0 {
-                return Some(self_serialized_file);
-            }
+    ) -> anyhow::Result<&'a SerializedFile> {
+        let file_id = self.get_file_id()?;
 
-            if let Some(viewer) = viewer {
-                let externals = self_serialized_file.get_externals();
+        if file_id == 0 {
+            return Ok(self_serialized_file);
+        }
 
-                if file_id > 0 {
-                    if let Some(external) = externals.get(file_id as usize - 1) {
-                        if let Some(file_name) = PathBuf::from(&external.path.to_string())
-                            .file_name()
-                            .map(|f| f.to_string_lossy().into_owned())
+        if let Some(viewer) = viewer {
+            let externals = self_serialized_file.get_externals();
+
+            if file_id > 0 {
+                if let Some(external) = externals.get(file_id as usize - 1) {
+                    if let Some(file_name) = PathBuf::from(&external.path.to_string())
+                        .file_name()
+                        .map(|f| f.to_string_lossy().into_owned())
+                    {
+                        if let Some(serialized_file) =
+                            viewer.get_serialized_file_by_path(&file_name)
                         {
-                            return viewer.get_serialized_file_by_path(&file_name);
+                            return Ok(serialized_file);
                         }
                     }
                 }
             }
         }
-        None
+        Err(anyhow!("cannot find serialized_file"))
     }
 
     fn get_type_tree_object(
@@ -47,24 +51,19 @@ pub trait PPtrObject: SerializedFileRef {
         self_serialized_file: &SerializedFile,
         viewer: Option<&UnityAssetViewer>,
     ) -> anyhow::Result<Option<TypeTreeObject>> {
-        if let Some(path_id) = self.get_path_id() {
-            if let Some(serialized_file) = self.get_serialized_file(self_serialized_file, viewer) {
-                return serialized_file.get_tt_object_by_path_id(path_id);
-            }
-        }
-        Ok(None)
+        let path_id = self.get_path_id()?;
+        let serialized_file = self.get_serialized_file(self_serialized_file, viewer)?;
+        serialized_file.get_tt_object_by_path_id(path_id)
     }
 
     fn get_type_tree_object_in_view(
         &self,
         viewer: &UnityAssetViewer,
     ) -> anyhow::Result<Option<TypeTreeObject>> {
-        if let Some(self_serialized_file) = viewer
+        let self_serialized_file = viewer
             .serialized_file_map
             .get(&self.get_serialized_file_id())
-        {
-            return self.get_type_tree_object(self_serialized_file, Some(viewer));
-        }
-        Ok(None)
+            .ok_or(anyhow!("cannot find serialized_file"))?;
+        self.get_type_tree_object(self_serialized_file, Some(viewer))
     }
 }

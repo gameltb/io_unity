@@ -93,7 +93,7 @@ impl UnityAssetViewer {
                 let mut name_map = HashMap::new();
                 for (name, asset_info) in containers {
                     if let Ok(pptr) = TypeTreeObjectRef::try_cast_from(&asset_info, "/Base/asset") {
-                        if let Some(path_id) = PPtr::new(&pptr).get_path_id() {
+                        if let Ok(path_id) = PPtr::new(&pptr).get_path_id() {
                             name_map.insert(path_id, name.clone());
                         }
 
@@ -121,7 +121,7 @@ impl UnityAssetViewer {
                     ) {
                         let mut name_map = HashMap::new();
                         for (name, pptr) in containers {
-                            if let Some(path_id) = PPtr::new(&pptr).get_path_id() {
+                            if let Ok(path_id) = PPtr::new(&pptr).get_path_id() {
                                 name_map.insert(path_id, name.clone());
                             }
 
@@ -289,7 +289,7 @@ impl UnityAssetViewer {
     pub fn get_container_name_by_pptr(&self, pptr: &PPtr) -> Option<&String> {
         let serialized_file_id = pptr.get_serialized_file_id();
         if let Some(name_map) = self.container_name_maps.get(&serialized_file_id) {
-            if let Some(path_id) = pptr.get_path_id() {
+            if let Ok(path_id) = pptr.get_path_id() {
                 return name_map.get(&path_id);
             }
         }

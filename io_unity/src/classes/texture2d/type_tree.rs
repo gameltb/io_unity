@@ -7,21 +7,23 @@ use num_enum::TryFromPrimitive;
 use std::io::{prelude::*, SeekFrom};
 
 impl Texture2DObject for Texture2D<'_> {
-    fn get_width(&self) -> Option<u64> {
+    fn get_width(&self) -> anyhow::Result<u64> {
         self.get_width().map(|i| i as u64)
     }
-    fn get_height(&self) -> Option<u64> {
+    fn get_height(&self) -> anyhow::Result<u64> {
         self.get_height().map(|i| i as u64)
     }
 
-    fn get_texture_format(&self) -> Option<TextureFormat> {
-        TextureFormat::try_from_primitive(self.get_texture_format()? as u32).ok()
+    fn get_texture_format(&self) -> anyhow::Result<TextureFormat> {
+        Ok(TextureFormat::try_from_primitive(
+            self.get_texture_format()? as u32,
+        )?)
     }
 
-    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>> {
-        if let Some(data) = self.get_image_data() {
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Vec<u8>> {
+        if let Ok(data) = self.get_image_data() {
             if !data.is_empty() {
-                return Some(data);
+                return Ok(data);
             }
         }
 
@@ -29,43 +31,41 @@ impl Texture2DObject for Texture2D<'_> {
             self.get_serialized_file_id(),
             &self.get_stream_data_path()?,
         ) {
-            file.seek(SeekFrom::Start(self.get_stream_data_offset()?))
-                .ok()?;
+            file.seek(SeekFrom::Start(self.get_stream_data_offset()?))?;
             let mut data = vec![0u8; self.get_stream_data_size()? as usize];
-            file.read_exact(&mut data).ok()?;
-            return Some(data);
+            file.read_exact(&mut data)?;
+            return Ok(data);
         }
-
-        None
+        Err(anyhow!("cannot find image data"))
     }
 }
 
 impl Texture2D<'_> {
-    fn get_width(&self) -> Option<i64> {
-        i64::try_cast_from(self.inner, "/Base/m_Width").ok()
+    fn get_width(&self) -> anyhow::Result<i64> {
+        i64::try_cast_from(self.inner, "/Base/m_Width")
     }
 
-    fn get_height(&self) -> Option<i64> {
-        i64::try_cast_from(self.inner, "/Base/m_Height").ok()
+    fn get_height(&self) -> anyhow::Result<i64> {
+        i64::try_cast_from(self.inner, "/Base/m_Height")
     }
 
-    fn get_texture_format(&self) -> Option<i64> {
-        i64::try_cast_from(self.inner, "/Base/m_TextureFormat").ok()
+    fn get_texture_format(&self) -> anyhow::Result<i64> {
+        i64::try_cast_from(self.inner, "/Base/m_TextureFormat")
     }
 
-    fn get_image_data(&self) -> Option<Vec<u8>> {
-        <Vec<u8>>::try_cast_from(self.inner, "/Base/image data").ok()
+    fn get_image_data(&self) -> anyhow::Result<Vec<u8>> {
+        <Vec<u8>>::try_cast_from(self.inner, "/Base/image data")
     }
 
-    fn get_stream_data_path(&self) -> Option<String> {
-        String::try_cast_from(self.inner, "/Base/m_StreamData/path").ok()
+    fn get_stream_data_path(&self) -> anyhow::Result<String> {
+        String::try_cast_from(self.inner, "/Base/m_StreamData/path")
     }
 
-    fn get_stream_data_offset(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/m_StreamData/offset").ok()
+    fn get_stream_data_offset(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/m_StreamData/offset")
     }
 
-    fn get_stream_data_size(&self) -> Option<u64> {
-        u64::try_cast_from(self.inner, "/Base/m_StreamData/size").ok()
+    fn get_stream_data_size(&self) -> anyhow::Result<u64> {
+        u64::try_cast_from(self.inner, "/Base/m_StreamData/size")
     }
 }

@@ -11,7 +11,7 @@ pub trait MeshObject {
     fn get_vertex_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
     fn get_normal_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
-    fn get_sub_mesh_count(&self) -> Option<usize>;
+    fn get_sub_mesh_count(&self) -> anyhow::Result<usize>;
     fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<BoneWeights>>;
     fn get_bind_pose(&self) -> anyhow::Result<Vec<Mat4>>;
 }

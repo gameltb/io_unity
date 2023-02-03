@@ -8,16 +8,16 @@ use num_enum::TryFromPrimitive;
 def_unity_class!(Texture2D);
 
 pub trait Texture2DObject {
-    fn get_width(&self) -> Option<u64>;
-    fn get_height(&self) -> Option<u64>;
-    fn get_texture_format(&self) -> Option<TextureFormat>;
-    fn get_image_data(&self, viewer: &UnityAssetViewer) -> Option<Vec<u8>>;
+    fn get_width(&self) -> anyhow::Result<u64>;
+    fn get_height(&self) -> anyhow::Result<u64>;
+    fn get_texture_format(&self) -> anyhow::Result<TextureFormat>;
+    fn get_image_data(&self, viewer: &UnityAssetViewer) -> anyhow::Result<Vec<u8>>;
 
     fn get_image(&self, viewer: &UnityAssetViewer) -> anyhow::Result<DynamicImage> {
-        let data = self.get_image_data(viewer).ok_or(anyhow!("data"))?;
-        let texture_format = self.get_texture_format().ok_or(anyhow!("texture_format"))?;
-        let width = self.get_width().ok_or(anyhow!("width"))? as usize;
-        let height = self.get_height().ok_or(anyhow!("height"))? as usize;
+        let data = self.get_image_data(viewer)?;
+        let texture_format = self.get_texture_format()?;
+        let width = self.get_width()? as usize;
+        let height = self.get_height()? as usize;
 
         match &texture_format {
             TextureFormat::DXT1

@@ -5,5 +5,5 @@ use crate::def_unity_class;
 def_unity_class!(NamedObject);
 
 pub trait NamedObjectObject {
-    fn get_name(&self) -> Option<String>;
+    fn get_name(&self) -> anyhow::Result<String>;
 }

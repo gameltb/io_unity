@@ -253,62 +253,62 @@ impl TypeTreeObjectRef {
                 "string" => {
                     let value = <String>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "bool" => {
                     let value = <bool>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "SInt8" => {
                     let value = <i8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "SInt16" | "short" => {
                     let value = <i16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "SInt32" | "int" => {
                     let value = <i32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "SInt64" | "long long" => {
                     let value = <i64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "UInt8" | "char" => {
                     let value = <u8>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "UInt16" | "unsigned short" => {
                     let value = <u16>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "UInt32" | "unsigned int" => {
                     let value = <u32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "UInt64" | "unsigned long long" | "FileSize" => {
                     let value = <u64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "float" => {
                     let value = <f32>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "double" => {
                     let value = <f64>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
-                     Ok(value.into_py(py))
+                    Ok(value.into_py(py))
                 }
                 "vector" | "staticvector" => {
                     let field = io_unity::type_tree::TypeTreeObjectRef::try_cast_from(
