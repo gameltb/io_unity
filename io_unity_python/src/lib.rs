@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+use std::{collections::{HashMap, BTreeMap}, fs::File, io::BufReader, path::Path};
 
 use io_unity::{
-    classes::{audio_clip::AudioClipObject, p_ptr::PPtrObject},
+    classes::{audio_clip::AudioClipObject, mesh::MeshObject, p_ptr::PPtrObject},
     type_tree::convert::TryCastFrom,
 };
 
@@ -114,6 +114,12 @@ fn set_info_json_tar_reader(path: String) -> PyResult<()> {
     let file = read_file(path).into_py_result()?;
     io_unity::type_tree::type_tree_json::set_info_json_tar_reader(file);
     Ok(())
+}
+
+#[pyfunction]
+fn get_bone_path_hash_map(viewer: &UnityAssetViewer, transform: &TypeTreeObjectRef) -> PyResult<BTreeMap<u32, String>> {
+    let transform = io_unity::classes::transform::Transform::new(&transform.0);
+    io_unity::classes::transform::get_bone_path_hash_map(&viewer.0,&transform).into_py_result()
 }
 
 #[pymethods]
@@ -448,6 +454,40 @@ impl Mesh {
     fn new(obj: &TypeTreeObjectRef) -> Self {
         Mesh(obj.0.clone())
     }
+
+    fn get_sub_mesh_count(&self) -> PyResult<usize> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        mesh.get_sub_mesh_count().into_py_result()
+    }
+
+    fn get_index_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<u32>> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        mesh.get_index_buff(sub_mesh_index).into_py_result()
+    }
+
+    fn get_vertex_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<f32>> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        mesh.get_vertex_buff(sub_mesh_index).into_py_result()
+    }
+
+    fn get_normal_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<f32>> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        mesh.get_normal_buff(sub_mesh_index).into_py_result()
+    }
+
+    fn get_uv0_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<f32>> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        mesh.get_uv0_buff(sub_mesh_index).into_py_result()
+    }
+
+    fn get_bone_weights_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<(Vec<f32>, Vec<u32>)>> {
+        let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
+        Ok(mesh.get_bone_weights_buff(sub_mesh_index)
+            .into_py_result()?
+            .into_iter()
+            .map(|w| (w.weight, w.bone_index))
+            .collect())
+    }
 }
 
 #[pymethods]
@@ -474,6 +514,7 @@ fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TypeTreeObjectRef>()?;
     m.add_class::<ObjectRef>()?;
     m.add_function(wrap_pyfunction!(set_info_json_tar_reader, m)?)?;
+    m.add_function(wrap_pyfunction!(get_bone_path_hash_map, m)?)?;
 
     #[macro_export]
     macro_rules! add_python_unity_class {

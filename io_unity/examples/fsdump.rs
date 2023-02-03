@@ -4,6 +4,7 @@ extern crate anyhow;
 
 use clap::{arg, Parser, Subcommand};
 use io_unity::classes::audio_clip::{AudioClip, AudioClipObject};
+use io_unity::classes::mesh::{Mesh, MeshObject};
 use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
@@ -197,16 +198,19 @@ fn main() -> anyhow::Result<()> {
                                     File::create("/tmp/tex/".to_string() + &name + ".txt").unwrap();
                                 file.write_all(script.as_bytes());
                             }
-                        } else if obj_meta.class == ClassIDType::AssetBundle as i32
-                            || obj_meta.class == ClassIDType::Material as i32
-                            || obj_meta.class == ClassIDType::GameObject as i32
-                            || obj_meta.class == ClassIDType::MonoBehaviour as i32
-                            || obj_meta.class == ClassIDType::Mesh as i32
-                        {
                         } else if obj_meta.class == ClassIDType::AudioClip as i32 {
                             let obj = obj.into();
                             let audio = AudioClip::new(&obj);
                             audio.get_audio_data(&unity_asset_viewer);
+                        } else if obj_meta.class == ClassIDType::Mesh as i32 {
+                            let obj = obj.into();
+                            let mesh = Mesh::new(&obj);
+                            dbg!(mesh.get_sub_mesh_count());
+                        } else if obj_meta.class == ClassIDType::AssetBundle as i32
+                            || obj_meta.class == ClassIDType::Material as i32
+                            || obj_meta.class == ClassIDType::GameObject as i32
+                            || obj_meta.class == ClassIDType::MonoBehaviour as i32
+                        {
                         } else {
                             // obj.display_tree();
                             // panic!()

@@ -107,7 +107,7 @@ where
                 field_cast_args.field_offset = offset;
                 feild.try_cast_to(&type_tree_obj.data_buff, &field_cast_args)
             })
-            .ok_or(anyhow!(format!("cannot get field {path:?}")))?
+            .ok_or(anyhow!(format!("cannot get field {self_path:?}")))?
     }
 }
 
@@ -124,7 +124,7 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for TypeTreeObjectRef {
                 path: self_path,
             });
         }
-        Err(anyhow!("cannot get field {path:?}"))
+        Err(anyhow!("cannot get TypeTreeObjectRef field {self_path:?}"))
     }
 }
 
@@ -153,7 +153,7 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
                 return Ok(vec);
             }
         }
-        Err(anyhow!("cannot get field {path:?}"))
+        Err(anyhow!("cannot get  Vec<TypeTreeObjectRef> field {self_path:?}"))
     }
 }
 

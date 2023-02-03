@@ -1,3 +1,4 @@
+import os
 from mathutils import Matrix, Quaternion, Vector
 from bpy_extras.io_utils import unpack_list
 import bpy
@@ -6,107 +7,49 @@ try:
     import io_unity_python
 except ModuleNotFoundError as e:
     import sys
-    sys.path.append("target/debug")
+    sys.path.append("target/release")
     import io_unity_python
 
-import importlib
-importlib.reload(io_unity_python)
+# delete all object
+# bpy.ops.object.mode_set(mode="OBJECT")
+# bpy.ops.object.select_all(action='SELECT')
+# bpy.ops.object.delete()
 
 
-file_path = "test.ab"
-object_path_id = 0
+uav = io_unity_python.UnityAssetViewer()
 
+uav.add_bundle_file("BUNDLE FILE PATH")
 
-fs = io_unity_python.UnityFS.readfs(file_path)
+for objref in uav:
+    if objref.get_class_id() == 137:
+        obj = uav.deref_object_ref(objref)
+        break
 
-cab = fs.get_cab()
+# obj.display_tree()
 
-cabobj = cab.get_object_by_path_id(object_path_id)
+unity_root_bone = io_unity_python.PPtr(
+    obj.m_RootBone).get_type_tree_object_in_view(uav)
+# unity_root_bone.display_tree()
+bone_hash_name_map = io_unity_python.get_bone_path_hash_map(
+    uav, unity_root_bone)
 
-cab_mesh_bone_name, cab_mesh_bone_index, cab_mesh_bone_local_mat = cabobj.get_bone_name_index_local_mat_buff(
-    cab)
-cabmesh = cabobj.get_mesh(cab)
-# cab_pose = cabmesh.get_bind_pose()
+mesh = io_unity_python.PPtr(obj.m_Mesh).get_type_tree_object_in_view(uav)
+# mesh.display_tree()
+
+unity_mesh_BoneNameHashes = mesh.m_BoneNameHashes
+unity_mesh_name = mesh.m_Name
+unity_mesh = io_unity_python.Mesh(mesh)
 
 sub_meshs = []
 
+for i in range(unity_mesh.get_sub_mesh_count()):
+    index = unity_mesh.get_index_buff(i)
+    vertex = unity_mesh.get_vertex_buff(i)
+    normals = unity_mesh.get_normal_buff(i)
+    uv = unity_mesh.get_uv0_buff(i)
+    bone_weights = unity_mesh.get_bone_weights_buff(i)
 
-def importSkeleton(pose, bonename, boneindex, armname="test"):
-    import bpy
-    from mathutils import Vector
-    armature = bpy.data.armatures.new(armname)
-    armature.show_axes = True
-    Skeleton = bpy.data.objects.new(armature.name, armature)
-
-    bpy.context.layer_collection.collection.objects.link(Skeleton)
-
-    Skeleton.select_set(True)
-    bpy.context.view_layer.objects.active = Skeleton
-
-    old_type = None
-    if not bpy.ops.object.mode_set.poll():
-        area = bpy.context.area
-        old_type = area.type
-        area.type = 'VIEW_3D'
-
-    prev_mode = Skeleton.mode
-    bpy.ops.object.mode_set(mode="EDIT")
-
-    def fixmat(mat):
-        fix = Matrix(
-            [[1, 0, 0, 0],
-             [0, 0, 1, 0],
-             [0, 1, 0, 0],
-             [0, 0, 0, 1]])
-        return fix @ mat @ fix
-
-    def getWorldCoordinate(bi, mat):
-        ii = bi
-        while boneindex[ii] != -1:
-            mat = Matrix(pose[boneindex[ii]]).transposed() @  mat 
-            ii = boneindex[ii]
-        print("getWorldCoordinate") 
-        print(mat) 
-        print(mat.decompose())
-        return mat
-
-    for i, bone in enumerate(pose):
-        edit_bone = Skeleton.data.edit_bones.new(bonename[i])
-
-        edit_bone.tail.y = 0.05
-        print(i,bonename[i])
-        print("raw")  
-        print(bone)  
-        print(Matrix(bone).transposed())
-        print(Matrix(bone).transposed().decompose())
-
-        edit_bone.matrix = getWorldCoordinate(
-            i,Matrix(bone).transposed())
-        # edit_bone.matrix = Matrix(bone).transposed()
-        print("------")
-
-    for i, bone in enumerate(pose):
-        edit_bone = Skeleton.data.edit_bones[bonename[i]]
-
-        if boneindex[i] != -1:
-            edit_bone.parent = Skeleton.data.edit_bones[bonename[boneindex[i]]]
-
-    bpy.ops.object.mode_set(mode=prev_mode)
-
-    if old_type:
-        area.type = old_type
-
-    return Skeleton
-
-
-for i in range(cabmesh.get_sub_mesh_count()):
-    index = cabmesh.get_index_buff(i)
-    vertex = cabmesh.get_vertex_buff(i)
-    normals = cabmesh.get_normal_buff(i)
-    uv = cabmesh.get_uv0_buff(i)
-    bone_weights = cabmesh.get_bone_weights_buff(i)
-
-    subMeshName = 'test' + str(i)
+    subMeshName = unity_mesh_name + "_" + str(i)
 
     mesh = bpy.data.meshes.new(subMeshName)
     obj = bpy.data.objects.new(subMeshName, mesh)
@@ -142,15 +85,76 @@ for i in range(cabmesh.get_sub_mesh_count()):
         for i, BoneWeight in enumerate(weights):
             if BoneWeight == 0:
                 continue
-            BoneName = cab_mesh_bone_name[bindex[i]]
+            BoneName = os.path.basename(
+                bone_hash_name_map[unity_mesh_BoneNameHashes[bindex[i]]])
             if BoneName not in obj.vertex_groups:
                 vertex_group = obj.vertex_groups.new(name=BoneName)
-            vertex_group = obj.vertex_groups[BoneName]
+            else:
+                vertex_group = obj.vertex_groups[BoneName]
             vertex_group.add([subvertex_index],
                              BoneWeight, "ADD")
 
-Skeleton = importSkeleton(
-    cab_mesh_bone_local_mat, cab_mesh_bone_name, cab_mesh_bone_index)
+
+def importSkeleton(uav, unity_root_bone, armname="test"):
+    armature = bpy.data.armatures.new(armname)
+    armature.show_axes = True
+    Skeleton = bpy.data.objects.new(armature.name, armature)
+
+    bpy.context.layer_collection.collection.objects.link(Skeleton)
+
+    Skeleton.select_set(True)
+    bpy.context.view_layer.objects.active = Skeleton
+
+    old_type = None
+    if not bpy.ops.object.mode_set.poll():
+        area = bpy.context.area
+        old_type = area.type
+        area.type = 'VIEW_3D'
+
+    prev_mode = Skeleton.mode
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    def import_bone(unity_bone, parent_bone=None):
+        game_object = io_unity_python.PPtr(
+            unity_bone.m_GameObject).get_type_tree_object_in_view(uav)
+        edit_bone = Skeleton.data.edit_bones.new(game_object.m_Name)
+        if edit_bone != None:
+            edit_bone.parent = parent_bone
+
+        edit_bone.tail.x = 0.05
+
+        position = unity_bone.m_LocalPosition
+        position = Vector((position.x, position.y, position.z))
+        scale = unity_bone.m_LocalScale
+        scale = Vector((scale.x, scale.y, scale.z))
+        rotation = unity_bone.m_LocalRotation
+        rotation = Quaternion((rotation.w, rotation.x, rotation.y, rotation.z))
+
+        m = Matrix.Translation(position)
+        m = m @ rotation.to_matrix().to_4x4()
+        m = m @ Matrix.Scale(1, 4, scale)
+
+        if parent_bone == None:
+            edit_bone.matrix = m
+        else:
+            edit_bone.matrix = parent_bone.matrix @ m
+
+        for cbone in unity_bone.m_Children:
+            import_bone(io_unity_python.PPtr(
+                cbone).get_type_tree_object_in_view(uav), edit_bone)
+        # +z =-> -x +y -> +z +x -> -y
+
+    import_bone(unity_root_bone, parent_bone=None)
+
+    bpy.ops.object.mode_set(mode=prev_mode)
+
+    if old_type:
+        area.type = old_type
+
+    return Skeleton
+
+
+Skeleton = importSkeleton(uav, unity_root_bone, unity_mesh_name)
 
 for sub_mesh in sub_meshs:
     sub_mesh.parent = Skeleton
