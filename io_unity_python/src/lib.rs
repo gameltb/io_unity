@@ -1,7 +1,15 @@
-use std::{collections::{HashMap, BTreeMap}, fs::File, io::BufReader, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::File,
+    io::BufReader,
+    path::Path,
+};
 
 use io_unity::{
-    classes::{audio_clip::AudioClipObject, mesh::MeshObject, p_ptr::PPtrObject},
+    classes::{
+        audio_clip::AudioClipObject, mesh::MeshObject, p_ptr::PPtrObject,
+        texture2d::Texture2DObject,
+    },
     type_tree::convert::TryCastFrom,
 };
 
@@ -117,9 +125,12 @@ fn set_info_json_tar_reader(path: String) -> PyResult<()> {
 }
 
 #[pyfunction]
-fn get_bone_path_hash_map(viewer: &UnityAssetViewer, transform: &TypeTreeObjectRef) -> PyResult<BTreeMap<u32, String>> {
+fn get_bone_path_hash_map(
+    viewer: &UnityAssetViewer,
+    transform: &TypeTreeObjectRef,
+) -> PyResult<BTreeMap<u32, String>> {
     let transform = io_unity::classes::transform::Transform::new(&transform.0);
-    io_unity::classes::transform::get_bone_path_hash_map(&viewer.0,&transform).into_py_result()
+    io_unity::classes::transform::get_bone_path_hash_map(&viewer.0, &transform).into_py_result()
 }
 
 #[pymethods]
@@ -301,8 +312,13 @@ impl TypeTreeObjectRef {
                         .map_err(cast_error_map)?;
                     Ok(value.into_py(py))
                 }
-                "UInt64" | "unsigned long long" | "FileSize" => {
+                "UInt64" | "unsigned long long" => {
                     let value = <u64>::try_cast_from(&field, path_to_self.as_slice())
+                        .map_err(cast_error_map)?;
+                    Ok(value.into_py(py))
+                }
+                "FileSize" => {
+                    let value = <usize>::try_cast_from(&field, path_to_self.as_slice())
                         .map_err(cast_error_map)?;
                     Ok(value.into_py(py))
                 }
@@ -482,7 +498,8 @@ impl Mesh {
 
     fn get_bone_weights_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<(Vec<f32>, Vec<u32>)>> {
         let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
-        Ok(mesh.get_bone_weights_buff(sub_mesh_index)
+        Ok(mesh
+            .get_bone_weights_buff(sub_mesh_index)
             .into_py_result()?
             .into_iter()
             .map(|w| (w.weight, w.bone_index))
@@ -502,6 +519,23 @@ impl AudioClip {
         audio_clip
             .get_audio_data(&viewer.0)
             .map(|data| PyBytes::new(py, &data).into())
+            .into_py_result()
+    }
+}
+
+#[pymethods]
+impl Texture2D {
+    #[new]
+    fn new(obj: &TypeTreeObjectRef) -> Self {
+        Texture2D(obj.0.clone())
+    }
+
+    fn save_image(&self, viewer: &UnityAssetViewer, file_path: String) -> PyResult<()> {
+        let texture = io_unity::classes::texture2d::Texture2D::new(&self.0);
+        texture
+            .get_image(&viewer.0)
+            .map(|dynimg| dynimg.flipv().save(file_path))
+            .into_py_result()?
             .into_py_result()
     }
 }
