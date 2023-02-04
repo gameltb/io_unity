@@ -26,8 +26,7 @@ pub fn get_transform_path(
     viewer: &UnityAssetViewer,
     transform: &Transform,
 ) -> anyhow::Result<String> {
-    let game_object_pptr = TypeTreeObjectRef::try_cast_from(transform.inner, "/Base/m_GameObject")
-        .map_err(|_| anyhow!(""))?;
+    let game_object_pptr = TypeTreeObjectRef::try_cast_from(transform.inner, "/Base/m_GameObject")?;
     let game_object = PPtr::new(&game_object_pptr).get_type_tree_object_in_view(viewer)?;
     if let Some(game_object) = game_object {
         if let Ok(father) = transform.get_father() {

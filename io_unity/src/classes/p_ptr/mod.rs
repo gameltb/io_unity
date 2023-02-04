@@ -43,7 +43,7 @@ pub trait PPtrObject: SerializedFileRef {
                 }
             }
         }
-        Err(anyhow!("cannot find serialized_file"))
+        Err(anyhow!("cannot find serialized_file. The serialized file contain the object which pptr point to may not has add to Viewer."))
     }
 
     fn get_type_tree_object(

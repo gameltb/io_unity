@@ -56,7 +56,7 @@ for objref in uav:
 print(help(obj))
 ```
 
-[simple python](io_unity_python/blender.py) for blender import mesh (skeleton not work)
+[simple python](io_unity_python/blender.py) for blender import mesh and skeleton.
 
 # simple gui
 
