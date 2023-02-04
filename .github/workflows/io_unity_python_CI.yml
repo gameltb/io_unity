@@ -11,6 +11,7 @@ env:
 
 defaults:
   run:
+    shell: bash
     working-directory: io_unity_python
 
 jobs:
