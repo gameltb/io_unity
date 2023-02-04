@@ -1,6 +1,8 @@
 # io_unity
 
-io_unity is a lib for read unity assets, which supports parsing UnityFS file and serialized file.
+**io_unity is a lib for read unity assets, which supports parsing UnityFS file and serialized file.**
+
+![Crates.io](https://img.shields.io/crates/v/io_unity)
 
 ## Additional type tree
 
