@@ -27,8 +27,10 @@ impl UnityResource for UnityFSNode {}
 pub struct ArchiveFlags {
     #[bits = 6]
     compression_type: CompressionType,
+    #[allow(dead_code)]
     blocks_and_directory_info_combined: bool,
     blocks_info_at_the_end: bool,
+    #[allow(dead_code)]
     old_web_plugin_compatibility: bool,
     block_info_need_padding_at_start: bool,
     #[skip]
@@ -43,6 +45,7 @@ pub struct ArchiveFlags {
 pub struct StorageBlockFlags {
     #[bits = 6]
     compression_type: CompressionType,
+    #[allow(dead_code)]
     streamed: bool,
     #[skip]
     __: B9,
