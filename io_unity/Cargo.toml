@@ -4,6 +4,10 @@ version = "0.2.0"
 edition = "2021"
 authors = ["gameltb <gamegccltb@gmail.com>"]
 description = "io_unity is a lib for read unity assets"
+homepage = "https://github.com/gameltb/io_unity"
+repository = "https://github.com/gameltb/io_unity"
+readme = "README.md"
+keywords = ["unity"]
 
 license = "MIT/Apache-2.0"
 
