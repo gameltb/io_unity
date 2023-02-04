@@ -24,11 +24,12 @@ jobs:
         manylinux: auto
         command: build
         args: --release --sdist -o dist --find-interpreter
+        working-directory: io_unity_python
     - name: Upload wheels
       uses: actions/upload-artifact@v2
       with:
         name: wheels
-        path: dist
+        path: io_unity_python/dist
 
   windows:
     runs-on: windows-latest
@@ -38,11 +39,12 @@ jobs:
       with:
         command: build
         args: --release -o dist --find-interpreter
+        working-directory: io_unity_python
     - name: Upload wheels
       uses: actions/upload-artifact@v2
       with:
         name: wheels
-        path: dist
+        path: io_unity_python/dist
 
   macos:
     runs-on: macos-latest
@@ -52,8 +54,9 @@ jobs:
       with:
         command: build
         args: --release -o dist --universal2 --find-interpreter
+        working-directory: io_unity_python
     - name: Upload wheels
       uses: actions/upload-artifact@v2
       with:
         name: wheels
-        path: dist
+        path: io_unity_python/dist
