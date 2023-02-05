@@ -92,22 +92,10 @@ impl ObjectRef {
 
     fn get_class_id(&self) -> i32 {
         self.class_id
-    }
-}
-
-#[pyclass]
-pub struct ObjectRefIter {
-    inner: std::vec::IntoIter<ObjectRef>,
-}
-
-#[pymethods]
-impl ObjectRefIter {
-    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
-        slf
-    }
-
-    fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<ObjectRef> {
-        slf.inner.next()
+    }    
+    
+    fn get_path_id(&self) -> i64 {
+        self.path_id
     }
 }
 
@@ -190,7 +178,7 @@ impl UnityAssetViewer {
         Ok(None)
     }
 
-    pub fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<ObjectRefIter>> {
+    pub fn get_objrefs(slf: PyRef<'_, Self>) -> PyResult<Vec<ObjectRef>> {
         let mut obj_vec = Vec::new();
 
         for (serialized_file_id, sf) in &slf.0.serialized_file_map {
@@ -202,10 +190,7 @@ impl UnityAssetViewer {
                 })
             }
         }
-        let iter = ObjectRefIter {
-            inner: obj_vec.into_iter(),
-        };
-        Py::new(slf.py(), iter)
+       Ok(obj_vec)
     }
 
     fn get_container_name_by_object_ref(&self, object_ref: &ObjectRef) -> Option<String> {

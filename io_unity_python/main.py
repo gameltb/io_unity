@@ -49,7 +49,7 @@ for root, dirs, files in os.walk(bundle_path):
             continue
         uav.add_bundle_file(os.path.join(root, name))
 
-for objref in uav:
+for objref in uav.get_objrefs():
     if objref.get_class_id() == 83:
         obj = uav.deref_object_ref(objref)
         audio_name = uav.get_container_name_by_object_ref(objref)

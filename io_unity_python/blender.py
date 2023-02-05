@@ -193,9 +193,11 @@ mat_tex_out_dir = ""
 
 uav = io_unity_python.UnityAssetViewer()
 
+uav.read_bundle_dir("Bundle Dir")
+
 import_names = []
 
-for objref in uav:
+for objref in uav.get_objrefs():
     if objref.get_class_id() == 137:
         obj = uav.deref_object_ref(objref)
         gobj = io_unity_python.PPtr(
@@ -210,6 +212,5 @@ for objref in uav:
 
 
 
-import gc
 del uav
 gc.collect()
