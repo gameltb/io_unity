@@ -78,7 +78,7 @@ pub fn get_bone_path_hash_map(
     viewer: &UnityAssetViewer,
     transform: &Transform,
 ) -> anyhow::Result<BTreeMap<u32, String>> {
-    let mut root_transform = get_root_bone(viewer, transform)?;
+    let root_transform = get_root_bone(viewer, transform)?;
     let root_transform = Transform::new(&root_transform);
     get_bone_children_path_hash_map(viewer, &root_transform)
 }
