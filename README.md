@@ -47,7 +47,7 @@ import io_unity_python
 uav = io_unity_python.UnityAssetViewer()
 uav.add_bundle_file("BUNDLE FILE PATH")
 
-for objref in uav:
+for objref in uav.get_objrefs():
     obj = uav.deref_object_ref(objref)
     obj.display_tree()
     try:
