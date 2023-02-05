@@ -37,8 +37,8 @@ use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{
     reader::TypeTreeObjectBinReadArgs, reader::TypeTreeObjectBinReadClassArgs, TypeTreeObject,
 };
+use crate::unityfs::UnityResource;
 use crate::until::{Endian, UnityVersion};
-use crate::UnityResource;
 
 use self::version17::FileIdentifier;
 

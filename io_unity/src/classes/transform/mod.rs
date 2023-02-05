@@ -88,14 +88,10 @@ pub fn get_root_bone(
     transform: &Transform,
 ) -> anyhow::Result<TypeTreeObjectRef> {
     let mut root_transform = transform.inner().clone();
-    loop {
-        if let Some(father) = PPtr::new(&Transform::new(&root_transform).get_father()?)
-            .get_type_tree_object_in_view(viewer)?
-        {
-            root_transform = father.into();
-        } else {
-            break;
-        }
+    while let Some(father) = PPtr::new(&Transform::new(&root_transform).get_father()?)
+        .get_type_tree_object_in_view(viewer)?
+    {
+        root_transform = father.into();
     }
     Ok(root_transform)
 }

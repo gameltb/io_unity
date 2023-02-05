@@ -1,17 +1,13 @@
-use std::borrow::Cow;
-
-use std::sync::Arc;
-
-use binrw::{binrw, NullString};
-
+use super::version11::TypeTreeNode;
+use super::version4::FileIdentifier;
+use super::version6::Object;
+use super::{BuildTarget, SerializedFileCommonHeader};
+use super::{Serialized, SerializedFileFormatVersion};
 use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 use crate::until::Endian;
-use crate::version11::TypeTreeNode;
-use crate::version4::FileIdentifier;
-use crate::version6::Object;
-use crate::{Serialized, SerializedFileFormatVersion};
-
-use super::{BuildTarget, SerializedFileCommonHeader};
+use binrw::{binrw, NullString};
+use std::borrow::Cow;
+use std::sync::Arc;
 
 #[binrw]
 #[brw(big)]
@@ -100,12 +96,12 @@ impl Serialized for SerializedFile {
             type_fields,
         ))
     }
-    fn get_externals(&self) -> Cow<Vec<crate::version17::FileIdentifier>> {
+    fn get_externals(&self) -> Cow<Vec<super::version17::FileIdentifier>> {
         let externals = self
             .content
             .externals
             .iter()
-            .map(|o| crate::version17::FileIdentifier {
+            .map(|o| super::version17::FileIdentifier {
                 temp_empty: NullString::default(),
                 guid: [0u8; 16],
                 r#type: 0,

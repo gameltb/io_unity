@@ -9,6 +9,7 @@ use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
 use io_unity::type_tree::TypeTreeObjectRef;
+use io_unity::unityfs::UnityFS;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Write};
@@ -18,8 +19,6 @@ use io_unity::{
     classes::ClassIDType, type_tree::type_tree_json::set_info_json_tar_reader,
     unity_asset_view::UnityAssetViewer,
 };
-
-use io_unity::*;
 
 /// unity extractor
 #[derive(Parser, Debug)]

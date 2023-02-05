@@ -1,8 +1,9 @@
 pub mod type_tree;
 
+use crate::def_unity_class;
+use crate::serialized_file::SerializedFile;
 use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
-use crate::{def_unity_class, SerializedFile};
 
 use std::path::PathBuf;
 

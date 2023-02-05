@@ -42,9 +42,9 @@ pub mod python_unity_class {
     );
 
     #[pyclass]
-    pub struct UnityFS(pub io_unity::UnityFS);
+    pub struct UnityFS(pub io_unity::unityfs::UnityFS);
     #[pyclass]
-    pub struct SerializedFile(pub io_unity::SerializedFile);
+    pub struct SerializedFile(pub io_unity::serialized_file::SerializedFile);
     #[pyclass]
     pub struct UnityAssetViewer(pub io_unity::unity_asset_view::UnityAssetViewer);
     #[pyclass]
@@ -92,8 +92,8 @@ impl ObjectRef {
 
     fn get_class_id(&self) -> i32 {
         self.class_id
-    }    
-    
+    }
+
     fn get_path_id(&self) -> i64 {
         self.path_id
     }
@@ -126,7 +126,9 @@ fn get_root_bone(
     transform: &TypeTreeObjectRef,
 ) -> PyResult<TypeTreeObjectRef> {
     let transform = io_unity::classes::transform::Transform::new(&transform.0);
-    Ok(TypeTreeObjectRef(io_unity::classes::transform::get_root_bone(&viewer.0, &transform).into_py_result()?))
+    Ok(TypeTreeObjectRef(
+        io_unity::classes::transform::get_root_bone(&viewer.0, &transform).into_py_result()?,
+    ))
 }
 
 #[pymethods]
@@ -190,7 +192,7 @@ impl UnityAssetViewer {
                 })
             }
         }
-       Ok(obj_vec)
+        Ok(obj_vec)
     }
 
     fn get_container_name_by_object_ref(&self, object_ref: &ObjectRef) -> Option<String> {

@@ -14,15 +14,15 @@ use io_unity::type_tree::convert::TryCastFrom;
 use tauri::{api::dialog, AboutMetadata, CustomMenuItem, Menu, MenuItem, Submenu};
 
 struct IOUnityContext {
-    fs: Mutex<HashMap<String, io_unity::UnityFS>>,
-    cabs: Mutex<HashMap<String, io_unity::SerializedFile>>,
+    fs: Mutex<HashMap<String, io_unity::unityfs::UnityFS>>,
+    cabs: Mutex<HashMap<String, io_unity::serialized_file::SerializedFile>>,
     objects: Mutex<HashMap<String, io_unity::type_tree::TypeTreeObject>>,
 }
 
 impl IOUnityContext {
     fn new(
-        fs: HashMap<String, io_unity::UnityFS>,
-        cabs: HashMap<String, io_unity::SerializedFile>,
+        fs: HashMap<String, io_unity::unityfs::UnityFS>,
+        cabs: HashMap<String, io_unity::serialized_file::SerializedFile>,
         objects: HashMap<String, io_unity::type_tree::TypeTreeObject>,
     ) -> Self {
         Self {
@@ -54,7 +54,7 @@ fn open_fs(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<String,
     if let Ok(mut op) = state.fs.try_lock() {
         let file = OpenOptions::new().read(true).open(fs_path).unwrap();
         let file = BufReader::new(file);
-        let fs = io_unity::UnityFS::read(Box::new(file), None).unwrap();
+        let fs = io_unity::unityfs::UnityFS::read(Box::new(file), None).unwrap();
         op.insert(fs_path.to_string(), fs);
         return Ok(fs_path.to_string());
     }
@@ -94,7 +94,8 @@ fn list_fs_cab(state: tauri::State<IOUnityContext>, fs_path: &str) -> Result<Vec
             if let Some(cabfile_path) = fs.get_cab_path().get(0) {
                 let cabfile = fs.get_file_data_by_path(cabfile_path).unwrap();
                 let cabfile_reader = Box::new(Cursor::new(cabfile));
-                let cab = io_unity::SerializedFile::read(cabfile_reader, 0, None).unwrap();
+                let cab = io_unity::serialized_file::SerializedFile::read(cabfile_reader, 0, None)
+                    .unwrap();
                 let mut objects = vec![];
                 for (pathid, obj) in cab.get_object_map() {
                     let tt_o = cab.get_tt_object_by_path_id(*pathid).unwrap();

@@ -1,18 +1,15 @@
 use std::borrow::Cow;
 
+use super::version17::{read_type_tree_string, FileIdentifier, Object, ScriptType};
+use super::{BuildTarget, SerializedFileCommonHeader};
+use super::{Serialized, SerializedFileFormatVersion};
+use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
+use crate::until::{binrw_parser::*, Endian};
+use binrw::io::Cursor;
+use binrw::{binrw, NullString};
 use std::fmt;
 use std::io::prelude::*;
 use std::sync::Arc;
-
-use binrw::io::Cursor;
-use binrw::{binrw, NullString};
-
-use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
-use crate::until::{binrw_parser::*, Endian};
-use crate::version17::{read_type_tree_string, FileIdentifier, Object, ScriptType};
-use crate::{Serialized, SerializedFileFormatVersion};
-
-use super::{BuildTarget, SerializedFileCommonHeader};
 
 #[binrw]
 #[brw(big)]

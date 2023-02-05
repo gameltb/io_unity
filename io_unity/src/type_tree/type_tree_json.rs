@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use tar::Archive;
 
-use crate::UnityResource;
+use crate::unityfs::UnityResource;
 
 use super::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 

@@ -10,8 +10,10 @@ use walkdir::WalkDir;
 use crate::type_tree::convert::TryCastFrom;
 use crate::{
     classes::{p_ptr::PPtr, ClassIDType},
+    serialized_file::SerializedFile,
     type_tree::TypeTreeObject,
-    SerializedFile, UnityFS, UnityResource,
+    unityfs::UnityFS,
+    unityfs::UnityResource,
 };
 use crate::{
     classes::{p_ptr::PPtrObject, SerializedFileRef},
