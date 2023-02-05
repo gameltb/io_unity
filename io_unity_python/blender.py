@@ -171,3 +171,7 @@ for objref in uav:
         except Exception as e:
             print(e)
 
+
+import gc
+del uav
+gc.collect()

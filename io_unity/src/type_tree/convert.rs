@@ -153,7 +153,9 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
                 return Ok(vec);
             }
         }
-        Err(anyhow!("cannot get  Vec<TypeTreeObjectRef> field {self_path:?}"))
+        Err(anyhow!(
+            "cannot get  Vec<TypeTreeObjectRef> field {self_path:?}"
+        ))
     }
 }
 

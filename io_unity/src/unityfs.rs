@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{prelude::*, BufReader, ErrorKind, SeekFrom};
+
+use std::io::{prelude::*, ErrorKind, SeekFrom};
 
 use std::sync::{Arc, Mutex};
 
@@ -15,9 +15,7 @@ use crate::until::binrw_parser::position_parser; // reading/writing utilities
 
 pub trait UnityResource: std::io::Read + std::io::Seek {}
 
-impl UnityResource for std::io::Cursor<Vec<u8>> {}
-impl UnityResource for BufReader<File> {}
-impl UnityResource for UnityFSNode {}
+impl<T: std::io::Read + std::io::Seek> UnityResource for T {}
 
 #[bitfield]
 #[derive(Clone, Copy, Debug, PartialEq)]

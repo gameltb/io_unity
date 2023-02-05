@@ -57,12 +57,11 @@ trait IntoPyResult<T> {
     fn into_py_result(self) -> PyResult<T>;
 }
 
-impl<T, E> IntoPyResult<T> for Result<T, E>
-where
-    E: std::fmt::Display,
-{
+impl<T> IntoPyResult<T> for Result<T, anyhow::Error> {
     fn into_py_result(self) -> PyResult<T> {
-        self.map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
+        self.map_err(|e| {
+            pyo3::exceptions::PyException::new_err(format!("{}\n\n{}", e, e.backtrace()))
+        })
     }
 }
 
@@ -496,7 +495,7 @@ impl Mesh {
         mesh.get_uv0_buff(sub_mesh_index).into_py_result()
     }
 
-    fn get_bone_weights_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<(Vec<f32>, Vec<u32>)>> {
+    fn get_bone_weights_buff(&self, sub_mesh_index: usize) -> PyResult<Vec<(Vec<f32>, Vec<i64>)>> {
         let mesh = io_unity::classes::mesh::Mesh::new(&self.0);
         Ok(mesh
             .get_bone_weights_buff(sub_mesh_index)
@@ -536,7 +535,7 @@ impl Texture2D {
             .get_image(&viewer.0)
             .map(|dynimg| dynimg.flipv().save(file_path))
             .into_py_result()?
-            .into_py_result()
+            .map_err(|e| pyo3::exceptions::PyException::new_err(e.to_string()))
     }
 }
 

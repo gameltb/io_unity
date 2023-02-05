@@ -1,6 +1,6 @@
 pub mod type_tree;
 
-use crate::{def_unity_class, until::binrw_parser::Mat4};
+use crate::def_unity_class;
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 
@@ -13,7 +13,6 @@ pub trait MeshObject {
     fn get_uv0_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
     fn get_sub_mesh_count(&self) -> anyhow::Result<usize>;
     fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<BoneWeights>>;
-    fn get_bind_pose(&self) -> anyhow::Result<Vec<Mat4>>;
 }
 
 pub fn get_format_size(format: VertexFormat) -> u8 {
@@ -33,14 +32,13 @@ pub fn get_format_size(format: VertexFormat) -> u8 {
 #[derive(Debug, PartialEq, Clone)]
 pub enum StreamBuff {
     Float(Vec<Vec<f32>>),
-    I32(Vec<Vec<i32>>),
-    U32(Vec<Vec<u32>>),
+    I64(Vec<Vec<i64>>),
 }
 
 #[derive(Debug)]
 pub struct BoneWeights {
     pub weight: Vec<f32>,
-    pub bone_index: Vec<u32>,
+    pub bone_index: Vec<i64>,
 }
 
 #[binrw]

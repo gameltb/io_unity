@@ -61,13 +61,13 @@ impl MeshObject for Mesh<'_> {
         let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
-        Ok(match vertex_data.get_channel(
+        Ok(match vertex_data.get_channel_stream_buff(
             &ChannelType::kShaderChannelVertex,
             &sub_mesh,
             self.inner.get_endian(),
         )? {
             StreamBuff::Float(buff) => buff,
-            StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
+            _ => unreachable!(),
         }
         .concat())
     }
@@ -81,13 +81,13 @@ impl MeshObject for Mesh<'_> {
         let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
-        Ok(match vertex_data.get_channel(
+        Ok(match vertex_data.get_channel_stream_buff(
             &ChannelType::kShaderChannelNormal,
             &sub_mesh,
             self.inner.get_endian(),
         )? {
             StreamBuff::Float(buff) => buff,
-            StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
+            _ => unreachable!(),
         }
         .concat())
     }
@@ -102,13 +102,13 @@ impl MeshObject for Mesh<'_> {
         let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
-        Ok(match vertex_data.get_channel(
+        Ok(match vertex_data.get_channel_stream_buff(
             &ChannelType::kShaderChannelTexCoord0,
             &sub_mesh,
             self.inner.get_endian(),
         )? {
             StreamBuff::Float(buff) => buff,
-            StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
+            _ => unreachable!(),
         }
         .concat())
     }
@@ -122,21 +122,21 @@ impl MeshObject for Mesh<'_> {
         let vertex_data_obj = self.get_vertex_data()?;
         let vertex_data: VertexData = (&vertex_data_obj).cast_as();
 
-        let weight_buff = match vertex_data.get_channel(
+        let weight_buff = match vertex_data.get_channel_stream_buff(
             &ChannelType::kShaderChannelBlendWeight,
             &sub_mesh,
             self.inner.get_endian(),
         )? {
             StreamBuff::Float(buff) => buff,
-            StreamBuff::I32(_) | StreamBuff::U32(_) => unreachable!(),
+            _ => unreachable!(),
         };
-        let bone_index_buff = match vertex_data.get_channel(
+        let bone_index_buff = match vertex_data.get_channel_stream_buff(
             &ChannelType::kShaderChannelBlendIndices,
             &sub_mesh,
             self.inner.get_endian(),
         )? {
-            StreamBuff::U32(buff) => buff,
-            StreamBuff::I32(_) | StreamBuff::Float(_) => unreachable!(),
+            StreamBuff::I64(buff) => buff,
+            _ => unreachable!(),
         };
 
         let mut buff = Vec::new();
@@ -148,10 +148,6 @@ impl MeshObject for Mesh<'_> {
 
     fn get_sub_mesh_count(&self) -> anyhow::Result<usize> {
         Ok(self.get_sub_meshes()?.len())
-    }
-
-    fn get_bind_pose(&self) -> anyhow::Result<Vec<crate::until::binrw_parser::Mat4>> {
-        todo!()
     }
 }
 
@@ -245,7 +241,7 @@ impl VertexData<'_> {
         Ok(stride as usize)
     }
 
-    fn get_channel(
+    fn get_channel_stream_buff(
         &self,
         channel: &ChannelType,
         sub_mesh: &SubMesh,
@@ -254,86 +250,139 @@ impl VertexData<'_> {
         let channel = &self.get_channels()?[channel.clone() as u8 as usize];
         let channel: Channel = channel.cast_as();
 
+        match &channel.get_format()? {
+            VertexFormat::Float => {
+                let buff = self.get_channel(&channel, sub_mesh, endian)?;
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::Float16 => {
+                let buff = self
+                    .get_channel(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| {
+                        f.into_iter()
+                            .map(|f| half::f16::from_bits(f).to_f32())
+                            .collect()
+                    })
+                    .collect();
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::UNorm8 => {
+                let buff = self
+                    .get_channel::<u8>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as f32 / 255.0).collect())
+                    .collect();
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::SNorm8 => {
+                let buff = self
+                    .get_channel::<i8>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| (f as f32 / 127.0).max(1.0)).collect())
+                    .collect();
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::UNorm16 => {
+                let buff = self
+                    .get_channel::<u16>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as f32 / 65535.0).collect())
+                    .collect();
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::SNorm16 => {
+                let buff = self
+                    .get_channel::<i16>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| {
+                        f.into_iter()
+                            .map(|f| (f as f32 / 32767.0).max(1.0))
+                            .collect()
+                    })
+                    .collect();
+                Ok(StreamBuff::Float(buff))
+            }
+            VertexFormat::UInt8 => {
+                let buff = self
+                    .get_channel::<u8>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+            VertexFormat::SInt8 => {
+                let buff = self
+                    .get_channel::<i8>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+            VertexFormat::UInt16 => {
+                let buff = self
+                    .get_channel::<u16>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+            VertexFormat::SInt16 => {
+                let buff = self
+                    .get_channel::<i16>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+            VertexFormat::UInt32 => {
+                let buff = self
+                    .get_channel::<u32>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+            VertexFormat::SInt32 => {
+                let buff = self
+                    .get_channel::<i32>(&channel, sub_mesh, endian)?
+                    .into_iter()
+                    .map(|f| f.into_iter().map(|f| f as i64).collect())
+                    .collect();
+                Ok(StreamBuff::I64(buff))
+            }
+        }
+    }
+
+    fn get_channel<T: BinRead<Args = ()>>(
+        &self,
+        channel: &Channel,
+        sub_mesh: &SubMesh,
+        endian: binrw::Endian,
+    ) -> anyhow::Result<Vec<Vec<T>>> {
         let offset = self.get_stream_offset(channel.get_stream()? as u8)?;
         let stride = self.get_stream_stride(channel.get_stream()? as u8)?;
         let buff = self.get_data()?;
         let mut reader = Cursor::new(buff);
         let op = ReadOptions::new(endian);
-        match &channel.get_format()? {
-            VertexFormat::Float => {
-                let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex()?
-                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
-                {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64 + i * stride as u64 + channel.get_offset()?,
-                    ))?;
-                    let sbuff = <Vec<f32>>::read_options(
-                        &mut reader,
-                        &op,
-                        VecArgs {
-                            count: channel.get_dimension()? as usize,
-                            inner: (),
-                        },
-                    )?;
-                    buff.push(sbuff);
-                }
-                Ok(StreamBuff::Float(buff))
-            }
-            VertexFormat::Float16 => {
-                let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex()?
-                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
-                {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64 + i * stride as u64 + channel.get_offset()?,
-                    ))?;
-                    let sbuff = <Vec<u16>>::read_options(
-                        &mut reader,
-                        &op,
-                        VecArgs {
-                            count: channel.get_dimension()? as usize,
-                            inner: (),
-                        },
-                    )?;
-                    buff.push(
-                        sbuff
-                            .into_iter()
-                            .map(|f| half::f16::from_bits(f).to_f32())
-                            .collect(),
-                    );
-                }
-                Ok(StreamBuff::Float(buff))
-            }
-            VertexFormat::UNorm8 => todo!(),
-            VertexFormat::SNorm8 => todo!(),
-            VertexFormat::UNorm16 => todo!(),
-            VertexFormat::SNorm16 => todo!(),
-            VertexFormat::UInt8 => todo!(),
-            VertexFormat::SInt8 => todo!(),
-            VertexFormat::UInt16 => todo!(),
-            VertexFormat::SInt16 => todo!(),
-            VertexFormat::UInt32 => {
-                let mut buff = vec![];
-                for i in sub_mesh.get_first_vertex()?
-                    ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
-                {
-                    reader.seek(SeekFrom::Start(
-                        offset as u64 + i * stride as u64 + channel.get_offset()?,
-                    ))?;
-                    let sbuff = <Vec<u32>>::read_options(
-                        &mut reader,
-                        &op,
-                        VecArgs {
-                            count: channel.get_dimension()? as usize,
-                            inner: (),
-                        },
-                    )?;
-                    buff.push(sbuff);
-                }
-                Ok(StreamBuff::U32(buff))
-            }
-            VertexFormat::SInt32 => todo!(),
+
+        let mut buff = vec![];
+        for i in sub_mesh.get_first_vertex()?
+            ..sub_mesh.get_vertex_count()? + sub_mesh.get_first_vertex()?
+        {
+            reader.seek(SeekFrom::Start(
+                offset as u64 + i * stride as u64 + channel.get_offset()?,
+            ))?;
+            let sbuff = <Vec<T>>::read_options(
+                &mut reader,
+                &op,
+                VecArgs {
+                    count: channel.get_dimension()? as usize,
+                    inner: (),
+                },
+            )?;
+            buff.push(sbuff);
         }
+        Ok(buff)
     }
 }
