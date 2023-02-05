@@ -1,6 +1,6 @@
 [package]
 name = "io_unity"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["gameltb <gamegccltb@gmail.com>"]
 description = "io_unity is a lib for read unity assets"
