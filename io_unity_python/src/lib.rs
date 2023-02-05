@@ -60,7 +60,7 @@ trait IntoPyResult<T> {
 impl<T> IntoPyResult<T> for Result<T, anyhow::Error> {
     fn into_py_result(self) -> PyResult<T> {
         self.map_err(|e| {
-            pyo3::exceptions::PyException::new_err(format!("{}\n\n{}", e, e.backtrace()))
+            pyo3::exceptions::PyException::new_err(format!("{}\n{}", e, e.backtrace()))
         })
     }
 }
@@ -130,6 +130,15 @@ fn get_bone_path_hash_map(
 ) -> PyResult<BTreeMap<u32, String>> {
     let transform = io_unity::classes::transform::Transform::new(&transform.0);
     io_unity::classes::transform::get_bone_path_hash_map(&viewer.0, &transform).into_py_result()
+}
+
+#[pyfunction]
+fn get_root_bone(
+    viewer: &UnityAssetViewer,
+    transform: &TypeTreeObjectRef,
+) -> PyResult<TypeTreeObjectRef> {
+    let transform = io_unity::classes::transform::Transform::new(&transform.0);
+    Ok(TypeTreeObjectRef(io_unity::classes::transform::get_root_bone(&viewer.0, &transform).into_py_result()?))
 }
 
 #[pymethods]
@@ -548,6 +557,7 @@ fn io_unity_python(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ObjectRef>()?;
     m.add_function(wrap_pyfunction!(set_info_json_tar_reader, m)?)?;
     m.add_function(wrap_pyfunction!(get_bone_path_hash_map, m)?)?;
+    m.add_function(wrap_pyfunction!(get_root_bone, m)?)?;
 
     #[macro_export]
     macro_rules! add_python_unity_class {

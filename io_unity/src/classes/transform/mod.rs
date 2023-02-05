@@ -42,7 +42,7 @@ pub fn get_transform_path(
     Ok(String::default())
 }
 
-pub fn get_bone_path_hash_map(
+pub fn get_bone_children_path_hash_map(
     viewer: &UnityAssetViewer,
     transform: &Transform,
 ) -> anyhow::Result<BTreeMap<u32, String>> {
@@ -68,8 +68,34 @@ pub fn get_bone_path_hash_map(
                 .unwrap();
             let chilren = chilren.into();
             let chilren = Transform::new(&chilren);
-            map.extend(get_bone_path_hash_map(viewer, &chilren)?);
+            map.extend(get_bone_children_path_hash_map(viewer, &chilren)?);
         }
     }
     Ok(map)
+}
+
+pub fn get_bone_path_hash_map(
+    viewer: &UnityAssetViewer,
+    transform: &Transform,
+) -> anyhow::Result<BTreeMap<u32, String>> {
+    let mut root_transform = get_root_bone(viewer, transform)?;
+    let root_transform = Transform::new(&root_transform);
+    get_bone_children_path_hash_map(viewer, &root_transform)
+}
+
+pub fn get_root_bone(
+    viewer: &UnityAssetViewer,
+    transform: &Transform,
+) -> anyhow::Result<TypeTreeObjectRef> {
+    let mut root_transform = transform.inner().clone();
+    loop {
+        if let Some(father) = PPtr::new(&Transform::new(&root_transform).get_father()?)
+            .get_type_tree_object_in_view(viewer)?
+        {
+            root_transform = father.into();
+        } else {
+            break;
+        }
+    }
+    Ok(root_transform)
 }

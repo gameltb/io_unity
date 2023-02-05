@@ -8,20 +8,26 @@ try:
     import io_unity_python
 except ModuleNotFoundError as e:
     import sys
-    sys.path.append("/tmp/target/release")
+    sys.path.append("target/release")
     import io_unity_python
 
+import gc
+gc.collect()
 
-def import_SkinnedMeshRenderer(obj):
+
+def import_SkinnedMeshRenderer(SkinnedMeshRenderer_obj):
     # obj.display_tree()
 
-    unity_root_bone = io_unity_python.PPtr(
-        obj.m_RootBone).get_type_tree_object_in_view(uav)
+    unity_root_bone = io_unity_python.get_root_bone(uav, io_unity_python.PPtr(
+        SkinnedMeshRenderer_obj.m_RootBone).get_type_tree_object_in_view(uav))
     # unity_root_bone.display_tree()
     bone_hash_name_map = io_unity_python.get_bone_path_hash_map(
         uav, unity_root_bone)
 
-    mesh = io_unity_python.PPtr(obj.m_Mesh).get_type_tree_object_in_view(uav)
+    mesh = io_unity_python.PPtr(
+        SkinnedMeshRenderer_obj.m_Mesh).get_type_tree_object_in_view(uav)
+    if mesh == None:
+        return
     # mesh.display_tree()
 
     unity_mesh_BoneNameHashes = mesh.m_BoneNameHashes
@@ -96,6 +102,29 @@ def import_SkinnedMeshRenderer(obj):
         SkeletonMod = sub_mesh.modifiers.new("armature", 'ARMATURE')
         SkeletonMod.object = Skeleton
 
+    for mat in SkinnedMeshRenderer_obj.m_Materials:
+        try:
+            mat = io_unity_python.PPtr(
+                mat).get_type_tree_object_in_view(uav)
+            # mat.display_tree()
+            TexEnvs = mat.m_SavedProperties.m_TexEnvs
+
+            for tex_type in TexEnvs:
+                try:
+                    tex = io_unity_python.PPtr(
+                        TexEnvs[tex_type].m_Texture).get_type_tree_object_in_view(uav)
+                    if tex != None:
+                        tex_name = tex.m_Name
+                        tex = io_unity_python.Texture2D(tex)
+                        os.makedirs(os.path.join(
+                            mat_tex_out_dir, mat.m_Name), exist_ok=True)
+                        tex.save_image(uav, os.path.join(os.path.join(
+                            mat_tex_out_dir, mat.m_Name), tex_name + tex_type + ".png"))
+                except Exception as e:
+                    print(tex_type, e)
+        except Exception as e:
+            print(e)
+
 
 def importSkeleton(uav, unity_root_bone, unity_mesh_BindPose_BoneName, unity_mesh_BindPose, armname="test"):
     armature = bpy.data.armatures.new(armname)
@@ -119,25 +148,26 @@ def importSkeleton(uav, unity_root_bone, unity_mesh_BindPose_BoneName, unity_mes
     def import_bone(unity_bone, parent_bone=None):
         game_object = io_unity_python.PPtr(
             unity_bone.m_GameObject).get_type_tree_object_in_view(uav)
-        if game_object.m_Name not in unity_mesh_BindPose_BoneName:
-            return
-        edit_bone = Skeleton.data.edit_bones.new(game_object.m_Name)
-        if edit_bone != None:
-            edit_bone.parent = parent_bone
+        if game_object.m_Name in unity_mesh_BindPose_BoneName:
+            edit_bone = Skeleton.data.edit_bones.new(game_object.m_Name)
+            if edit_bone != None:
+                edit_bone.parent = parent_bone
 
-        edit_bone.tail.x = 0.05
+            edit_bone.tail.x = 0.05
 
-        bone_BindPose = unity_mesh_BindPose[unity_mesh_BindPose_BoneName.index(
-            game_object.m_Name)]
-        mat = Matrix()
-        mat[0][0], mat[0][1], mat[0][2], mat[0][3] = bone_BindPose.e00, bone_BindPose.e01, bone_BindPose.e02, bone_BindPose.e03
-        mat[1][0], mat[1][1], mat[1][2], mat[1][3] = bone_BindPose.e10, bone_BindPose.e11, bone_BindPose.e12, bone_BindPose.e13
-        mat[2][0], mat[2][1], mat[2][2], mat[2][3] = bone_BindPose.e20, bone_BindPose.e21, bone_BindPose.e22, bone_BindPose.e23
-        mat[3][0], mat[3][1], mat[3][2], mat[3][3] = bone_BindPose.e30, bone_BindPose.e31, bone_BindPose.e32, bone_BindPose.e33
+            bone_BindPose = unity_mesh_BindPose[unity_mesh_BindPose_BoneName.index(
+                game_object.m_Name)]
+            mat = Matrix()
+            mat[0][0], mat[0][1], mat[0][2], mat[0][3] = bone_BindPose.e00, bone_BindPose.e01, bone_BindPose.e02, bone_BindPose.e03
+            mat[1][0], mat[1][1], mat[1][2], mat[1][3] = bone_BindPose.e10, bone_BindPose.e11, bone_BindPose.e12, bone_BindPose.e13
+            mat[2][0], mat[2][1], mat[2][2], mat[2][3] = bone_BindPose.e20, bone_BindPose.e21, bone_BindPose.e22, bone_BindPose.e23
+            mat[3][0], mat[3][1], mat[3][2], mat[3][3] = bone_BindPose.e30, bone_BindPose.e31, bone_BindPose.e32, bone_BindPose.e33
 
-        mat.invert()
+            mat.invert()
 
-        edit_bone.matrix = mat
+            edit_bone.matrix = mat
+        else:
+            edit_bone = parent_bone
 
         for cbone in unity_bone.m_Children:
             import_bone(io_unity_python.PPtr(
@@ -159,17 +189,25 @@ def importSkeleton(uav, unity_root_bone, unity_mesh_BindPose_BoneName, unity_mes
 # bpy.ops.object.delete()
 
 
+mat_tex_out_dir = ""
+
 uav = io_unity_python.UnityAssetViewer()
 
-uav.add_bundle_file("BUNDLE FILE PATH")
+import_names = []
 
 for objref in uav:
     if objref.get_class_id() == 137:
         obj = uav.deref_object_ref(objref)
-        try:
-            import_SkinnedMeshRenderer(obj)
-        except Exception as e:
-            print(e)
+        gobj = io_unity_python.PPtr(
+            obj.m_GameObject).get_type_tree_object_in_view(uav)
+        print(gobj.m_Name)
+        if gobj.m_Name in import_names:
+            try:
+                import_SkinnedMeshRenderer(obj)
+            except Exception as e:
+                raise e
+            break
+
 
 
 import gc
