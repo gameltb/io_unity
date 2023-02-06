@@ -2,12 +2,14 @@ use std::fmt;
 use std::io::prelude::*;
 use std::ops::Deref;
 
-use binrw::{binrw, BinResult, ReadOptions, WriteOptions};
+use binrw::{binrw, BinResult, Endian};
 use binrw::{BinRead, BinWrite};
 
 // reading/writing utilities
 
-pub fn position_parser<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<u64> {
+#[allow(unused_variables)]
+#[binrw::parser(reader, endian)]
+pub fn position_parser() -> BinResult<u64> {
     Ok(reader.stream_position()?)
 }
 
@@ -23,26 +25,26 @@ impl Deref for U8Bool {
 }
 
 impl BinRead for U8Bool {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
-        let val = <u8>::read_options(reader, options, ())?;
+        let val = <u8>::read_options(reader, endian, ())?;
         Ok(U8Bool(val != 0))
     }
 }
 
 impl BinWrite for U8Bool {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        _options: &WriteOptions,
-        _args: Self::Args,
+        _endian: Endian,
+        _args: Self::Args<'_>,
     ) -> BinResult<()> {
         let buf = if **self { [1u8; 1] } else { [0u8; 1] };
         writer.write_all(&buf)?;
@@ -63,31 +65,31 @@ impl Deref for Vec2 {
 }
 
 impl BinRead for Vec2 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         Ok(Vec2(glam::Vec2::from_array(<[f32; 2]>::read_options(
             reader,
-            options,
+            endian,
             (),
         )?)))
     }
 }
 
 impl BinWrite for Vec2 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        options: &WriteOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<()> {
-        self.0.to_array().write_options(writer, options, args)?;
+        self.0.to_array().write_options(writer, endian, args)?;
         Ok(())
     }
 }
@@ -103,31 +105,31 @@ impl Deref for Vec3 {
 }
 
 impl BinRead for Vec3 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         Ok(Vec3(glam::Vec3::from_array(<[f32; 3]>::read_options(
             reader,
-            options,
+            endian,
             (),
         )?)))
     }
 }
 
 impl BinWrite for Vec3 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        options: &WriteOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<()> {
-        self.0.to_array().write_options(writer, options, args)?;
+        self.0.to_array().write_options(writer, endian, args)?;
         Ok(())
     }
 }
@@ -144,31 +146,31 @@ impl Deref for Vec4 {
 }
 
 impl BinRead for Vec4 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         Ok(Vec4(glam::Vec4::from(<[f32; 4]>::read_options(
             reader,
-            options,
+            endian,
             (),
         )?)))
     }
 }
 
 impl BinWrite for Vec4 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        options: &WriteOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<()> {
-        self.0.to_array().write_options(writer, options, args)?;
+        self.0.to_array().write_options(writer, endian, args)?;
         Ok(())
     }
 }
@@ -185,31 +187,29 @@ impl Deref for Mat4 {
 }
 
 impl BinRead for Mat4 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         Ok(Mat4(glam::Mat4::from_cols_array(
-            &<[f32; 16]>::read_options(reader, options, ())?,
+            &<[f32; 16]>::read_options(reader, endian, ())?,
         )))
     }
 }
 
 impl BinWrite for Mat4 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        options: &WriteOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<()> {
-        self.0
-            .to_cols_array()
-            .write_options(writer, options, args)?;
+        self.0.to_cols_array().write_options(writer, endian, args)?;
         Ok(())
     }
 }
@@ -226,31 +226,31 @@ impl Deref for Quat {
 }
 
 impl BinRead for Quat {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _: Self::Args,
+        endian: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         Ok(Quat(glam::Quat::from_array(<[f32; 4]>::read_options(
             reader,
-            options,
+            endian,
             (),
         )?)))
     }
 }
 
 impl BinWrite for Quat {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        options: &WriteOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<()> {
-        self.0.to_array().write_options(writer, options, args)?;
+        self.0.to_array().write_options(writer, endian, args)?;
         Ok(())
     }
 }

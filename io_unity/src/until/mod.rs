@@ -54,3 +54,12 @@ pub enum Endian {
     Little,
     Big,
 }
+
+impl From<&Endian> for binrw::Endian {
+    fn from(value: &Endian) -> Self {
+        match value {
+            Endian::Little => binrw::Endian::Little,
+            Endian::Big => binrw::Endian::Big,
+        }
+    }
+}

@@ -4,7 +4,7 @@ use std::{
     io::{Cursor, Read, Seek},
 };
 
-use binrw::{BinRead, ReadOptions, VecArgs};
+use binrw::{BinRead, VecArgs};
 
 use super::{ArrayFieldValue, DataOffset, Field, FieldValue, TypeTreeObject, TypeTreeObjectRef};
 
@@ -33,8 +33,11 @@ impl TryRead<i32> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<i32, Self::Error> {
         if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
-            let op = ReadOptions::new(field_cast_args.endian);
-            return Ok(<i32>::read_options(object_data_reader, &op, ())?);
+            return Ok(<i32>::read_options(
+                object_data_reader,
+                field_cast_args.endian,
+                (),
+            )?);
         }
         Err(anyhow!("Type not match."))
     }
@@ -244,9 +247,12 @@ impl TryCast<i16> for Field {
     ) -> Result<i16, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["SInt16", "short"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<i16>::read_options(&mut reader, &op, ())?);
+                return Ok(<i16>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -263,9 +269,12 @@ impl TryCast<i32> for Field {
     ) -> Result<i32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["SInt32", "int"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<i32>::read_options(&mut reader, &op, ())?);
+                return Ok(<i32>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -283,8 +292,12 @@ impl TryCast<i64> for Field {
         if ["SInt64", "long long"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                let op = ReadOptions::new(field_cast_args.endian);
-                return Ok(<i64>::read_options(&mut reader, &op, ())?);
+
+                return Ok(<i64>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         } else {
             let value: Result<i32, _> = self.try_cast_to(object_data_buff, field_cast_args);
@@ -332,9 +345,12 @@ impl TryCast<u16> for Field {
     ) -> Result<u16, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["UInt16", "unsigned short"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<u16>::read_options(&mut reader, &op, ())?);
+                return Ok(<u16>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -351,9 +367,12 @@ impl TryCast<u32> for Field {
     ) -> Result<u32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["UInt32", "unsigned int"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<u32>::read_options(&mut reader, &op, ())?);
+                return Ok(<u32>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -370,9 +389,12 @@ impl TryCast<u64> for Field {
     ) -> Result<u64, Self::Error> {
         if ["UInt64", "unsigned long long"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<u64>::read_options(&mut reader, &op, ())?);
+                return Ok(<u64>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         } else {
             let value: Result<u32, _> = self.try_cast_to(object_data_buff, field_cast_args);
@@ -402,9 +424,8 @@ impl TryCast<usize> for Field {
     ) -> Result<usize, Self::Error> {
         if ["FileSize"].contains(&self.field_type.get_type().as_str()) {
             if let FieldValue::DataOffset(data) = &self.data {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<u64>::read_options(&mut reader, &op, ())? as usize);
+                return Ok(<u64>::read_options(&mut reader, field_cast_args.endian, ())? as usize);
             }
         }
         Err(anyhow!("Type not match."))
@@ -421,9 +442,12 @@ impl TryCast<f32> for Field {
     ) -> Result<f32, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["float"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<f32>::read_options(&mut reader, &op, ())?);
+                return Ok(<f32>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -440,9 +464,12 @@ impl TryCast<f64> for Field {
     ) -> Result<f64, Self::Error> {
         if let FieldValue::DataOffset(data) = &self.data {
             if ["double"].contains(&self.field_type.get_type().as_str()) {
-                let op = ReadOptions::new(field_cast_args.endian);
                 let mut reader = gen_reader(object_data_buff, data, field_cast_args)?;
-                return Ok(<f64>::read_options(&mut reader, &op, ())?);
+                return Ok(<f64>::read_options(
+                    &mut reader,
+                    field_cast_args.endian,
+                    (),
+                )?);
             }
         }
         Err(anyhow!("Type not match."))
@@ -458,7 +485,6 @@ impl TryCast<Vec<f32>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<f32>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -468,7 +494,7 @@ impl TryCast<Vec<f32>> for Field {
                         let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                         return Ok(<Vec<f32>>::read_options(
                             &mut reader,
-                            &op,
+                            field_cast_args.endian,
                             VecArgs {
                                 count: size as usize,
                                 inner: (),
@@ -491,7 +517,6 @@ impl TryCast<Vec<f64>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<f64>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -501,7 +526,7 @@ impl TryCast<Vec<f64>> for Field {
                         let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                         return Ok(<Vec<f64>>::read_options(
                             &mut reader,
-                            &op,
+                            field_cast_args.endian,
                             VecArgs {
                                 count: size as usize,
                                 inner: (),
@@ -524,7 +549,6 @@ impl TryCast<Vec<u8>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u8>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -535,7 +559,7 @@ impl TryCast<Vec<u8>> for Field {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                             return Ok(<Vec<u8>>::read_options(
                                 &mut reader,
-                                &op,
+                                field_cast_args.endian,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
@@ -559,7 +583,6 @@ impl TryCast<Vec<u16>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u16>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -570,7 +593,7 @@ impl TryCast<Vec<u16>> for Field {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                             return Ok(<Vec<u16>>::read_options(
                                 &mut reader,
-                                &op,
+                                field_cast_args.endian,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
@@ -594,7 +617,6 @@ impl TryCast<Vec<u32>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u32>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -605,7 +627,7 @@ impl TryCast<Vec<u32>> for Field {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                             return Ok(<Vec<u32>>::read_options(
                                 &mut reader,
-                                &op,
+                                field_cast_args.endian,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),
@@ -629,7 +651,6 @@ impl TryCast<Vec<u64>> for Field {
         field_cast_args: &FieldCastArgs,
     ) -> Result<Vec<u64>, Self::Error> {
         if let FieldValue::Array(array_field) = &self.data {
-            let op = ReadOptions::new(field_cast_args.endian);
             if let ArrayFieldValue::DataOffset(array) = &array_field.data {
                 let size: i32 = array_field
                     .array_size
@@ -640,7 +661,7 @@ impl TryCast<Vec<u64>> for Field {
                             let mut reader = gen_reader(object_data_buff, array, field_cast_args)?;
                             return Ok(<Vec<u64>>::read_options(
                                 &mut reader,
-                                &op,
+                                field_cast_args.endian,
                                 VecArgs {
                                     count: size as usize,
                                     inner: (),

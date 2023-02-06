@@ -4,10 +4,9 @@ use super::{BuildTarget, SerializedFileCommonHeader};
 use super::{Serialized, SerializedFileFormatVersion};
 use crate::type_tree::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 use crate::until::{binrw_parser::*, Endian};
-use binrw::{binrw, BinResult, NullString, ReadOptions};
+use binrw::{binrw, BinResult, NullString};
 use binrw::{io::Cursor, BinRead};
 use std::borrow::Cow;
-use std::io::prelude::*;
 use std::sync::Arc;
 
 #[binrw]
@@ -133,15 +132,12 @@ pub struct ScriptType {
     local_identifier_in_file: i32,
 }
 
-pub fn path_id_parser<R: Read + Seek>(
-    reader: &mut R,
-    ro: &ReadOptions,
-    flags: (bool,),
-) -> BinResult<i64> {
+#[binrw::parser(reader, endian)]
+pub fn path_id_parser(flags: (bool,)) -> BinResult<i64> {
     let (big_id_enabled,) = flags;
 
     if !big_id_enabled {
-        return Ok(<i32>::read_options(reader, ro, ())? as i64);
+        return Ok(<i32>::read_options(reader, endian, ())? as i64);
     }
-    <i64>::read_options(reader, ro, ())
+    <i64>::read_options(reader, endian, ())
 }

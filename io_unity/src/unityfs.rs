@@ -1,5 +1,5 @@
 use crate::until::binrw_parser::position_parser;
-use binrw::{binrw, BinResult, NullString, ReadOptions};
+use binrw::{binrw, BinResult, Endian, NullString};
 use binrw::{io::Cursor, BinRead};
 use lz4::block::decompress;
 use modular_bitfield::specifiers::{B22, B9};
@@ -249,7 +249,7 @@ impl Node {
 
 fn blocks_info_parser<R: Read + Seek>(
     reader: &mut R,
-    _ro: &ReadOptions,
+    _endian: Endian,
     flags: (u32, u32, u32, ArchiveFlags),
 ) -> BinResult<BlocksInfo> {
     let (version, compressed_blocks_info_size, uncompressed_blocks_info_size, flags) = flags;

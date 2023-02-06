@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use binrw::{BinRead, BinResult, ReadOptions, VecArgs};
+use binrw::{BinRead, BinResult, Endian, VecArgs};
 
 use crate::type_tree::{
     convert::{FieldCastArgs, TryRead},
@@ -51,16 +51,16 @@ impl TypeTreeObjectBinReadClassArgs {
 }
 
 impl BinRead for TypeTreeObject {
-    type Args = TypeTreeObjectBinReadArgs;
+    type Args<'a> = TypeTreeObjectBinReadArgs;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<Self> {
         fn read<R: Read + Seek>(
             reader: &mut R,
-            options: &ReadOptions,
+            endian: Endian,
             type_fields: &Vec<Arc<Box<dyn TypeField + Send + Sync>>>,
             field_index: &mut usize,
             read_offset: &mut u64,
@@ -74,20 +74,14 @@ impl BinRead for TypeTreeObject {
                 assert!(!is_fix_size_array_item);
                 *field_index += 1;
                 let size_start_pos = reader.stream_position()?;
-                let size_field = read(
-                    reader,
-                    options,
-                    type_fields,
-                    field_index,
-                    read_offset,
-                    false,
-                )?;
+                let size_field =
+                    read(reader, endian, type_fields, field_index, read_offset, false)?;
                 reader.seek(SeekFrom::Start(size_start_pos))?;
                 let size: i32 = size_field
                     .try_read_to(
                         reader,
                         &FieldCastArgs {
-                            endian: options.endian(),
+                            endian,
                             field_offset: None,
                         },
                     )
@@ -129,7 +123,7 @@ impl BinRead for TypeTreeObject {
                     let mut item_field_offset = 0;
                     let item_field = read(
                         reader,
-                        options,
+                        endian,
                         &item_type_fields,
                         &mut 0,
                         &mut item_field_offset,
@@ -162,7 +156,7 @@ impl BinRead for TypeTreeObject {
                         *field_index = item_field_index;
                         array.push(read(
                             reader,
-                            options,
+                            endian,
                             type_fields,
                             field_index,
                             read_offset,
@@ -192,7 +186,7 @@ impl BinRead for TypeTreeObject {
                             *field_index += 1;
                             let field_data = read(
                                 reader,
-                                options,
+                                endian,
                                 type_fields,
                                 field_index,
                                 read_offset,
@@ -255,7 +249,7 @@ impl BinRead for TypeTreeObject {
         let mut data_buff_offset = 0;
         let data = read(
             reader,
-            options,
+            endian,
             &args.class_args.type_fields,
             &mut index,
             &mut data_buff_offset,
@@ -264,14 +258,14 @@ impl BinRead for TypeTreeObject {
         reader.seek(SeekFrom::Start(start_pos))?;
 
         Ok(TypeTreeObject {
-            endian: options.endian(),
+            endian,
             class_id: args.class_args.class_id,
             serialized_file_id: args.serialized_file_id,
             path_id: args.path_id,
             data_layout: data,
             data_buff: <Vec<u8>>::read_options(
                 reader,
-                options,
+                endian,
                 VecArgs {
                     count: data_buff_offset as usize,
                     inner: (),

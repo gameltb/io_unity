@@ -9,7 +9,7 @@ use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObjectRef;
 
-use binrw::{BinRead, ReadOptions, VecArgs};
+use binrw::{BinRead, VecArgs};
 
 impl MeshObject for Mesh<'_> {
     fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>> {
@@ -23,13 +23,12 @@ impl MeshObject for Mesh<'_> {
         let mut reader = Cursor::new(buff);
         reader.seek(SeekFrom::Start(sub_mesh.get_first_byte()?))?;
 
-        let op = ReadOptions::new(self.inner.get_endian());
         let first_vertex = sub_mesh.get_first_vertex()?;
 
         if self.get_index_format()? == 0 {
             let buff = <Vec<u16>>::read_options(
                 &mut reader,
-                &op,
+                self.inner.get_endian(),
                 VecArgs {
                     count: sub_mesh.get_index_count()? as usize,
                     inner: (),
@@ -42,7 +41,7 @@ impl MeshObject for Mesh<'_> {
         } else {
             let buff = <Vec<u32>>::read_options(
                 &mut reader,
-                &op,
+                self.inner.get_endian(),
                 VecArgs {
                     count: sub_mesh.get_index_count()? as usize,
                     inner: (),
@@ -354,7 +353,7 @@ impl VertexData<'_> {
         }
     }
 
-    fn get_channel<T: BinRead<Args = ()>>(
+    fn get_channel<T: for<'a> BinRead<Args<'a> = ()> + 'static>(
         &self,
         channel: &Channel,
         sub_mesh: &SubMesh,
@@ -364,7 +363,6 @@ impl VertexData<'_> {
         let stride = self.get_stream_stride(channel.get_stream()? as u8)?;
         let buff = self.get_data()?;
         let mut reader = Cursor::new(buff);
-        let op = ReadOptions::new(endian);
 
         let mut buff = vec![];
         for i in sub_mesh.get_first_vertex()?
@@ -375,7 +373,7 @@ impl VertexData<'_> {
             ))?;
             let sbuff = <Vec<T>>::read_options(
                 &mut reader,
-                &op,
+                endian,
                 VecArgs {
                     count: channel.get_dimension()? as usize,
                     inner: (),

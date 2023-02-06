@@ -14,7 +14,7 @@ use std::sync::Arc;
 #[derive(Debug, PartialEq)]
 pub struct SerializedFile {
     header: SerializedFileCommonHeader,
-    #[br(offset = (header.file_size - header.metadata_size) as u64)]
+    #[br(seek_before = std::io::SeekFrom::Start((header.file_size - header.metadata_size) as u64))]
     endianess: Endian,
     #[br(is_little = endianess == Endian::Little)]
     content: SerializedFileContent,

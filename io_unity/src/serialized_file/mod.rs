@@ -26,8 +26,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::io::{prelude::*, ErrorKind, SeekFrom};
 
+use binrw::BinRead;
 use binrw::{binrw, BinResult};
-use binrw::{BinRead, ReadOptions};
 
 use num_enum::TryFromPrimitive;
 use once_cell::sync::Lazy;
@@ -514,12 +514,8 @@ pub trait Serialized: fmt::Debug {
 
         reader.seek(SeekFrom::Start(self.get_data_offset() + obj.byte_start))?;
 
-        let options = ReadOptions::new(match self.get_endianess() {
-            Endian::Little => binrw::Endian::Little,
-            Endian::Big => binrw::Endian::Big,
-        });
-
-        let mut type_tree_object = TypeTreeObject::read_options(reader, &options, args)?;
+        let mut type_tree_object =
+            TypeTreeObject::read_options(reader, self.get_endianess().into(), args)?;
         let apos = reader.stream_position()?;
         if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
             println!(
