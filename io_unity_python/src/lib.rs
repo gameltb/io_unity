@@ -65,6 +65,12 @@ impl<T> IntoPyResult<T> for Result<T, anyhow::Error> {
     }
 }
 
+impl<T> IntoPyResult<T> for Result<T, io_unity::error::Error> {
+    fn into_py_result(self) -> PyResult<T> {
+        self.map_err(|e| pyo3::exceptions::PyException::new_err(format!("{e}",)))
+    }
+}
+
 impl<T> IntoPyResult<T> for Option<T> {
     fn into_py_result(self) -> PyResult<T> {
         self.ok_or(pyo3::exceptions::PyException::new_err("Value is None"))

@@ -2,6 +2,7 @@ pub mod type_tree;
 
 use crate::{
     def_unity_class,
+    error::ReadResult,
     type_tree::{convert::TryCastFrom, TypeTreeObjectRef},
     unity_asset_view::UnityAssetViewer,
 };
@@ -17,15 +18,12 @@ pub const CRC_ISO_HDLC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 def_unity_class!(Transform);
 
 pub trait TransformObject {
-    fn get_father(&self) -> anyhow::Result<TypeTreeObjectRef>;
-    fn get_local_mat(&self) -> anyhow::Result<Mat4>;
-    fn get_children(&self) -> anyhow::Result<Vec<TypeTreeObjectRef>>;
+    fn get_father(&self) -> ReadResult<TypeTreeObjectRef>;
+    fn get_local_mat(&self) -> ReadResult<Mat4>;
+    fn get_children(&self) -> ReadResult<Vec<TypeTreeObjectRef>>;
 }
 
-pub fn get_transform_path(
-    viewer: &UnityAssetViewer,
-    transform: &Transform,
-) -> anyhow::Result<String> {
+pub fn get_transform_path(viewer: &UnityAssetViewer, transform: &Transform) -> ReadResult<String> {
     let game_object_pptr = TypeTreeObjectRef::try_cast_from(transform.inner, "/Base/m_GameObject")?;
     let game_object = PPtr::new(&game_object_pptr).get_type_tree_object_in_view(viewer)?;
     if let Some(game_object) = game_object {
@@ -45,7 +43,7 @@ pub fn get_transform_path(
 pub fn get_bone_children_path_hash_map(
     viewer: &UnityAssetViewer,
     transform: &Transform,
-) -> anyhow::Result<BTreeMap<u32, String>> {
+) -> ReadResult<BTreeMap<u32, String>> {
     let mut map = BTreeMap::new();
     let mut path = get_transform_path(viewer, transform)?;
 
@@ -77,7 +75,7 @@ pub fn get_bone_children_path_hash_map(
 pub fn get_bone_path_hash_map(
     viewer: &UnityAssetViewer,
     transform: &Transform,
-) -> anyhow::Result<BTreeMap<u32, String>> {
+) -> ReadResult<BTreeMap<u32, String>> {
     let root_transform = get_root_bone(viewer, transform)?;
     let root_transform = Transform::new(&root_transform);
     get_bone_children_path_hash_map(viewer, &root_transform)
@@ -86,7 +84,7 @@ pub fn get_bone_path_hash_map(
 pub fn get_root_bone(
     viewer: &UnityAssetViewer,
     transform: &Transform,
-) -> anyhow::Result<TypeTreeObjectRef> {
+) -> ReadResult<TypeTreeObjectRef> {
     let mut root_transform = transform.inner().clone();
     while let Some(father) = PPtr::new(&Transform::new(&root_transform).get_father()?)
         .get_type_tree_object_in_view(viewer)?

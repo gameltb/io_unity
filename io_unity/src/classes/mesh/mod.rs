@@ -1,18 +1,18 @@
 pub mod type_tree;
 
-use crate::def_unity_class;
+use crate::{def_unity_class, error::ReadResult};
 use binrw::binrw;
 use num_enum::TryFromPrimitive;
 
 def_unity_class!(Mesh);
 
 pub trait MeshObject {
-    fn get_index_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<u32>>;
-    fn get_vertex_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
-    fn get_normal_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
-    fn get_uv0_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<f32>>;
-    fn get_sub_mesh_count(&self) -> anyhow::Result<usize>;
-    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> anyhow::Result<Vec<BoneWeights>>;
+    fn get_index_buff(&self, sub_mesh_id: usize) -> ReadResult<Vec<u32>>;
+    fn get_vertex_buff(&self, sub_mesh_id: usize) -> ReadResult<Vec<f32>>;
+    fn get_normal_buff(&self, sub_mesh_id: usize) -> ReadResult<Vec<f32>>;
+    fn get_uv0_buff(&self, sub_mesh_id: usize) -> ReadResult<Vec<f32>>;
+    fn get_sub_mesh_count(&self) -> ReadResult<usize>;
+    fn get_bone_weights_buff(&self, sub_mesh_id: usize) -> ReadResult<Vec<BoneWeights>>;
 }
 
 pub fn get_format_size(format: VertexFormat) -> u8 {

@@ -1,6 +1,7 @@
 pub mod type_tree;
 
 use crate::def_unity_class;
+use crate::error::{Error, ReadResult};
 use crate::serialized_file::SerializedFile;
 use crate::type_tree::TypeTreeObject;
 use crate::unity_asset_view::UnityAssetViewer;
@@ -12,14 +13,14 @@ use super::SerializedFileRef;
 def_unity_class!(PPtr);
 
 pub trait PPtrObject: SerializedFileRef {
-    fn get_path_id(&self) -> anyhow::Result<i64>;
-    fn get_file_id(&self) -> anyhow::Result<i64>;
+    fn get_path_id(&self) -> ReadResult<i64>;
+    fn get_file_id(&self) -> ReadResult<i64>;
 
     fn get_serialized_file<'a>(
         &self,
         self_serialized_file: &'a SerializedFile,
         viewer: Option<&'a UnityAssetViewer>,
-    ) -> anyhow::Result<&'a SerializedFile> {
+    ) -> ReadResult<&'a SerializedFile> {
         let file_id = self.get_file_id()?;
 
         if file_id == 0 {
@@ -44,14 +45,14 @@ pub trait PPtrObject: SerializedFileRef {
                 }
             }
         }
-        Err(anyhow!("cannot find serialized_file. The serialized file contain the object which pptr point to may not has add to Viewer."))
+        Err(Error::ExternalSerializedFileNotFound)
     }
 
     fn get_type_tree_object(
         &self,
         self_serialized_file: &SerializedFile,
         viewer: Option<&UnityAssetViewer>,
-    ) -> anyhow::Result<Option<TypeTreeObject>> {
+    ) -> Result<Option<TypeTreeObject>, Error> {
         let path_id = self.get_path_id()?;
         let serialized_file = self.get_serialized_file(self_serialized_file, viewer)?;
         serialized_file.get_tt_object_by_path_id(path_id)
@@ -60,11 +61,11 @@ pub trait PPtrObject: SerializedFileRef {
     fn get_type_tree_object_in_view(
         &self,
         viewer: &UnityAssetViewer,
-    ) -> anyhow::Result<Option<TypeTreeObject>> {
+    ) -> Result<Option<TypeTreeObject>, Error> {
         let self_serialized_file = viewer
             .serialized_file_map
             .get(&self.get_serialized_file_id())
-            .ok_or(anyhow!("cannot find serialized_file"))?;
+            .ok_or(Error::SerializedFileNotFound)?;
         self.get_type_tree_object(self_serialized_file, Some(viewer))
     }
 }

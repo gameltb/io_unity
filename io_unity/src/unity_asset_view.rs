@@ -7,9 +7,9 @@ use std::{
 
 use walkdir::WalkDir;
 
-use crate::type_tree::convert::TryCastFrom;
 use crate::{
     classes::{p_ptr::PPtr, ClassIDType},
+    error::Error,
     serialized_file::SerializedFile,
     type_tree::TypeTreeObject,
     unityfs::UnityFS,
@@ -19,6 +19,7 @@ use crate::{
     classes::{p_ptr::PPtrObject, SerializedFileRef},
     type_tree::TypeTreeObjectRef,
 };
+use crate::{error::ReadResult, type_tree::convert::TryCastFrom};
 
 #[derive(Default)]
 pub struct UnityAssetViewer {
@@ -37,7 +38,7 @@ impl UnityAssetViewer {
         Self::default()
     }
 
-    pub fn read_bundle_dir<P: AsRef<Path>>(&mut self, dir_path: P) -> anyhow::Result<()> {
+    pub fn read_bundle_dir<P: AsRef<Path>>(&mut self, dir_path: P) -> ReadResult<()> {
         for entry in WalkDir::new(dir_path).into_iter().flatten() {
             if entry.file_type().is_file() {
                 let file = OpenOptions::new().read(true).open(entry.path())?;
@@ -57,18 +58,18 @@ impl UnityAssetViewer {
         &mut self,
         bundle_file_reader: Box<dyn UnityResource + Send + Sync>,
         resource_search_path: Option<String>,
-    ) -> anyhow::Result<i64> {
+    ) -> ReadResult<i64> {
         let unity_fs = UnityFS::read(bundle_file_reader, resource_search_path)?;
         let unity_fs_id = self.unity_fs_count;
         self.unity_fs_count += 1;
         for cab_path in unity_fs.get_cab_path() {
             let cab_buff = unity_fs.get_file_data_by_path(&cab_path)?;
-            let cab_buff_reader = Box::new(Cursor::new(cab_buff));
-            // let cab_buff_reader = Box::new(BufReader::new(
-            //     unity_fs
-            //         .get_file_reader_by_path(&cab_path)
-            //         .ok_or(anyhow!("can not get cab reader"))?,
-            // ));
+            let _cab_buff_reader = Box::new(Cursor::new(cab_buff));
+            let cab_buff_reader = Box::new(BufReader::new(
+                unity_fs
+                    .get_file_reader_by_path(&cab_path)
+                    .ok_or(Error::Other("can not get cab reader".to_owned()))?,
+            ));
 
             let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
             self.serialized_file_to_unity_fs_map
@@ -83,7 +84,7 @@ impl UnityAssetViewer {
         &mut self,
         serialized_file_reader: Box<dyn UnityResource + Send + Sync>,
         resource_search_path: Option<String>,
-    ) -> anyhow::Result<i64> {
+    ) -> ReadResult<i64> {
         let serialized_file_id = self.serialized_file_count;
         self.serialized_file_count += 1;
 
@@ -151,7 +152,7 @@ impl UnityAssetViewer {
         Ok(serialized_file_id)
     }
 
-    pub fn read_data_dir<P: AsRef<Path>>(&mut self, data_dir_path: P) -> anyhow::Result<()> {
+    pub fn read_data_dir<P: AsRef<Path>>(&mut self, data_dir_path: P) -> ReadResult<()> {
         for i in 0..u8::MAX {
             let file_name = format!("level{i}");
             if let Ok(file) = OpenOptions::new()
@@ -306,7 +307,7 @@ impl UnityAssetViewer {
     pub fn get_type_tree_object_by_container_name(
         &self,
         container_name: &String,
-    ) -> anyhow::Result<Option<TypeTreeObject>> {
+    ) -> ReadResult<Option<TypeTreeObject>> {
         if let Some(serialized_file_id) = self.container_maps.get(container_name) {
             if let Some((serialized_file_id, pptr)) = serialized_file_id.get(0) {
                 if let Some(serialized_file) = self.serialized_file_map.get(serialized_file_id) {

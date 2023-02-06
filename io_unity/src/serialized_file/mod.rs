@@ -24,7 +24,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::io::{prelude::*, ErrorKind, SeekFrom};
+use std::io::{prelude::*, SeekFrom};
 
 use binrw::BinRead;
 use binrw::{binrw, BinResult};
@@ -32,6 +32,7 @@ use binrw::{binrw, BinResult};
 use num_enum::TryFromPrimitive;
 use once_cell::sync::Lazy;
 
+use crate::error::Error;
 #[cfg(feature = "type-tree-json")]
 use crate::type_tree::type_tree_json::get_type_object_args_by_version_class_id;
 use crate::type_tree::{
@@ -317,7 +318,7 @@ pub struct SerializedFileMetadata {
     pub serialized_file_id: i64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Object {
     pub path_id: i64,
     byte_start: u64,
@@ -432,7 +433,7 @@ impl SerializedFile {
         &self.object_map
     }
 
-    pub fn get_tt_object_by_path_id(&self, path_id: i64) -> anyhow::Result<Option<TypeTreeObject>> {
+    pub fn get_tt_object_by_path_id(&self, path_id: i64) -> Result<Option<TypeTreeObject>, Error> {
         self.object_map
             .get(&path_id)
             .map(|obj| {
@@ -443,13 +444,10 @@ impl SerializedFile {
                         self.serialized_file_id,
                         path_id,
                     )
-                    .map_err(|err| {
-                        anyhow!(format!(
-                            "error while read object.data_offset: {} object : {:?} error : {}",
-                            self.content.get_data_offset(),
-                            obj,
-                            err
-                        ))
+                    .map_err(|err| Error::ObjectReadError {
+                        source: err.into(),
+                        data_offset: self.content.get_data_offset(),
+                        object_meta: obj.clone(),
                     })
             })
             .transpose()
@@ -495,7 +493,7 @@ pub trait Serialized: fmt::Debug {
         obj: &Object,
         serialized_file_id: i64,
         path_id: i64,
-    ) -> BinResult<TypeTreeObject> {
+    ) -> Result<TypeTreeObject, Error> {
         let class_args = if self.get_enable_type_tree() {
             self.get_type_object_args_by_type_id(obj.type_id)
         } else {
@@ -508,7 +506,7 @@ pub trait Serialized: fmt::Debug {
             obj.class,
         ));
 
-        let class_args = class_args.ok_or(std::io::Error::from(ErrorKind::NotFound))?;
+        let class_args = class_args.ok_or(Error::TypeTreeObjectBinReadArgsBuild)?;
 
         let args = TypeTreeObjectBinReadArgs::new(serialized_file_id, path_id, class_args);
 
@@ -518,12 +516,6 @@ pub trait Serialized: fmt::Debug {
             TypeTreeObject::read_options(reader, self.get_endianess().into(), args)?;
         let apos = reader.stream_position()?;
         if apos - (self.get_data_offset() + obj.byte_start) != obj.byte_size as u64 {
-            println!(
-                "{} readed, {} object size. class id {:?}",
-                apos - (self.get_data_offset() + obj.byte_start),
-                obj.byte_size,
-                obj.class
-            );
             let mut external_data = vec![
                 0u8;
                 (obj.byte_size as u64 - (apos - (self.get_data_offset() + obj.byte_start)))

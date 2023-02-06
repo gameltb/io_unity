@@ -1,12 +1,11 @@
+use super::{ArrayFieldValue, DataOffset, Field, FieldValue, TypeTreeObject, TypeTreeObjectRef};
+use crate::error::{Error, ReadResult};
+use binrw::{BinRead, VecArgs};
 use std::{
     collections::HashMap,
     fmt::Debug,
     io::{Cursor, Read, Seek},
 };
-
-use binrw::{BinRead, VecArgs};
-
-use super::{ArrayFieldValue, DataOffset, Field, FieldValue, TypeTreeObject, TypeTreeObjectRef};
 
 #[derive(Debug, Clone)]
 pub struct FieldCastArgs {
@@ -25,7 +24,7 @@ pub trait TryRead<T>: Sized {
 }
 
 impl TryRead<i32> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_read_to<R: Read + Seek>(
         &self,
@@ -39,7 +38,10 @@ impl TryRead<i32> for Field {
                 (),
             )?);
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<i32>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
@@ -61,9 +63,9 @@ pub trait TryCastFrom<T, P>: Sized {
 
 impl<T, E> TryCastFrom<E, &str> for T
 where
-    for<'a> T: TryCastFrom<E, &'a [String], Error = anyhow::Error>,
+    for<'a> T: TryCastFrom<E, &'a [String], Error = Error>,
 {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: E, path: &str) -> Result<Self, Self::Error> {
         let path: Vec<String> = path
@@ -77,9 +79,9 @@ where
 
 impl<T> TryCastFrom<&TypeTreeObject, &[String]> for T
 where
-    Field: TryCast<T, Error = anyhow::Error>,
+    Field: TryCast<T, Error = Error>,
 {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: &TypeTreeObject, path: &[String]) -> Result<Self, Self::Error> {
         value
@@ -89,20 +91,23 @@ where
                 field_cast_args.field_offset = offset;
                 feild.try_cast_to(&value.data_buff, &field_cast_args)
             })
-            .ok_or(anyhow!(format!("cannot get field {path:?}")))?
+            .ok_or(Error::FieldNotFound(path.to_vec()))?
     }
 }
 
 impl<'a, T> TryCastFrom<&TypeTreeObjectRef, &'a [String]> for T
 where
-    Field: TryCast<T, Error = anyhow::Error>,
+    Field: TryCast<T, Error = Error>,
 {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &'a [String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
+        let type_tree_obj = value
+            .inner
+            .read()
+            .map_err(|e| Error::Other(e.to_string()))?;
         type_tree_obj
             .get_field_by_path_list(&self_path)
             .map(|(feild, offset)| {
@@ -110,34 +115,40 @@ where
                 field_cast_args.field_offset = offset;
                 feild.try_cast_to(&type_tree_obj.data_buff, &field_cast_args)
             })
-            .ok_or(anyhow!(format!("cannot get field {self_path:?}")))?
+            .ok_or(Error::FieldNotFound(self_path))?
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for TypeTreeObjectRef {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
+        let type_tree_obj = value
+            .inner
+            .read()
+            .map_err(|e| Error::Other(e.to_string()))?;
         if type_tree_obj.get_field_by_path_list(&self_path).is_some() {
             return Ok(TypeTreeObjectRef {
                 inner: value.inner.clone(),
                 path: self_path,
             });
         }
-        Err(anyhow!("cannot get TypeTreeObjectRef field {self_path:?}"))
+        Err(Error::FieldNotFound(self_path))
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let mut self_path: Vec<String> = value.path.clone();
         self_path.extend_from_slice(path);
-        let type_tree_obj = value.inner.read().map_err(|e| anyhow!(e.to_string()))?;
+        let type_tree_obj = value
+            .inner
+            .read()
+            .map_err(|e| Error::Other(e.to_string()))?;
         if let Some((array_field, _offset)) = type_tree_obj.get_field_by_path_list(&self_path) {
             if let FieldValue::Array(array) = &array_field.data {
                 let size: i32 = array.array_size.try_cast_to(
@@ -156,14 +167,12 @@ impl TryCastFrom<&TypeTreeObjectRef, &[String]> for Vec<TypeTreeObjectRef> {
                 return Ok(vec);
             }
         }
-        Err(anyhow!(
-            "cannot get  Vec<TypeTreeObjectRef> field {self_path:?}"
-        ))
+        Err(Error::ArrayFieldNotFound(self_path))
     }
 }
 
 impl TryCastFrom<&TypeTreeObjectRef, &[String]> for HashMap<String, TypeTreeObjectRef> {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_from(value: &TypeTreeObjectRef, path: &[String]) -> Result<Self, Self::Error> {
         let entites = <Vec<TypeTreeObjectRef>>::try_cast_from(value, path)?;
@@ -186,7 +195,7 @@ fn gen_reader<'a>(
     object_data_buff: &'a [u8],
     data_offset: &DataOffset,
     field_cast_args: &FieldCastArgs,
-) -> anyhow::Result<Cursor<&'a [u8]>> {
+) -> ReadResult<Cursor<&'a [u8]>> {
     let mut reader = Cursor::new(object_data_buff);
     match data_offset {
         DataOffset::AbsDataOffset(data) => reader.set_position(*data),
@@ -194,15 +203,14 @@ fn gen_reader<'a>(
             *data
                 + field_cast_args
                     .field_offset
-                    .ok_or(anyhow!("ArrayItemOffset use without field offset."))?
-                    as u64,
+                    .ok_or(Error::ArrayItemOffsetError)? as u64,
         ),
     }
     Ok(reader)
 }
 
 impl TryCast<bool> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -215,12 +223,15 @@ impl TryCast<bool> for Field {
                 return Ok(<u8>::read(&mut reader)? != 0);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<bool>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<i8> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -233,12 +244,15 @@ impl TryCast<i8> for Field {
                 return Ok(<i8>::read(&mut reader)?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<i8>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<i16> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -255,12 +269,15 @@ impl TryCast<i16> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<i16>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<i32> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -277,12 +294,15 @@ impl TryCast<i32> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<i32>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<i64> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -313,12 +333,15 @@ impl TryCast<i64> for Field {
                 return Ok(value as i64);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<i64>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<u8> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -331,12 +354,15 @@ impl TryCast<u8> for Field {
                 return Ok(<u8>::read(&mut reader)?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<u8>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<u16> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -353,12 +379,15 @@ impl TryCast<u16> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<u16>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<u32> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -375,12 +404,15 @@ impl TryCast<u32> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<u32>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<u64> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -410,12 +442,15 @@ impl TryCast<u64> for Field {
                 return Ok(value as u64);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<u64>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<usize> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -428,12 +463,15 @@ impl TryCast<usize> for Field {
                 return Ok(<u64>::read_options(&mut reader, field_cast_args.endian, ())? as usize);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<usize>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<f32> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -450,12 +488,15 @@ impl TryCast<f32> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<f32>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<f64> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -472,12 +513,15 @@ impl TryCast<f64> for Field {
                 )?);
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<f64>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<f32>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -504,12 +548,15 @@ impl TryCast<Vec<f32>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<f32>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<f64>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -536,12 +583,15 @@ impl TryCast<Vec<f64>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<f64>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<u8>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -570,12 +620,15 @@ impl TryCast<Vec<u8>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<u8>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<u16>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -604,12 +657,15 @@ impl TryCast<Vec<u16>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<u16>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<u32>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -638,12 +694,15 @@ impl TryCast<Vec<u32>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<u32>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<Vec<u64>> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -672,12 +731,15 @@ impl TryCast<Vec<u64>> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<Vec<u64>>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<String> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -692,12 +754,15 @@ impl TryCast<String> for Field {
                 }
             }
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<String>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<glam::Quat> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -707,28 +772,31 @@ impl TryCast<glam::Quat> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(anyhow!("Cannot get x."))?
+                .ok_or(Error::FieldNotFound(vec!["x".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(anyhow!("Cannot get y."))?
+                .ok_or(Error::FieldNotFound(vec!["y".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let z: f32 = fields
                 .get("z")
-                .ok_or(anyhow!("Cannot get z."))?
+                .ok_or(Error::FieldNotFound(vec!["z".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let w: f32 = fields
                 .get("w")
-                .ok_or(anyhow!("Cannot get w."))?
+                .ok_or(Error::FieldNotFound(vec!["w".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Quat::from_xyzw(x, y, z, w));
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<glam::Quat>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<glam::Vec3> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -738,24 +806,27 @@ impl TryCast<glam::Vec3> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(anyhow!("Cannot get x."))?
+                .ok_or(Error::FieldNotFound(vec!["x".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(anyhow!("Cannot get y."))?
+                .ok_or(Error::FieldNotFound(vec!["y".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let z: f32 = fields
                 .get("z")
-                .ok_or(anyhow!("Cannot get z."))?
+                .ok_or(Error::FieldNotFound(vec!["z".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Vec3::new(x, y, z));
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<glam::Vec3>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }
 
 impl TryCast<glam::Vec2> for Field {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_cast_to(
         &self,
@@ -765,14 +836,17 @@ impl TryCast<glam::Vec2> for Field {
         if let FieldValue::Fields(fields) = &self.data {
             let x: f32 = fields
                 .get("x")
-                .ok_or(anyhow!("Cannot get x."))?
+                .ok_or(Error::FieldNotFound(vec!["x".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             let y: f32 = fields
                 .get("y")
-                .ok_or(anyhow!("Cannot get y."))?
+                .ok_or(Error::FieldNotFound(vec!["y".to_owned()]))?
                 .try_cast_to(object_data_buff, field_cast_args)?;
             return Ok(glam::Vec2::new(x, y));
         }
-        Err(anyhow!("Type not match."))
+        Err(Error::TypeMisMatch {
+            want_to_cast: std::any::type_name::<glam::Vec2>(),
+            found_type_name: self.field_type.get_type().to_owned(),
+        })
     }
 }

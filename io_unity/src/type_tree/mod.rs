@@ -9,7 +9,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::type_tree::convert::TryCast;
+use crate::{
+    error::{Error, ReadResult},
+    type_tree::convert::TryCast,
+};
 
 use self::convert::FieldCastArgs;
 
@@ -73,7 +76,7 @@ impl Field {
         &self,
         object_data_buff: &'a [u8],
         field_cast_args: &FieldCastArgs,
-    ) -> anyhow::Result<&'a [u8]> {
+    ) -> ReadResult<&'a [u8]> {
         let offset = field_cast_args.field_offset;
         let (pos, size) = match &self.data {
             FieldValue::DataOffset(data_offset) => {
@@ -81,8 +84,9 @@ impl Field {
                     DataOffset::AbsDataOffset(data) => *data,
                     DataOffset::ArrayItemOffset(data) => {
                         *data
-                            + offset.ok_or(anyhow!("ArrayItemOffset use without field offset."))?
-                                as u64
+                            + offset.ok_or(Error::AsSliceError(
+                                "ArrayItemOffset use without field offset.",
+                            ))? as u64
                     }
                 };
                 let size = self.field_type.get_byte_size() as u64;
@@ -93,24 +97,25 @@ impl Field {
                     let pos = match data_offset {
                         DataOffset::AbsDataOffset(data) => *data,
                         DataOffset::ArrayItemOffset(_) => {
-                            return Err(anyhow!("ArrayData use with ArrayItemOffset."))
+                            return Err(Error::AsSliceError("ArrayData use with ArrayItemOffset."))
                         }
                     };
                     let array_size: i32 = array
                         .array_size
                         .try_cast_to(object_data_buff, field_cast_args)?;
                     if array_size < 0 {
-                        return Err(anyhow!("ArrayData size less then 0."));
+                        return Err(Error::AsSliceError("ArrayData size less then 0."));
                     }
-                    let size = array
-                        .item_field_size
-                        .ok_or(anyhow!("Fix item size array cannot get item size."))?
-                        * array_size as u64;
+                    let size = array.item_field_size.ok_or(Error::AsSliceError(
+                        "Fix item size array cannot get item size.",
+                    ))? * array_size as u64;
                     (pos, size)
                 }
-                ArrayFieldValue::ArrayItems(_) => return Err(anyhow!("Cannot get array size.")),
+                ArrayFieldValue::ArrayItems(_) => {
+                    return Err(Error::AsSliceError("Cannot get array size."))
+                }
             },
-            FieldValue::Fields(_) => return Err(anyhow!("Cannot get fields data.")),
+            FieldValue::Fields(_) => return Err(Error::AsSliceError("Cannot get fields data.")),
         };
         Ok(&object_data_buff[pos as usize..(pos + size) as usize])
     }
@@ -290,26 +295,25 @@ impl TypeTreeObject {
         self.endian
     }
 
-    pub fn try_as_slice(&self, path: &str) -> anyhow::Result<&[u8]> {
-        self.get_field_by_path(path)
-            .map(|(feild, offset)| {
-                let mut field_cast_args = self.get_field_cast_args();
-                field_cast_args.field_offset = offset;
-                feild.try_as_slice(&self.data_buff, &field_cast_args)
-            })
-            .ok_or(anyhow!("cannot get field."))?
+    pub fn try_as_slice(&self, path: &str) -> ReadResult<&[u8]> {
+        let (feild, offset) = self.get_field_by_path(path)?;
+        let mut field_cast_args = self.get_field_cast_args();
+        field_cast_args.field_offset = offset;
+        feild.try_as_slice(&self.data_buff, &field_cast_args)
     }
 
-    pub(super) fn get_field_by_path(&self, path: &str) -> Option<(&Field, Option<i64>)> {
+    pub(super) fn get_field_by_path(&self, path: &str) -> ReadResult<(&Field, Option<i64>)> {
         let path: Vec<String> = path
             .split('/')
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
             .collect();
         if path.len() <= 1 {
-            return None;
+            return Err(Error::FieldNotFound(path));
         }
-        self.data_layout.get_field(&path[1..], None, self)
+        self.data_layout
+            .get_field(&path[1..], None, self)
+            .ok_or(Error::FieldNotFound(path))
     }
 
     pub(super) fn get_field_by_path_list(&self, path: &[String]) -> Option<(&Field, Option<i64>)> {

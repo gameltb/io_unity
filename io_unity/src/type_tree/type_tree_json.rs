@@ -1,4 +1,5 @@
 use super::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
+use crate::error::{Error, ReadResult};
 use crate::unityfs::UnityResource;
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashMap};
@@ -131,7 +132,7 @@ pub fn set_info_json_tar_reader(reader: Box<dyn UnityResource + Send + Sync>) {
     }
 }
 
-fn read_info_json_by_version(version: &String) -> anyhow::Result<InfoJson::InfoJson> {
+fn read_info_json_by_version(version: &String) -> ReadResult<InfoJson::InfoJson> {
     if let Ok(mut info_json_tar_reader) = INFO_JSON_TAR_READER.lock() {
         if let Some(ref mut info_json_tar_reader) = &mut *info_json_tar_reader {
             info_json_tar_reader.seek(std::io::SeekFrom::Start(0))?;
@@ -146,14 +147,17 @@ fn read_info_json_by_version(version: &String) -> anyhow::Result<InfoJson::InfoJ
                 if let Some(path) = file.header().path()?.to_str() {
                     if path == json_path {
                         // files implement the Read trait
-                        let info_json: InfoJson::InfoJson = serde_json::from_reader(file)?;
+                        let info_json: InfoJson::InfoJson = serde_json::from_reader(file)
+                            .map_err(|e| Error::Other(e.to_string()))?;
                         return Ok(info_json);
                     }
                 }
             }
         }
     }
-    Err(anyhow!("cannot find json file for version {:?}", version))
+    Err(Error::Other(format!(
+        "cannot find json file for version {version:?}"
+    )))
 }
 
 pub fn get_type_object_args_by_version_class_id(
@@ -241,11 +245,11 @@ mod test {
     #[test]
     fn test_json() {
         let time = std::time::Instant::now();
-
         let args = get_type_object_args_by_version_class_id(&"3.4.0".to_string(), 1);
         println!("{:?}", args);
         println!("Read use {:?}", time.elapsed());
 
+        let time = std::time::Instant::now();
         let args = get_type_object_args_by_version_class_id(&"3.4.0".to_string(), 2);
         println!("{:?}", args);
         println!("Read use {:?}", time.elapsed());

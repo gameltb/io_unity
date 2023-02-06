@@ -1,8 +1,8 @@
 pub mod type_tree;
 
-use crate::def_unity_class;
 use crate::type_tree::convert::TryCastFrom;
 use crate::type_tree::TypeTreeObjectRef;
+use crate::{def_unity_class, error::ReadResult};
 use binrw::{binrw, BinRead};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
@@ -56,9 +56,7 @@ impl StreamedCurveKey {
     }
 }
 
-pub fn streamed_clip_read_data<R: Read + Seek>(
-    reader: &mut R,
-) -> anyhow::Result<Vec<StreamedFrame>> {
+pub fn streamed_clip_read_data<R: Read + Seek>(reader: &mut R) -> ReadResult<Vec<StreamedFrame>> {
     let mut streamed_frames = Vec::new();
     let end_pos = reader.seek(SeekFrom::End(0))?;
     reader.seek(SeekFrom::Start(0))?;
@@ -85,7 +83,7 @@ pub fn streamed_clip_read_data<R: Read + Seek>(
     Ok(streamed_frames)
 }
 
-pub fn streamed_clip_read_u32_buff(u32_buff: &[u32]) -> anyhow::Result<Vec<StreamedFrame>> {
+pub fn streamed_clip_read_u32_buff(u32_buff: &[u32]) -> ReadResult<Vec<StreamedFrame>> {
     let byte_buff_list: Vec<[u8; 4]> = u32_buff.iter().map(|u| u.to_ne_bytes()).collect();
     let streamed_clip_buff = byte_buff_list.concat();
     let mut streamed_clip_buff_reader = Cursor::new(streamed_clip_buff);
