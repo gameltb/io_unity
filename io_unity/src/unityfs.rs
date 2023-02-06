@@ -1,17 +1,13 @@
-use std::collections::BTreeMap;
-
-use std::io::{prelude::*, ErrorKind, SeekFrom};
-
-use std::sync::{Arc, Mutex};
-
+use crate::until::binrw_parser::position_parser;
 use binrw::{binrw, BinResult, NullString, ReadOptions};
 use binrw::{io::Cursor, BinRead};
 use lz4::block::decompress;
 use modular_bitfield::specifiers::{B22, B9};
 use modular_bitfield::{bitfield, BitfieldSpecifier};
 use num_enum::TryFromPrimitive;
-
-use crate::until::binrw_parser::position_parser; // reading/writing utilities
+use std::collections::BTreeMap;
+use std::io::{prelude::*, ErrorKind, SeekFrom};
+use std::sync::{Arc, Mutex};
 
 pub trait UnityResource: std::io::Read + std::io::Seek {}
 

@@ -1,5 +1,4 @@
 use std::fmt;
-
 use std::io::prelude::*;
 use std::ops::Deref;
 

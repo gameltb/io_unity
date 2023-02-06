@@ -1,12 +1,9 @@
+use super::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
+use crate::unityfs::UnityResource;
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashMap};
-
 use std::sync::{Arc, Mutex};
 use tar::Archive;
-
-use crate::unityfs::UnityResource;
-
-use super::{reader::TypeTreeObjectBinReadClassArgs, TypeField};
 
 mod InfoJson {
     #![allow(non_snake_case)]
