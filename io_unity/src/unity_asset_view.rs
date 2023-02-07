@@ -64,12 +64,12 @@ impl UnityAssetViewer {
         self.unity_fs_count += 1;
         for cab_path in unity_fs.get_cab_path() {
             let cab_buff = unity_fs.get_file_data_by_path(&cab_path)?;
-            let _cab_buff_reader = Box::new(Cursor::new(cab_buff));
-            let cab_buff_reader = Box::new(BufReader::new(
-                unity_fs
-                    .get_file_reader_by_path(&cab_path)
-                    .ok_or(Error::Other("can not get cab reader".to_owned()))?,
-            ));
+            let cab_buff_reader = Box::new(Cursor::new(cab_buff));
+            // let cab_buff_reader = Box::new(BufReader::new(
+            //     unity_fs
+            //         .get_file_reader_by_path(&cab_path)
+            //         .ok_or(Error::Other("can not get cab reader".to_owned()))?,
+            // ));
 
             let serialized_file_id = self.add_serialized_file(cab_buff_reader, None)?;
             self.serialized_file_to_unity_fs_map
