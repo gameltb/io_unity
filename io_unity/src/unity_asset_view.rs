@@ -9,7 +9,6 @@ use walkdir::WalkDir;
 
 use crate::{
     classes::{p_ptr::PPtr, ClassIDType},
-    error::Error,
     serialized_file::SerializedFile,
     type_tree::TypeTreeObject,
     unityfs::UnityFS,

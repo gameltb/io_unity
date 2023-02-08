@@ -4,14 +4,13 @@ extern crate anyhow;
 
 use clap::{arg, Parser, Subcommand};
 use io_unity::classes::audio_clip::{AudioClip, AudioClipObject};
-use io_unity::classes::mesh::{Mesh, MeshObject};
 use io_unity::classes::p_ptr::{PPtr, PPtrObject};
 use io_unity::classes::texture2d::{Texture2D, Texture2DObject};
 use io_unity::type_tree::convert::TryCastFrom;
 use io_unity::type_tree::TypeTreeObjectRef;
 use io_unity::unityfs::UnityFS;
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 
@@ -60,6 +59,9 @@ pub enum Commands {
         /// filter path
         #[arg(value_parser)]
         filter_path: Option<String>,
+        /// The dir save extracted assets.
+        #[arg(short, long)]
+        out_dir: String,
     },
 }
 
@@ -75,7 +77,8 @@ fn main() -> anyhow::Result<()> {
 
     let mut unity_asset_viewer = UnityAssetViewer::new();
     if let Some(bundle_dir) = args.bundle_dir {
-        unity_asset_viewer.read_bundle_dir(bundle_dir)?;
+        unity_asset_viewer.read_bundle_dir(&bundle_dir)?;
+
     }
     if let Some(data_dir) = args.data_dir {
         unity_asset_viewer.read_data_dir(data_dir)?;
@@ -135,7 +138,6 @@ fn main() -> anyhow::Result<()> {
                             if let Some(script) =
                                 script_pptr.get_type_tree_object_in_view(&unity_asset_viewer)?
                             {
-                                // println!("\t{:?}", script.get_string_by_path("/Base/m_ClassName"));
                                 if let Ok(class_name) =
                                     String::try_cast_from(&script, "/Base/m_ClassName")
                                 {
@@ -155,8 +157,38 @@ fn main() -> anyhow::Result<()> {
                 mono_behaviour_calss_types
             );
         }
-        Commands::Extract { filter_path: _ } => {
-            for (_, sf) in &unity_asset_viewer.serialized_file_map {
+        Commands::Extract {
+            filter_path: _,
+            out_dir,
+        } => {
+            let gen_out_path = |container_name: &Option<&String>, name: &Result<String, _>, ext| {
+                let mut out_path_base = PathBuf::from(out_dir);
+                let out_path = if let Some(container_name) = container_name {
+                    if container_name.ends_with(ext) {
+                        out_path_base.join(container_name)
+                    } else {
+                        out_path_base.join(container_name.to_string() + ext)
+                    }
+                } else {
+                    let out_file_name = if let Ok(name) = name {
+                        name.to_owned()
+                    } else {
+                        "data".to_owned()
+                    };
+                    let mut out_path = out_path_base.clone();
+                    let mut f_out_file_name = out_file_name.clone();
+                    let mut i = 0;
+                    while out_path_base.join(f_out_file_name.clone() + ext).exists() {
+                        f_out_file_name = format!("{}.{}", &out_file_name, i);
+                        i += 1;
+                    }
+                    out_path_base.join(f_out_file_name + ext)
+                };
+                create_dir_all(&out_path.parent().unwrap()).unwrap();
+                return out_path;
+            };
+
+            for (serialized_file_id, sf) in &unity_asset_viewer.serialized_file_map {
                 for (path_id, obj_meta) in sf.get_object_map() {
                     let obj = sf
                         .get_tt_object_by_path_id(*path_id)
@@ -176,44 +208,37 @@ fn main() -> anyhow::Result<()> {
                         .unwrap()
                         .unwrap();
 
-                    if let Ok(name) = String::try_cast_from(&obj, "/Base/m_Name") {
-                        println!("name {}", name);
-                        if obj_meta.class == ClassIDType::Texture2D as i32 {
-                            let obj = obj.into();
-                            let tex = Texture2D::new(&obj);
+                    let container_name = unity_asset_viewer
+                        .get_container_name_by_serialized_file_id_and_path_id(
+                            *serialized_file_id,
+                            *path_id,
+                        );
 
-                            let out_tex_path_base = "/tmp/tex/".to_string() + &name;
-                            let mut out_tex_path = out_tex_path_base.clone();
-                            let mut i = 0;
-                            while PathBuf::from(out_tex_path.clone() + ".png").exists() {
-                                out_tex_path = format!("{}.{}", out_tex_path_base, i);
-                                i += 1;
-                            }
-                            tex.get_image(&unity_asset_viewer)
-                                .and_then(|dynimg| Ok(dynimg.flipv().save(out_tex_path + ".png")));
-                        } else if obj_meta.class == ClassIDType::TextAsset as i32 {
-                            if let Ok(script) = String::try_cast_from(&obj, "/Base/m_Script") {
-                                let mut file =
-                                    File::create("/tmp/tex/".to_string() + &name + ".txt").unwrap();
-                                file.write_all(script.as_bytes());
-                            }
-                        } else if obj_meta.class == ClassIDType::AudioClip as i32 {
-                            let obj = obj.into();
-                            let audio = AudioClip::new(&obj);
-                            audio.get_audio_data(&unity_asset_viewer);
-                        } else if obj_meta.class == ClassIDType::Mesh as i32 {
-                            let obj = obj.into();
-                            let mesh = Mesh::new(&obj);
-                            dbg!(mesh.get_sub_mesh_count());
-                        } else if obj_meta.class == ClassIDType::AssetBundle as i32
-                            || obj_meta.class == ClassIDType::Material as i32
-                            || obj_meta.class == ClassIDType::GameObject as i32
-                            || obj_meta.class == ClassIDType::MonoBehaviour as i32
-                        {
-                        } else {
-                            // obj.display_tree();
-                            // panic!()
+                    let name = String::try_cast_from(&obj, "/Base/m_Name");
+
+                    dbg!(&container_name, &name);
+
+                    if obj_meta.class == ClassIDType::Texture2D as i32 {
+                        let obj = obj.into();
+                        let tex = Texture2D::new(&obj);
+
+                        let out_tex_path = gen_out_path(&container_name, &name, ".png");
+
+                        tex.get_image(&unity_asset_viewer)
+                            .map(|dynimg| dynimg.flipv().save(out_tex_path))??;
+                    } else if obj_meta.class == ClassIDType::TextAsset as i32 {
+                        if let Ok(script) = String::try_cast_from(&obj, "/Base/m_Script") {
+                            let mut file =
+                                File::create(gen_out_path(&container_name, &name, ".txt"))?;
+                            file.write_all(script.as_bytes())?;
                         }
+                    } else if obj_meta.class == ClassIDType::AudioClip as i32 {
+                        let obj = obj.into();
+                        let audio = AudioClip::new(&obj);
+                        let audio_data = audio.get_audio_data(&unity_asset_viewer)?;
+                        let mut file =
+                            File::create(gen_out_path(&container_name, &name, ".audio"))?;
+                        file.write_all(&audio_data)?;
                     }
                 }
             }
@@ -232,7 +257,7 @@ fn dump_unity_fs(unity_fs: &UnityFS) {
                 .to_string_lossy()
                 .to_string();
             let mut file = File::create(file_name).unwrap();
-            file.write_all(&*file_buff);
+            file.write_all(&*file_buff).unwrap();
         }
     }
 }
